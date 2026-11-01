@@ -13,6 +13,7 @@ import {
   USERNAME_PATTERN,
 } from "./lib";
 import { PROFILE_THEME_IDS } from "../lib/profileThemes";
+import { DISPLAY_NAME_FONT_IDS } from "../lib/displayName";
 import { joinKyroHq } from "./servers";
 import {
   claimUpload,
@@ -54,17 +55,6 @@ const PROFILE_BADGES = [
   "supporter",
   "donator",
   "partner",
-];
-
-const DISPLAY_NAME_FONTS = [
-  "default",
-  "rounded",
-  "serif",
-  "mono",
-  "handwritten",
-  "condensed",
-  "slab",
-  "pixel",
 ];
 
 const HEX_COLOUR = /^#[0-9a-fA-F]{6}$/;
@@ -201,7 +191,7 @@ export const updateProfile = mutation({
       patch.accent = args.accent || undefined;
     }
     if (args.displayNameFont !== undefined) {
-      if (!DISPLAY_NAME_FONTS.includes(args.displayNameFont)) {
+      if (!DISPLAY_NAME_FONT_IDS.includes(args.displayNameFont)) {
         throw new Error("That display-name font doesn't exist.");
       }
       patch.displayNameFont =

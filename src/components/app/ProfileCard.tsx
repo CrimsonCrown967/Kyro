@@ -146,6 +146,13 @@ export function ProfileCard() {
     <Dialog open onOpenChange={close}>
       <DialogContent
         overlayClassName="data-[state=closed]:duration-0"
+        style={
+          profileTheme
+            ? {
+                background: `linear-gradient(180deg, color-mix(in oklab, ${profileTheme.solid} 48%, var(--background)), color-mix(in oklab, ${profileTheme.solid} 28%, var(--background)))`,
+              }
+            : undefined
+        }
         className={cn(
           "flex max-h-[92vh] w-[calc(100vw-1.5rem)] flex-col gap-0 overflow-hidden rounded-2xl border-border/70 bg-background p-0 sm:max-w-[36rem]",
           // Unmount instantly on close so the next member-sidebar click isn't

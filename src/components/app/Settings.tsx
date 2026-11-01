@@ -2204,7 +2204,16 @@ function ProfilePreviewPane({
         Preview
       </p>
 
-      <div className="overflow-hidden rounded-xl bg-zinc-950/95 text-zinc-100 shadow-lg ring-1 ring-white/10">
+      <div
+        className="overflow-hidden rounded-xl bg-zinc-950/95 text-zinc-100 shadow-lg ring-1 ring-white/10"
+        style={
+          themeEntry
+            ? {
+                background: `linear-gradient(180deg, color-mix(in oklab, ${themeEntry.solid} 72%, #111827), color-mix(in oklab, ${themeEntry.solid} 48%, #09090b))`,
+              }
+            : undefined
+        }
+      >
         {/* Banner: current picture, else the chosen colour theme. */}
         <div
           className={cn(

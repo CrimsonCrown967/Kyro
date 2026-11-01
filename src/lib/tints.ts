@@ -2,7 +2,7 @@
  * App-wide colour tints for Settings → Appearance → Colour themes.
  *
  * Each tint washes the whole interface: it recolours the primary/brand
- * tokens and lays a faint gradient over the background. `a`/`b` are the
+ * tokens and recolours the app's backgrounds and panels. `a`/`b` are the
  * gradient stops, `solid` is the representative colour used where a single
  * colour is needed (buttons, links, focus rings). Class-free — values are
  * applied as CSS custom properties from src/lib/store.ts.
@@ -35,6 +35,26 @@ export const APP_TINTS: AppTint[] = [
   { id: "azure", a: "#22d3ee", b: "#3b82f6", solid: "#0284c7" },
   { id: "orchid", a: "#e879f9", b: "#d946ef", solid: "#c026d3" },
   { id: "royal", a: "#3b82f6", b: "#1d4ed8", solid: "#2563eb" },
+  { id: "ruby", a: "#fb7185", b: "#9f1239", solid: "#e11d48" },
+  { id: "magenta", a: "#f0abfc", b: "#a21caf", solid: "#d946ef" },
+  { id: "peach", a: "#fed7aa", b: "#fb7185", solid: "#fb923c" },
+  { id: "mocha", a: "#d6b59c", b: "#7c4a35", solid: "#92400e" },
+  { id: "copper", a: "#fdba74", b: "#9a3412", solid: "#c2410c" },
+  { id: "slate", a: "#cbd5e1", b: "#475569", solid: "#64748b" },
+  { id: "ice", a: "#cffafe", b: "#38bdf8", solid: "#0ea5e9" },
+  { id: "aqua", a: "#67e8f9", b: "#06b6d4", solid: "#0891b2" },
+  { id: "indigo", a: "#a5b4fc", b: "#4338ca", solid: "#4f46e5" },
+  { id: "plum", a: "#d8b4fe", b: "#7e22ce", solid: "#9333ea" },
+  { id: "moss", a: "#bef264", b: "#3f6212", solid: "#65a30d" },
+  { id: "lime", a: "#d9f99d", b: "#22c55e", solid: "#84cc16" },
+  { id: "sand", a: "#fde68a", b: "#b45309", solid: "#d97706" },
+  { id: "berry", a: "#f9a8d4", b: "#7e22ce", solid: "#c026d3" },
+  { id: "volcano", a: "#fbbf24", b: "#991b1b", solid: "#dc2626" },
+  { id: "galaxy", a: "#818cf8", b: "#db2777", solid: "#7c3aed" },
+  { id: "seaglass", a: "#99f6e4", b: "#0e7490", solid: "#0d9488" },
+  { id: "blossom", a: "#fecdd3", b: "#e879f9", solid: "#ec4899" },
+  { id: "graphite", a: "#94a3b8", b: "#1e293b", solid: "#475569" },
+  { id: "electric", a: "#22d3ee", b: "#8b5cf6", solid: "#6366f1" },
 ];
 
 /** Looks up a tint by id; unknown ids mean "no tint". */

@@ -58,9 +58,82 @@ export const DISPLAY_NAME_FONTS = [
     weight: 800,
     tracking: "0.08em",
   },
+  {
+    id: "modern",
+    label: "Modern",
+    family: 'Inter, "Segoe UI", Helvetica, Arial, sans-serif',
+    weight: 600,
+    tracking: "-0.035em",
+  },
+  {
+    id: "typewriter",
+    label: "Typewriter",
+    family: '"Courier New", Courier, monospace',
+    weight: 700,
+    tracking: "0.025em",
+  },
+  {
+    id: "comic",
+    label: "Comic",
+    family: '"Comic Sans MS", "Comic Sans", cursive',
+    weight: 700,
+    tracking: "0",
+  },
+  {
+    id: "gothic",
+    label: "Gothic",
+    family: 'Copperplate, "Copperplate Gothic Light", fantasy',
+    weight: 800,
+    tracking: "0.055em",
+  },
+  {
+    id: "elegant",
+    label: "Elegant",
+    family: 'Didot, "Bodoni MT", Palatino, serif',
+    weight: 700,
+    tracking: "0.015em",
+  },
+  {
+    id: "tech",
+    label: "Tech",
+    family: 'Eurostile, "Bank Gothic", "Trebuchet MS", sans-serif',
+    weight: 800,
+    tracking: "0.075em",
+  },
+  {
+    id: "bubble",
+    label: "Bubble",
+    family: '"Cooper Black", "Arial Rounded MT Bold", fantasy',
+    weight: 800,
+    tracking: "0.01em",
+  },
+  {
+    id: "narrow",
+    label: "Narrow",
+    family: '"Arial Narrow", "Roboto Condensed", Arial, sans-serif',
+    weight: 800,
+    tracking: "0.02em",
+  },
+  {
+    id: "terminal",
+    label: "Terminal",
+    family: '"Lucida Console", "Courier New", monospace',
+    weight: 500,
+    tracking: "-0.04em",
+  },
+  {
+    id: "storybook",
+    label: "Storybook",
+    family: 'Garamond, "Book Antiqua", Georgia, serif',
+    weight: 700,
+    tracking: "0.025em",
+  },
 ] as const;
 
 export type DisplayNameFont = (typeof DISPLAY_NAME_FONTS)[number]["id"];
+export const DISPLAY_NAME_FONT_IDS: string[] = DISPLAY_NAME_FONTS.map(
+  (font) => font.id,
+);
 export type DisplayNameColorMode = "none" | "solid" | "gradient";
 
 export const DISPLAY_NAME_COLOUR_PRESETS = [
@@ -72,6 +145,14 @@ export const DISPLAY_NAME_COLOUR_PRESETS = [
   ["#d946ef", "#7c3aed"],
   ["#2dd4bf", "#22c55e"],
   ["#f59e0b", "#fde047"],
+  ["#ef4444", "#7f1d1d"],
+  ["#f472b6", "#ec4899"],
+  ["#a78bfa", "#4f46e5"],
+  ["#67e8f9", "#14b8a6"],
+  ["#bef264", "#16a34a"],
+  ["#fda4af", "#fb923c"],
+  ["#94a3b8", "#475569"],
+  ["#38bdf8", "#d946ef"],
 ] as const;
 
 export interface DisplayNameStyledUser {
