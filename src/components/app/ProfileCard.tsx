@@ -155,7 +155,10 @@ export function ProfileCard() {
             : undefined
         }
         className={cn(
-          "relative isolate flex max-h-[92vh] w-[calc(100vw-1.5rem)] flex-col gap-0 overflow-hidden rounded-2xl border-border/70 bg-background p-0 sm:max-w-[36rem]",
+          // DialogContent is already `fixed`; adding `relative` here would
+          // override that Tailwind position class and push the profile toward
+          // the bottom of the portal instead of centering it.
+          "isolate flex max-h-[92vh] w-[calc(100vw-1.5rem)] flex-col gap-0 overflow-hidden rounded-2xl border-border/70 bg-background p-0 sm:max-w-[36rem]",
           // Unmount instantly on close so the next member-sidebar click isn't
           // swallowed by the fading backdrop.
           "data-[state=closed]:duration-0",
