@@ -12,6 +12,30 @@ export async function deleteMessageData(
     .withIndex("by_message", (q) => q.eq("messageId", message._id))
     .collect();
   for (const reaction of reactions) await ctx.db.delete(reaction._id);
+  const thread = await ctx.db
+    .query("threads")
+    .withIndex("by_parent", (q) => q.eq("parentMessageId", message._id))
+    .unique();
+  if (thread) {
+    const replies = await ctx.db
+      .query("threadMessages")
+      .withIndex("by_thread", (q) => q.eq("threadId", thread._id))
+      .collect();
+    for (const reply of replies) await ctx.db.delete(reply._id);
+    await ctx.db.delete(thread._id);
+  }
+  const poll = await ctx.db
+    .query("polls")
+    .withIndex("by_message", (q) => q.eq("messageId", message._id))
+    .unique();
+  if (poll) {
+    const votes = await ctx.db
+      .query("pollVotes")
+      .withIndex("by_poll", (q) => q.eq("pollId", poll._id))
+      .collect();
+    for (const vote of votes) await ctx.db.delete(vote._id);
+    await ctx.db.delete(poll._id);
+  }
   for (const attachment of message.attachments ?? []) {
     await deleteClaimedUpload(
       ctx,
@@ -75,6 +99,23 @@ export async function deleteChannelData(
     .withIndex("by_container", (q) => q.eq("containerId", channel._id))
     .collect();
   for (const message of messages) await deleteMessageData(ctx, message);
+  const forumPosts = await ctx.db
+    .query("forumPosts")
+    .withIndex("by_channel", (q) => q.eq("channelId", channel._id))
+    .collect();
+  for (const post of forumPosts) {
+    const comments = await ctx.db
+      .query("forumComments")
+      .withIndex("by_post", (q) => q.eq("postId", post._id))
+      .collect();
+    for (const comment of comments) await ctx.db.delete(comment._id);
+    await ctx.db.delete(post._id);
+  }
+  const notificationSettings = await ctx.db
+    .query("channelNotificationSettings")
+    .withIndex("by_channel_level", (q) => q.eq("channelId", channel._id))
+    .collect();
+  for (const setting of notificationSettings) await ctx.db.delete(setting._id);
   await deleteContainerMetadata(ctx, "channel", channel._id);
   await ctx.db.delete(channel._id);
 }

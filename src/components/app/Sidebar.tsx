@@ -99,7 +99,13 @@ function ServerSection({ serverId }: { serverId: string }) {
   const [createOpen, setCreateOpen] = useState(false);
   const [nicknameOpen, setNicknameOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-  const activeChannel = useMatch("/dashboard/s/:serverId/c/:channelId");
+  const activeTextChannel = useMatch("/dashboard/s/:serverId/c/:channelId");
+  const activeVoiceChannel = useMatch("/dashboard/s/:serverId/v/:channelId");
+  const activeForumChannel = useMatch("/dashboard/s/:serverId/f/:channelId");
+  const activeChannelId =
+    activeTextChannel?.params.channelId ??
+    activeVoiceChannel?.params.channelId ??
+    activeForumChannel?.params.channelId;
 
   const permissions = listing?.permissions ?? [];
   const canManageChannels = permissions.includes(PERMISSIONS.MANAGE_CHANNELS);
@@ -349,12 +355,13 @@ function ServerSection({ serverId }: { serverId: string }) {
 
             {!collapsed[group.id] &&
               group.channels.map((channel) => {
-                const active = activeChannel?.params.channelId === channel.id;
+                const active = activeChannelId === channel.id;
                 const isVoice = channel.kind === "voice";
+                const isForum = channel.kind === "forum";
                 return (
                   <Link
                     key={channel.id}
-                    to={`/dashboard/s/${serverId}/${isVoice ? "v" : "c"}/${channel.id}`}
+                    to={`/dashboard/s/${serverId}/${isVoice ? "v" : isForum ? "f" : "c"}/${channel.id}`}
                     title={channel.topic ?? channel.name}
                     className={cn(
                       "mb-1 flex items-center gap-2 rounded-lg border-l-2 px-2.5 py-2 text-sm transition-colors",
@@ -365,6 +372,8 @@ function ServerSection({ serverId }: { serverId: string }) {
                   >
                     {isVoice ? (
                       <Volume2 className="size-4 shrink-0 opacity-70" />
+                    ) : isForum ? (
+                      <MessagesSquare className="size-4 shrink-0 opacity-70" />
                     ) : channel.isRules ? (
                       <BookOpen className="size-4 shrink-0 opacity-70" />
                     ) : (

@@ -284,7 +284,9 @@ const schema = defineSchema(
       /** Read-only channel: only members with manage_messages may post. */
       readOnly: v.optional(v.boolean()),
       /** `text` (default) or `voice` — voice channels host live audio rooms. */
-      kind: v.optional(v.union(v.literal("text"), v.literal("voice"))),
+      kind: v.optional(
+        v.union(v.literal("text"), v.literal("voice"), v.literal("forum")),
+      ),
       /** Per-role permission overrides scoped to this channel. */
       permissionOverwrites: v.optional(
         v.array(
@@ -350,6 +352,83 @@ const schema = defineSchema(
         searchField: "content",
         filterFields: ["containerType"],
       }),
+
+    /** A focused conversation branching from one channel or DM message. */
+    threads: defineTable({
+      parentMessageId: v.id("messages"),
+      sourceType: v.union(v.literal("channel"), v.literal("conversation")),
+      sourceId: v.string(),
+      title: v.string(),
+      createdById: v.id("users"),
+      createdAt: v.number(),
+      lastMessageAt: v.number(),
+      replyCount: v.number(),
+      locked: v.optional(v.boolean()),
+    })
+      .index("by_parent", ["parentMessageId"])
+      .index("by_source", ["sourceId", "lastMessageAt"]),
+
+    threadMessages: defineTable({
+      threadId: v.id("threads"),
+      authorId: v.id("users"),
+      content: v.string(),
+      createdAt: v.number(),
+      editedAt: v.optional(v.number()),
+    })
+      .index("by_thread", ["threadId", "createdAt"])
+      .index("by_author", ["authorId"]),
+
+    /** Long-form tagged posts inside a forum channel. */
+    forumPosts: defineTable({
+      channelId: v.id("channels"),
+      serverId: v.id("servers"),
+      authorId: v.id("users"),
+      title: v.string(),
+      content: v.string(),
+      tags: v.array(v.string()),
+      createdAt: v.number(),
+      updatedAt: v.number(),
+      lastCommentAt: v.number(),
+      commentCount: v.number(),
+      locked: v.optional(v.boolean()),
+      pinned: v.optional(v.boolean()),
+    })
+      .index("by_channel", ["channelId", "lastCommentAt"])
+      .index("by_author", ["authorId"])
+      .searchIndex("search_forum_posts", {
+        searchField: "title",
+        filterFields: ["channelId"],
+      }),
+
+    forumComments: defineTable({
+      postId: v.id("forumPosts"),
+      authorId: v.id("users"),
+      content: v.string(),
+      createdAt: v.number(),
+      editedAt: v.optional(v.number()),
+    })
+      .index("by_post", ["postId", "createdAt"])
+      .index("by_author", ["authorId"]),
+
+    polls: defineTable({
+      messageId: v.id("messages"),
+      createdById: v.id("users"),
+      question: v.string(),
+      options: v.array(v.object({ id: v.string(), text: v.string() })),
+      multiple: v.boolean(),
+      createdAt: v.number(),
+      closesAt: v.optional(v.number()),
+      closedAt: v.optional(v.number()),
+    }).index("by_message", ["messageId"]),
+
+    pollVotes: defineTable({
+      pollId: v.id("polls"),
+      userId: v.id("users"),
+      optionIds: v.array(v.string()),
+      updatedAt: v.number(),
+    })
+      .index("by_poll", ["pollId"])
+      .index("by_poll_user", ["pollId", "userId"]),
 
     /**
      * Ownership and lifecycle metadata for every object-storage upload.
@@ -605,6 +684,19 @@ const schema = defineSchema(
     })
       .index("by_to_container", ["toId", "containerKey"])
       .index("by_container", ["containerKey"]),
+
+    channelNotificationSettings: defineTable({
+      userId: v.id("users"),
+      channelId: v.id("channels"),
+      level: v.union(
+        v.literal("all"),
+        v.literal("mentions"),
+        v.literal("none"),
+      ),
+      updatedAt: v.number(),
+    })
+      .index("by_user_channel", ["userId", "channelId"])
+      .index("by_channel_level", ["channelId", "level"]),
 
     /** DM voice calls — powers missed-call badges in the conversation list. */
     calls: defineTable({

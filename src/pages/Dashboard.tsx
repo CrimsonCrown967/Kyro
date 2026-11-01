@@ -9,6 +9,7 @@ import { AppShell } from "@/components/app/AppShell";
 import { ChannelChat, DirectChat } from "@/components/app/ChatView";
 import { DiscoverView } from "@/components/app/DiscoverView";
 import { FriendsView } from "@/components/app/Friends";
+import { ForumChannelPage } from "@/components/app/ForumChannelPage";
 import { MembershipGate } from "@/components/app/MembershipGate";
 import { ServerSettings } from "@/components/app/ServerSettings";
 import { ServerThemeScope } from "@/components/app/ServerThemeScope";
@@ -27,20 +28,30 @@ export default function Dashboard() {
     <RouteErrorBoundary>
       <AppShell>
         <Routes>
-        <Route index element={<FriendsView />} />
-        <Route path="discover" element={<DiscoverView />} />
-        {/* Staff console — admins and moderators sign in with their Kyro
+          <Route index element={<FriendsView />} />
+          <Route path="discover" element={<DiscoverView />} />
+          {/* Staff console — admins and moderators sign in with their Kyro
             account; the page itself gates access server-side. */}
-        <Route path="admin" element={<AdminPortal />} />
-        <Route path="dm" element={<Navigate to="/dashboard" replace />} />
-        <Route path="dm/:conversationId" element={<DirectChatRoute />} />
-        <Route path="s/:serverId" element={<ServerIndexRoute />} />
-        <Route path="s/:serverId/c/:channelId" element={<ChannelRoute />} />
-        <Route path="s/:serverId/v/:channelId" element={<VoiceChannelRoute />} />
-        <Route path="s/:serverId/settings/*" element={<ServerSettingsRoute />} />
-        {/* Wildcard must be last: any unknown slug within the dashboard falls back
+          <Route path="admin" element={<AdminPortal />} />
+          <Route path="dm" element={<Navigate to="/dashboard" replace />} />
+          <Route path="dm/:conversationId" element={<DirectChatRoute />} />
+          <Route path="s/:serverId" element={<ServerIndexRoute />} />
+          <Route path="s/:serverId/c/:channelId" element={<ChannelRoute />} />
+          <Route
+            path="s/:serverId/v/:channelId"
+            element={<VoiceChannelRoute />}
+          />
+          <Route
+            path="s/:serverId/f/:channelId"
+            element={<ForumChannelRoute />}
+          />
+          <Route
+            path="s/:serverId/settings/*"
+            element={<ServerSettingsRoute />}
+          />
+          {/* Wildcard must be last: any unknown slug within the dashboard falls back
             to the current community instead of a hard 404. */}
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </AppShell>
     </RouteErrorBoundary>
@@ -128,6 +139,18 @@ function VoiceChannelRoute() {
   );
 }
 
+function ForumChannelRoute() {
+  const { serverId, channelId } = useParams();
+  if (!serverId || !channelId) return <Navigate to="/dashboard" replace />;
+  return (
+    <MembershipGate serverId={serverId}>
+      <ServerThemeScope serverId={serverId as Id<"servers">}>
+        <ForumChannelPage serverId={serverId} channelId={channelId} />
+      </ServerThemeScope>
+    </MembershipGate>
+  );
+}
+
 function ServerSettingsRoute() {
   const { serverId } = useParams();
   if (!serverId) return <Navigate to="/dashboard" replace />;
@@ -174,11 +197,14 @@ function ServerIndexContent() {
   const firstText = channels.channels.find(
     (channel) => channel.kind === "text",
   );
-  const first = firstText ?? channels.channels[0];
+  const firstForum = channels.channels.find(
+    (channel) => channel.kind === "forum",
+  );
+  const first = firstText ?? firstForum ?? channels.channels[0];
   if (first)
     return (
       <Navigate
-        to={`/dashboard/s/${serverId}/${first.kind === "voice" ? "v" : "c"}/${first.id}`}
+        to={`/dashboard/s/${serverId}/${first.kind === "voice" ? "v" : first.kind === "forum" ? "f" : "c"}/${first.id}`}
         replace
       />
     );

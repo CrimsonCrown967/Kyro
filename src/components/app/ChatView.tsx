@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from "convex/react";
-import { Hash, Loader2, MessagesSquare } from "@/components/icons";
+import { Bell, Check, Hash, Loader2, MessagesSquare } from "@/components/icons";
 import { useEffect, useState, type ReactNode } from "react";
 import { Navigate, useSearchParams } from "react-router";
 import { api } from "@/convex/_generated/api";
@@ -16,6 +16,13 @@ import { DmCallHeader, VoiceRoom } from "@/components/app/Voice";
 import { UserAvatar } from "@/components/app/UserAvatar";
 import { WorkspaceActions } from "@/components/app/WorkspaceActions";
 import { StyledDisplayName } from "@/components/app/StyledDisplayName";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { toast } from "sonner";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import { useUiStore } from "@/lib/store";
 
@@ -148,6 +155,9 @@ function ChatSurface({
         {containerType === "conversation" && (
           <DmCallHeader conversationId={containerId} />
         )}
+        {containerType === "channel" && (
+          <ChannelNotificationControl channelId={containerId} />
+        )}
         <WorkspaceActions showMemberToggle={containerType === "channel"} />
         {headerAction}
       </div>
@@ -215,6 +225,57 @@ function ChatSurface({
 
       {/* Keeps the report dialog mounted only while the surface is shown. */}
     </div>
+  );
+}
+
+function ChannelNotificationControl({ channelId }: { channelId: string }) {
+  const level = useQuery(api.notifications.channelPreference, {
+    channelId: channelId as Id<"channels">,
+  });
+  const setLevel = useMutation(api.notifications.setChannelPreference);
+  const options = [
+    { id: "all", label: "Every message" },
+    { id: "mentions", label: "Mentions only" },
+    { id: "none", label: "Nothing" },
+  ] as const;
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          aria-label="Channel notifications"
+          title="Channel notifications"
+          className="rounded-lg p-2 text-muted-foreground hover:bg-surface hover:text-foreground"
+        >
+          <Bell className="size-5" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-52">
+        {options.map((option) => (
+          <DropdownMenuItem
+            key={option.id}
+            onClick={() =>
+              void setLevel({
+                channelId: channelId as Id<"channels">,
+                level: option.id,
+              })
+                .then(() => toast.success("Notification preference saved."))
+                .catch((error: unknown) =>
+                  toast.error(
+                    error instanceof Error
+                      ? error.message
+                      : "Could not save notifications.",
+                  ),
+                )
+            }
+          >
+            <span className="flex-1">{option.label}</span>
+            {level === option.id && <Check className="size-4 text-primary" />}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

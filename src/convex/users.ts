@@ -5,6 +5,7 @@ import { mutation, query } from "./_generated/server";
 import {
   hydrateUser,
   hydrateUsers,
+  getUserByUsername,
   isFounderUser,
   isReservedUsername,
   normalizeUsername,
@@ -645,8 +646,22 @@ export const searchMessages = query({
   args: { term: v.string(), limit: v.optional(v.number()) },
   handler: async (ctx, { term, limit }) => {
     const { id: viewerId } = await requireUser(ctx);
-    const needle = term.trim();
-    if (needle.length < 2) return [];
+    const filters = new Map<string, string>();
+    const needle = term
+      .trim()
+      .replace(
+        /\b(from|in|before|after|has|pinned|mentions):("[^"]+"|\S+)/gi,
+        (_match, key: string, rawValue: string) => {
+          filters.set(
+            key.toLowerCase(),
+            rawValue.replace(/^"|"$/g, "").toLowerCase(),
+          );
+          return " ";
+        },
+      )
+      .replace(/\s+/g, " ")
+      .trim();
+    if (needle.length < 2 && filters.size === 0) return [];
 
     const [memberships, conversations] = await Promise.all([
       ctx.db
@@ -669,12 +684,78 @@ export const searchMessages = query({
     const conversationIds = new Set(conversations.map((c) => c.conversationId));
     conversationIds.forEach((id) => channelIds.add(id));
 
-    const hits = await ctx.db
-      .query("messages")
-      .withSearchIndex("search_content", (q) => q.search("content", needle))
-      .take(150);
+    const hits =
+      needle.length >= 2
+        ? await ctx.db
+            .query("messages")
+            .withSearchIndex("search_content", (q) =>
+              q.search("content", needle),
+            )
+            .take(250)
+        : (
+            await Promise.all(
+              Array.from(channelIds)
+                .slice(0, 75)
+                .map((containerId) =>
+                  ctx.db
+                    .query("messages")
+                    .withIndex("by_container", (q) =>
+                      q.eq("containerId", containerId),
+                    )
+                    .order("desc")
+                    .take(20),
+                ),
+            )
+          )
+            .flat()
+            .sort((a, b) => b.createdAt - a.createdAt);
 
-    const allowed = hits.filter((m) => channelIds.has(m.containerId));
+    const fromName = filters.get("from")?.replace(/^@/, "");
+    const fromUser = fromName ? await getUserByUsername(ctx, fromName) : null;
+    const inName = filters.get("in")?.replace(/^#/, "");
+    const before = filters.get("before")
+      ? Date.parse(filters.get("before")!)
+      : Number.NaN;
+    const after = filters.get("after")
+      ? Date.parse(filters.get("after")!)
+      : Number.NaN;
+    const has = filters.get("has");
+    const pinned = filters.get("pinned");
+    const mentions = filters.get("mentions");
+    const allowed = [];
+    for (const message of hits) {
+      if (!channelIds.has(message.containerId)) continue;
+      if (fromName && message.authorId !== fromUser?._id) continue;
+      if (!Number.isNaN(before) && message.createdAt >= before) continue;
+      if (!Number.isNaN(after) && message.createdAt < after) continue;
+      if (pinned === "true" && message.pinnedAt === undefined) continue;
+      if (pinned === "false" && message.pinnedAt !== undefined) continue;
+      if (has === "link" && !/https?:\/\//i.test(message.content)) continue;
+      if (
+        (has === "image" || has === "attachment") &&
+        !(message.attachments ?? []).some((attachment) =>
+          has === "image" ? attachment.mimeType.startsWith("image/") : true,
+        )
+      ) {
+        continue;
+      }
+      if (mentions === "me") {
+        const viewer = await ctx.db.get(viewerId);
+        if (
+          !viewer?.username ||
+          !message.content
+            .toLowerCase()
+            .includes(`@${viewer.username.toLowerCase()}`)
+        ) {
+          continue;
+        }
+      }
+      if (inName && message.containerType === "channel") {
+        const channel = await ctx.db.get(message.containerId as Id<"channels">);
+        if (!channel || channel.name.toLowerCase() !== inName) continue;
+      }
+      allowed.push(message);
+    }
     const scoped = allowed.slice(0, Math.min(limit ?? 25, 50));
 
     const authors = await hydrateUsers(

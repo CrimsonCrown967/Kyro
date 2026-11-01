@@ -463,6 +463,15 @@ export const Crop = (props: IconProps) => (
   </Icon>
 );
 
+export const BarChart3 = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M4 20V10" />
+    <path d="M10 20V4" />
+    <path d="M16 20v-7" />
+    <path d="M22 20H2" />
+  </Icon>
+);
+
 export const Lock = (props: IconProps) => (
   <Icon {...props}>
     <rect x="4.5" y="10" width="15" height="10" rx="3.5" />

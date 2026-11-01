@@ -70,9 +70,16 @@ export function AppShell({ children }: { children: ReactNode }) {
   } = useUiStore();
 
   const channelMatch = useMatch("/dashboard/s/:serverId/c/:channelId");
+  const voiceMatch = useMatch("/dashboard/s/:serverId/v/:channelId");
+  const forumMatch = useMatch("/dashboard/s/:serverId/f/:channelId");
+  const serverSettingsMatch = useMatch("/dashboard/s/:serverId/settings/*");
   const serverMatch = useMatch("/dashboard/s/:serverId");
   const activeServerId =
-    channelMatch?.params.serverId ?? serverMatch?.params.serverId;
+    channelMatch?.params.serverId ??
+    voiceMatch?.params.serverId ??
+    forumMatch?.params.serverId ??
+    serverSettingsMatch?.params.serverId ??
+    serverMatch?.params.serverId;
   const settingsOpen = searchParams.get("settings") !== null;
 
   // Presence heartbeat: keeps this account visible as online for others.

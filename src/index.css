@@ -369,6 +369,9 @@ html[data-tint] {
   .message-row {
     animation: kyro-message-in 220ms ease-out both;
   }
+  .thread-reply-enter {
+    animation: kyro-message-in 180ms ease-out both;
+  }
   .user-preview-enter {
     animation: kyro-preview-in 240ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
   }

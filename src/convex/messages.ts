@@ -101,6 +101,20 @@ function containerLink(
     : `/dashboard/dm/${containerId}`;
 }
 
+async function channelNotificationLevel(
+  ctx: Ctx,
+  userId: Id<"users">,
+  channelId: Id<"channels">,
+): Promise<"all" | "mentions" | "none"> {
+  const setting = await ctx.db
+    .query("channelNotificationSettings")
+    .withIndex("by_user_channel", (q) =>
+      q.eq("userId", userId).eq("channelId", channelId),
+    )
+    .unique();
+  return setting?.level ?? "mentions";
+}
+
 /**
  * Custom emojis travel as stable `<:name:id>` tokens. Only members of the
  * emoji's source community may send or react with it, even in another server
@@ -271,6 +285,21 @@ export const list = query({
         const reply = message.replyToId
           ? (replyMap.get(message.replyToId) ?? null)
           : null;
+        const thread = await ctx.db
+          .query("threads")
+          .withIndex("by_parent", (q) => q.eq("parentMessageId", message._id))
+          .unique();
+        const poll = await ctx.db
+          .query("polls")
+          .withIndex("by_message", (q) => q.eq("messageId", message._id))
+          .unique();
+        const pollVotes = poll
+          ? await ctx.db
+              .query("pollVotes")
+              .withIndex("by_poll", (q) => q.eq("pollId", poll._id))
+              .collect()
+          : [];
+        const myPollVote = pollVotes.find((vote) => vote.userId === viewerId);
         return {
           id: message._id,
           content: message.content,
@@ -298,6 +327,34 @@ export const list = query({
                 id: reply._id,
                 excerpt: reply.content.slice(0, 160),
                 author: replyAuthors.get(reply.authorId) ?? null,
+              }
+            : null,
+          thread: thread
+            ? {
+                id: thread._id as string,
+                replyCount: thread.replyCount,
+                lastMessageAt: thread.lastMessageAt,
+                locked: thread.locked === true,
+              }
+            : null,
+          poll: poll
+            ? {
+                id: poll._id as string,
+                question: poll.question,
+                multiple: poll.multiple,
+                closed:
+                  poll.closedAt !== undefined ||
+                  (poll.closesAt !== undefined && poll.closesAt <= Date.now()),
+                closesAt: poll.closesAt ?? null,
+                canClose: poll.createdById === viewerId,
+                selectedOptionIds: myPollVote?.optionIds ?? [],
+                totalVotes: pollVotes.length,
+                options: poll.options.map((option) => ({
+                  ...option,
+                  votes: pollVotes.filter((vote) =>
+                    vote.optionIds.includes(option.id),
+                  ).length,
+                })),
               }
             : null,
           customEmojis: customEmojiIds(message.content)
@@ -613,6 +670,15 @@ export const send = mutation({
           ) {
             continue;
           }
+          if (
+            (await channelNotificationLevel(
+              ctx,
+              membership.userId,
+              args.containerId as Id<"channels">,
+            )) === "none"
+          ) {
+            continue;
+          }
           const target = await ctx.db.get(membership.userId);
           if (!target || target.deletedAt !== undefined) continue;
           if (
@@ -651,11 +717,51 @@ export const send = mutation({
           .unique();
         if (!membership) continue;
         if (membership.muted) continue;
+        if (
+          (await channelNotificationLevel(
+            ctx,
+            target._id,
+            args.containerId as Id<"channels">,
+          )) === "none"
+        ) {
+          continue;
+        }
         notified.add(target._id);
         await notify(ctx, {
           userId: target._id,
           type: "mention",
           title: `${user.name ?? user.username} mentioned you`,
+          body: content.slice(0, 160),
+          actorId: userId,
+          link,
+          containerKey: args.containerId,
+        });
+      }
+
+      // Members who explicitly subscribed to every message receive a normal
+      // channel notification unless a mention above already notified them.
+      const everyMessageSettings = await ctx.db
+        .query("channelNotificationSettings")
+        .withIndex("by_channel_level", (q) =>
+          q
+            .eq("channelId", args.containerId as Id<"channels">)
+            .eq("level", "all"),
+        )
+        .take(500);
+      for (const setting of everyMessageSettings) {
+        if (setting.userId === userId || notified.has(setting.userId)) continue;
+        const membership = await ctx.db
+          .query("serverMembers")
+          .withIndex("by_server_user", (q) =>
+            q.eq("serverId", serverId!).eq("userId", setting.userId),
+          )
+          .unique();
+        if (!membership || membership.muted) continue;
+        notified.add(setting.userId);
+        await notify(ctx, {
+          userId: setting.userId,
+          type: "system",
+          title: `${user.name ?? user.username} posted in a followed channel`,
           body: content.slice(0, 160),
           actorId: userId,
           link,
@@ -694,7 +800,15 @@ export const send = mutation({
           (target !== null &&
             dmConversation !== null &&
             dmConversation.participantIds.includes(replyTarget.authorId));
-        if (allowed && !mutedServer) {
+        const targetChannelLevel =
+          access.kind === "channel" && target
+            ? await channelNotificationLevel(
+                ctx,
+                target._id,
+                args.containerId as Id<"channels">,
+              )
+            : "mentions";
+        if (allowed && !mutedServer && targetChannelLevel !== "none") {
           await notify(ctx, {
             userId: replyTarget.authorId,
             type: "reply",

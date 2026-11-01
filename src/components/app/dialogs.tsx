@@ -6,6 +6,7 @@ import {
   Hash,
   Link2,
   Loader2,
+  MessagesSquare,
   Plus,
   ShieldAlert,
   Volume2,
@@ -63,7 +64,9 @@ export function CreateCommunityDialog({
       navigate(`/dashboard/s/${serverId}`);
       toast.success("Community created");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not create the community.");
+      setError(
+        err instanceof Error ? err.message : "Could not create the community.",
+      );
     } finally {
       setBusy(false);
     }
@@ -75,7 +78,8 @@ export function CreateCommunityDialog({
         <DialogHeader>
           <DialogTitle>Create a community</DialogTitle>
           <DialogDescription>
-            Communities are free forever — every feature is available to everyone.
+            Communities are free forever — every feature is available to
+            everyone.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="grid gap-4">
@@ -183,7 +187,9 @@ export function InviteDialog({
         toast.success("Invite created — use the code below");
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not create an invite.");
+      toast.error(
+        error instanceof Error ? error.message : "Could not create an invite.",
+      );
     } finally {
       setBusy(false);
     }
@@ -215,7 +221,9 @@ export function InviteDialog({
             <select
               id="invite-expiry"
               value={expiresInHours}
-              onChange={(event) => setExpiresInHours(Number(event.target.value))}
+              onChange={(event) =>
+                setExpiresInHours(Number(event.target.value))
+              }
               className="h-9 rounded-md border border-input bg-background px-2 text-sm"
             >
               <option value={0}>Never</option>
@@ -239,7 +247,11 @@ export function InviteDialog({
             </select>
           </div>
           <Button onClick={create} disabled={busy} className="ml-auto">
-            {busy ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Plus className="mr-2 size-4" />}
+            {busy ? (
+              <Loader2 className="mr-2 size-4 animate-spin" />
+            ) : (
+              <Plus className="mr-2 size-4" />
+            )}
             Generate link
           </Button>
         </div>
@@ -267,7 +279,9 @@ export function InviteDialog({
                   >
                     <Link2 className="size-4 shrink-0 text-cyan" />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-mono text-xs">{invite.code}</p>
+                      <p className="truncate font-mono text-xs">
+                        {invite.code}
+                      </p>
                       <p className="text-[11px] text-muted-foreground">
                         {invite.uses} use{invite.uses === 1 ? "" : "s"}
                         {invite.maxUses ? ` of ${invite.maxUses}` : ""}
@@ -289,7 +303,9 @@ export function InviteDialog({
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => revoke({ inviteId: invite.id as Id<"invites"> })}
+                      onClick={() =>
+                        revoke({ inviteId: invite.id as Id<"invites"> })
+                      }
                       aria-label="Revoke invite"
                     >
                       <X className="size-4 text-destructive" />
@@ -321,7 +337,7 @@ export function CreateChannelDialog({
   const [name, setName] = useState("");
   const [topic, setTopic] = useState("");
   const [categoryId, setCategoryId] = useState<string>("");
-  const [kind, setKind] = useState<"text" | "voice">("text");
+  const [kind, setKind] = useState<"text" | "voice" | "forum">("text");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -344,10 +360,14 @@ export function CreateChannelDialog({
       navigate(
         kind === "voice"
           ? `/dashboard/s/${serverId}/v/${channelId}`
-          : `/dashboard/s/${serverId}/c/${channelId}`,
+          : kind === "forum"
+            ? `/dashboard/s/${serverId}/f/${channelId}`
+            : `/dashboard/s/${serverId}/c/${channelId}`,
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not create the channel.");
+      setError(
+        err instanceof Error ? err.message : "Could not create the channel.",
+      );
     } finally {
       setBusy(false);
     }
@@ -359,18 +379,19 @@ export function CreateChannelDialog({
         <DialogHeader>
           <DialogTitle>Create channel</DialogTitle>
           <DialogDescription>
-            Text channels are for talking in writing; voice channels host live
-            audio everyone can drop into.
+            Create text chat, live voice, or a tagged forum for longer
+            discussions.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="grid gap-4">
           <div className="grid gap-2">
             <Label>Channel type</Label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               {(
                 [
                   { value: "text", label: "Text", icon: Hash },
                   { value: "voice", label: "Voice", icon: Volume2 },
+                  { value: "forum", label: "Forum", icon: MessagesSquare },
                 ] as const
               ).map((option) => (
                 <button
@@ -394,6 +415,8 @@ export function CreateChannelDialog({
             <div className="flex items-center gap-2 rounded-md border border-input bg-background px-3">
               {kind === "voice" ? (
                 <Volume2 className="size-4 text-muted-foreground" />
+              ) : kind === "forum" ? (
+                <MessagesSquare className="size-4 text-muted-foreground" />
               ) : (
                 <Hash className="size-4 text-muted-foreground" />
               )}
@@ -437,7 +460,11 @@ export function CreateChannelDialog({
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
           <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => onOpenChange(false)}
+            >
               Cancel
             </Button>
             <Button type="submit" disabled={busy || name.trim().length < 1}>
@@ -494,7 +521,9 @@ export function ReportDialog({
       });
       setDone(true);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not send the report.");
+      toast.error(
+        error instanceof Error ? error.message : "Could not send the report.",
+      );
     } finally {
       setBusy(false);
     }
@@ -629,7 +658,8 @@ export function ConfirmDangerDialog({
         </DialogHeader>
         <div className="grid gap-2">
           <Label htmlFor="confirm-phrase">
-            Type <span className="font-mono font-semibold">{confirmPhrase}</span> to
+            Type{" "}
+            <span className="font-mono font-semibold">{confirmPhrase}</span> to
             confirm
           </Label>
           <Input

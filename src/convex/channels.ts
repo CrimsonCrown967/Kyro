@@ -142,7 +142,11 @@ export const list = query({
           position: channel.position,
           readOnly: channel.readOnly === true,
           kind:
-            channel.kind === "voice" ? ("voice" as const) : ("text" as const),
+            channel.kind === "voice"
+              ? ("voice" as const)
+              : channel.kind === "forum"
+                ? ("forum" as const)
+                : ("text" as const),
           isRules: access.server.rulesChannelId === channel._id,
           slowMode: channel.slowMode ?? 0,
           permissions: effective.get(channel._id) ?? access.permissions,
@@ -178,8 +182,10 @@ export const create = mutation({
         }),
       ),
     ),
-    /** `voice` creates a live audio room instead of a text channel. */
-    kind: v.optional(v.union(v.literal("text"), v.literal("voice"))),
+    /** Voice hosts audio; forum hosts tagged long-form discussions. */
+    kind: v.optional(
+      v.union(v.literal("text"), v.literal("voice"), v.literal("forum")),
+    ),
   },
   handler: async (
     ctx,
@@ -225,7 +231,7 @@ export const create = mutation({
       categoryId: categoryId ?? undefined,
       name: clean,
       topic: topic?.trim().slice(0, 300) || undefined,
-      kind: kind === "voice" ? "voice" : undefined,
+      kind: kind === "voice" ? "voice" : kind === "forum" ? "forum" : undefined,
       position: siblings.length,
       permissionOverwrites: overwrites.length > 0 ? overwrites : undefined,
       createdAt: Date.now(),

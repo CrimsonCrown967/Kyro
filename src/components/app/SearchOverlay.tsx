@@ -63,15 +63,15 @@ export function SearchOverlay({
   const query = debounced.length === 0 ? "skip" : debounced;
   const people = useQuery(
     api.users.searchUsers,
-    query === "skip" ? "skip" : { term: query },
+    query === "skip" || section !== "people" ? "skip" : { term: query },
   );
   const messages = useQuery(
     api.users.searchMessages,
-    query === "skip" ? "skip" : { term: query },
+    query === "skip" || section !== "messages" ? "skip" : { term: query },
   );
   const communities = useQuery(
     api.servers.discover,
-    query === "skip" ? "skip" : { term: query },
+    query === "skip" || section !== "communities" ? "skip" : { term: query },
   );
 
   const close = () => onOpenChange(false);
@@ -111,7 +111,13 @@ export function SearchOverlay({
   };
 
   const searching = debounced.length > 0;
-  const loading = searching && (people === undefined || messages === undefined);
+  const loading =
+    searching &&
+    (section === "people"
+      ? people === undefined
+      : section === "messages"
+        ? messages === undefined
+        : communities === undefined);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -129,7 +135,11 @@ export function SearchOverlay({
             autoFocus
             value={term}
             onChange={(event) => setTerm(event.target.value)}
-            placeholder="Search people, messages, communities…"
+            placeholder={
+              section === "messages"
+                ? "Search messages or use filters…"
+                : `Search ${section}…`
+            }
             className="h-8 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
             aria-label="Search Kyro"
           />
@@ -155,6 +165,31 @@ export function SearchOverlay({
             </button>
           ))}
         </div>
+
+        {section === "messages" && (
+          <div className="flex gap-1.5 overflow-x-auto border-b border-border/60 px-3 py-2">
+            {[
+              "from:@user",
+              "in:#channel",
+              "mentions:me",
+              "has:image",
+              "has:link",
+              "pinned:true",
+              "after:2026-01-01",
+            ].map((filter) => (
+              <button
+                key={filter}
+                type="button"
+                onClick={() =>
+                  setTerm((current) => `${current.trim()} ${filter}`.trim())
+                }
+                className="shrink-0 rounded-full border border-border/70 bg-surface px-2.5 py-1 text-[10px] font-semibold text-muted-foreground hover:border-primary/40 hover:text-foreground"
+              >
+                {filter}
+              </button>
+            ))}
+          </div>
+        )}
 
         <div className="min-h-0 flex-1 overflow-y-auto p-2">
           {!searching && (

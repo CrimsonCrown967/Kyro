@@ -1,5 +1,5 @@
 import { useAction, useConvex, useMutation } from "convex/react";
-import { Paperclip, Send, Smile, X } from "@/components/icons";
+import { BarChart3, Paperclip, Send, Smile, X } from "@/components/icons";
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -25,6 +25,7 @@ import { UserAvatar } from "@/components/app/UserAvatar";
 import type { CustomEmoji } from "@/lib/emoji";
 import { GifPicker } from "@/components/app/GifPicker";
 import { StyledDisplayName } from "@/components/app/StyledDisplayName";
+import { PollComposerDialog } from "@/components/app/PollComposerDialog";
 
 export interface MentionUser {
   id: string;
@@ -69,6 +70,7 @@ export function Composer({
   const [busy, setBusy] = useState(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [gifOpen, setGifOpen] = useState(false);
+  const [pollOpen, setPollOpen] = useState(false);
   const [customEmojis, setCustomEmojis] = useState<CustomEmoji[]>([]);
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionStart, setMentionStart] = useState<number | null>(null);
@@ -451,6 +453,16 @@ export function Composer({
           </PopoverContent>
         </Popover>
 
+        <button
+          type="button"
+          aria-label="Create poll"
+          title="Create poll"
+          onClick={() => setPollOpen(true)}
+          className="rounded-md p-2 text-muted-foreground hover:bg-background hover:text-foreground"
+        >
+          <BarChart3 className="size-4" />
+        </button>
+
         <Button
           size="icon"
           variant="ghost"
@@ -471,6 +483,12 @@ export function Composer({
         </span>{" "}
         for a new line · Markdown and code blocks supported
       </p>
+      <PollComposerDialog
+        open={pollOpen}
+        onOpenChange={setPollOpen}
+        containerType={containerType}
+        containerId={containerId}
+      />
     </div>
   );
 }

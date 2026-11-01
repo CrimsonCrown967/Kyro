@@ -1,6 +1,8 @@
 import { useConvex, useMutation, useQuery } from "convex/react";
 import {
   AlertTriangle,
+  BarChart3,
+  Check,
   Copy,
   CornerUpLeft,
   Ellipsis,
@@ -8,6 +10,7 @@ import {
   Forward,
   Globe,
   Link2,
+  Lock,
   Loader2,
   Pencil,
   Pin,
@@ -49,6 +52,7 @@ import { toast } from "sonner";
 import type { CustomEmoji } from "@/lib/emoji";
 import { EmojiPicker } from "@/components/app/EmojiPicker";
 import { StyledDisplayName } from "@/components/app/StyledDisplayName";
+import { ThreadPanel } from "@/components/app/ThreadPanel";
 import {
   Dialog,
   DialogContent,
@@ -105,6 +109,23 @@ export interface MessageDto {
   replyTo: { id: string; excerpt: string; author: MessageAuthor | null } | null;
   customEmojis?: CustomEmoji[];
   pinnedAt?: number | null;
+  thread?: {
+    id: string;
+    replyCount: number;
+    lastMessageAt: number;
+    locked: boolean;
+  } | null;
+  poll?: {
+    id: string;
+    question: string;
+    multiple: boolean;
+    closed: boolean;
+    closesAt: number | null;
+    canClose: boolean;
+    selectedOptionIds: string[];
+    totalVotes: number;
+    options: { id: string; text: string; votes: number }[];
+  } | null;
 }
 
 export interface MessageListResult {
@@ -168,6 +189,8 @@ export function MessageList({
     null,
   );
   const [forwardMessage, setForwardMessage] = useState<MessageDto | null>(null);
+  const [threadId, setThreadId] = useState<string | null>(null);
+  const openThread = useMutation(api.threads.openForMessage);
   const [listParams] = useSearchParams();
 
   const latest = useQuery(api.messages.list, {
@@ -358,6 +381,22 @@ export function MessageList({
                       mentionUsers={mentionUsers}
                       onOpenMedia={(url, label) => setMedia({ url, label })}
                       onForward={() => setForwardMessage(message)}
+                      onOpenThread={async () => {
+                        try {
+                          const id =
+                            message.thread?.id ??
+                            (await openThread({
+                              messageId: message.id as Id<"messages">,
+                            }));
+                          setThreadId(id as string);
+                        } catch (error) {
+                          toast.error(
+                            error instanceof Error
+                              ? error.message
+                              : "Could not open thread.",
+                          );
+                        }
+                      }}
                     />
                   </div>
                 );
@@ -391,6 +430,9 @@ export function MessageList({
           message={forwardMessage}
           onOpenChange={(open) => !open && setForwardMessage(null)}
         />
+      )}
+      {threadId && (
+        <ThreadPanel threadId={threadId} onClose={() => setThreadId(null)} />
       )}
     </>
   );
@@ -429,6 +471,7 @@ function MessageRow({
   mentionUsers,
   onOpenMedia,
   onForward,
+  onOpenThread,
 }: {
   message: MessageDto;
   grouped: boolean;
@@ -445,6 +488,7 @@ function MessageRow({
   mentionUsers: { id: string; name: string; username: string | null }[];
   onOpenMedia: (url: string, label: string) => void;
   onForward: () => void;
+  onOpenThread: () => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(message.content);
@@ -695,6 +739,21 @@ function MessageRow({
               </p>
               <p className="whitespace-pre-wrap break-words">{translated}</p>
             </div>
+          )}
+
+          {message.poll && !editing && <PollCard poll={message.poll} />}
+
+          {message.thread && !editing && (
+            <button
+              type="button"
+              onClick={onOpenThread}
+              className="mt-2 flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10"
+            >
+              <Reply className="size-3.5" />
+              {message.thread.replyCount} thread repl
+              {message.thread.replyCount === 1 ? "y" : "ies"}
+              {message.thread.locked && <Lock className="size-3" />}
+            </button>
           )}
 
           {message.replyTo && (
@@ -992,6 +1051,10 @@ function MessageRow({
             <DropdownMenuItem onClick={onForward}>
               <Forward className="size-4" /> Forward
             </DropdownMenuItem>
+            <DropdownMenuItem onClick={onOpenThread}>
+              <Reply className="size-4" />
+              {message.thread ? "Open thread" : "Start thread"}
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => void copyMessageLink()}>
               <Link2 className="size-4" /> Copy message link
             </DropdownMenuItem>
@@ -1050,6 +1113,119 @@ function MessageRow({
             )}
           </DropdownMenuContent>
         </DropdownMenu>
+      </div>
+    </div>
+  );
+}
+
+function PollCard({ poll }: { poll: NonNullable<MessageDto["poll"]> }) {
+  const vote = useMutation(api.polls.vote);
+  const closePoll = useMutation(api.polls.close);
+  const [busy, setBusy] = useState(false);
+
+  const select = async (optionId: string) => {
+    if (busy || poll.closed) return;
+    const selected = poll.selectedOptionIds.includes(optionId);
+    const next = poll.multiple
+      ? selected
+        ? poll.selectedOptionIds.filter((id) => id !== optionId)
+        : [...poll.selectedOptionIds, optionId]
+      : selected
+        ? []
+        : [optionId];
+    setBusy(true);
+    try {
+      await vote({ pollId: poll.id as Id<"polls">, optionIds: next });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not vote.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="mt-3 max-w-xl rounded-2xl border border-border/70 bg-panel/75 p-4 shadow-sm">
+      <div className="flex items-start gap-3">
+        <BarChart3 className="mt-0.5 size-5 shrink-0 text-primary" />
+        <div className="min-w-0 flex-1">
+          <p className="font-bold">{poll.question}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {poll.multiple ? "Choose one or more" : "Choose one"} ·{" "}
+            {poll.totalVotes} voter{poll.totalVotes === 1 ? "" : "s"}
+          </p>
+        </div>
+      </div>
+      <div className="mt-3 space-y-2">
+        {poll.options.map((option) => {
+          const selected = poll.selectedOptionIds.includes(option.id);
+          const percentage =
+            poll.totalVotes > 0
+              ? Math.round((option.votes / poll.totalVotes) * 100)
+              : 0;
+          return (
+            <button
+              key={option.id}
+              type="button"
+              disabled={busy || poll.closed}
+              onClick={() => void select(option.id)}
+              className={cn(
+                "relative flex w-full items-center gap-3 overflow-hidden rounded-xl border px-3 py-2.5 text-left text-sm transition-colors",
+                selected
+                  ? "border-primary/60 text-foreground"
+                  : "border-border/70 hover:border-primary/35",
+              )}
+            >
+              <span
+                aria-hidden="true"
+                className="absolute inset-y-0 left-0 bg-primary/10 transition-[width]"
+                style={{ width: `${Math.min(100, percentage)}%` }}
+              />
+              <span
+                className={cn(
+                  "relative flex size-4 shrink-0 items-center justify-center border",
+                  poll.multiple ? "rounded" : "rounded-full",
+                  selected &&
+                    "border-primary bg-primary text-primary-foreground",
+                )}
+              >
+                {selected && <Check className="size-3" />}
+              </span>
+              <span className="relative min-w-0 flex-1 truncate">
+                {option.text}
+              </span>
+              <span className="relative text-xs font-semibold text-muted-foreground">
+                {option.votes} · {percentage}%
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <div className="mt-3 flex items-center justify-between text-[11px] text-muted-foreground">
+        <span>
+          {poll.closed
+            ? "Poll closed"
+            : poll.closesAt
+              ? `Closes ${new Date(poll.closesAt).toLocaleString()}`
+              : "No automatic close"}
+        </span>
+        {poll.canClose && !poll.closed && (
+          <button
+            type="button"
+            className="font-semibold hover:text-foreground"
+            onClick={() =>
+              void closePoll({ pollId: poll.id as Id<"polls"> }).catch(
+                (error: unknown) =>
+                  toast.error(
+                    error instanceof Error
+                      ? error.message
+                      : "Could not close poll.",
+                  ),
+              )
+            }
+          >
+            Close poll
+          </button>
+        )}
       </div>
     </div>
   );
