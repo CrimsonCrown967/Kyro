@@ -33,6 +33,7 @@ import { DisplayNameStyleDialog } from "@/components/app/DisplayNameStyleDialog"
 import { StyledDisplayName } from "@/components/app/StyledDisplayName";
 import { DecorationPickerDialog } from "@/components/app/DecorationPickerDialog";
 import { ProfileDecorationLayer } from "@/components/app/DecorationArt";
+import { ImageCropDialog } from "@/components/app/ImageCropDialog";
 import { ConfirmDangerDialog } from "@/components/app/dialogs";
 import { Button } from "@/components/ui/button";
 import {
@@ -1352,10 +1353,37 @@ function ProfileTab() {
   const [decorationPicker, setDecorationPicker] = useState<
     "avatar" | "profile" | null
   >(null);
+  const [cropRequest, setCropRequest] = useState<{
+    file: File;
+    kind: "avatar" | "banner";
+  } | null>(null);
 
   if (!me) return <p className="text-sm text-muted-foreground">Loading…</p>;
   const avatarDecoration = findAvatarDecoration(me.avatarDecoration);
   const profileDecoration = findProfileDecoration(me.profileDecoration);
+
+  const finishProfileImage = async (file: File) => {
+    const request = cropRequest;
+    if (!request) return;
+    const avatar = request.kind === "avatar";
+    if (avatar) setUploading(true);
+    else setUploadingBanner(true);
+    try {
+      const attachment = await upload(file);
+      await update(
+        avatar
+          ? { avatarStorageId: attachment.storageId }
+          : { bannerStorageId: attachment.storageId },
+      );
+      toast.success(avatar ? "Avatar updated" : "Banner updated");
+      setCropRequest(null);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Upload failed.");
+    } finally {
+      if (avatar) setUploading(false);
+      else setUploadingBanner(false);
+    }
+  };
 
   const save = async () => {
     setBusy(true);
@@ -1420,29 +1448,15 @@ function ProfileTab() {
                         type="file"
                         accept="image/*"
                         className="hidden"
-                        onChange={async (event) => {
+                        onChange={(event) => {
                           const file = event.target.files?.[0];
                           if (!file) return;
+                          event.target.value = "";
                           if (file.size > MAX_UPLOAD_BYTES) {
                             toast.error("Images must be under 10 MB.");
                             return;
                           }
-                          setUploading(true);
-                          try {
-                            const attachment = await upload(file);
-                            await update({
-                              avatarStorageId: attachment.storageId,
-                            });
-                            toast.success("Avatar updated");
-                          } catch (error) {
-                            toast.error(
-                              error instanceof Error
-                                ? error.message
-                                : "Upload failed.",
-                            );
-                          } finally {
-                            setUploading(false);
-                          }
+                          setCropRequest({ file, kind: "avatar" });
                         }}
                       />
                     </label>
@@ -1492,29 +1506,15 @@ function ProfileTab() {
                         type="file"
                         accept="image/*"
                         className="hidden"
-                        onChange={async (event) => {
+                        onChange={(event) => {
                           const file = event.target.files?.[0];
                           if (!file) return;
+                          event.target.value = "";
                           if (file.size > MAX_UPLOAD_BYTES) {
                             toast.error("Images must be under 10 MB.");
                             return;
                           }
-                          setUploadingBanner(true);
-                          try {
-                            const attachment = await upload(file);
-                            await update({
-                              bannerStorageId: attachment.storageId,
-                            });
-                            toast.success("Banner updated");
-                          } catch (error) {
-                            toast.error(
-                              error instanceof Error
-                                ? error.message
-                                : "Upload failed.",
-                            );
-                          } finally {
-                            setUploadingBanner(false);
-                          }
+                          setCropRequest({ file, kind: "banner" });
                         }}
                       />
                     </label>
@@ -2176,6 +2176,22 @@ function ProfileTab() {
           onOpenChange={(open) => {
             if (!open) setDecorationPicker(null);
           }}
+        />
+      )}
+      {cropRequest && (
+        <ImageCropDialog
+          file={cropRequest.file}
+          title={
+            cropRequest.kind === "avatar"
+              ? "Crop profile picture"
+              : "Crop banner"
+          }
+          aspect={cropRequest.kind === "avatar" ? 1 : 3}
+          outputWidth={cropRequest.kind === "avatar" ? 512 : 1500}
+          outputHeight={cropRequest.kind === "avatar" ? 512 : 500}
+          rounded={cropRequest.kind === "avatar"}
+          onCancel={() => setCropRequest(null)}
+          onComplete={finishProfileImage}
         />
       )}
     </div>

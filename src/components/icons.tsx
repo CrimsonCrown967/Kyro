@@ -434,6 +434,35 @@ export const Link2 = (props: IconProps) => (
   </Icon>
 );
 
+export const Pin = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="m8 4 8 8" />
+    <path d="m14.5 3.5 6 6-3 1.2-3.8 3.8-1.2 3-6-6 3-1.2 3.8-3.8Z" />
+    <path d="m9.5 14.5-6 6" />
+  </Icon>
+);
+
+export const Forward = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M13 5.5 20 12l-7 6.5v-4H8.5c-2.7 0-4.4 1-5.5 3 0-5.2 2.3-8 6.8-8H13Z" />
+  </Icon>
+);
+
+export const Globe = (props: IconProps) => (
+  <Icon {...props}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M3.5 12h17" />
+    <path d="M12 3c2.3 2.5 3.5 5.5 3.5 9s-1.2 6.5-3.5 9c-2.3-2.5-3.5-5.5-3.5-9S9.7 5.5 12 3Z" />
+  </Icon>
+);
+
+export const Crop = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M7 3v13a3 3 0 0 0 3 3h11" />
+    <path d="M3 7h13a3 3 0 0 1 3 3v11" />
+  </Icon>
+);
+
 export const Lock = (props: IconProps) => (
   <Icon {...props}>
     <rect x="4.5" y="10" width="15" height="10" rx="3.5" />

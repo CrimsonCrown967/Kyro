@@ -4,8 +4,13 @@ import {
   Copy,
   CornerUpLeft,
   Ellipsis,
+  EyeOff,
+  Forward,
+  Globe,
+  Link2,
   Loader2,
   Pencil,
+  Pin,
   Phone,
   PhoneOff,
   Reply,
@@ -29,6 +34,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -47,6 +53,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 
@@ -97,6 +104,7 @@ export interface MessageDto {
   }[];
   replyTo: { id: string; excerpt: string; author: MessageAuthor | null } | null;
   customEmojis?: CustomEmoji[];
+  pinnedAt?: number | null;
 }
 
 export interface MessageListResult {
@@ -159,6 +167,8 @@ export function MessageList({
   const [media, setMedia] = useState<{ url: string; label: string } | null>(
     null,
   );
+  const [forwardMessage, setForwardMessage] = useState<MessageDto | null>(null);
+  const [listParams] = useSearchParams();
 
   const latest = useQuery(api.messages.list, {
     containerType,
@@ -228,6 +238,17 @@ export function MessageList({
     }
   }, [messages.length, containerId, latest]);
 
+  const linkedMessageId = listParams.get("message");
+  useEffect(() => {
+    if (!linkedMessageId || messages.length === 0) return;
+    const frame = window.requestAnimationFrame(() => {
+      document
+        .getElementById(`message-${linkedMessageId}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [linkedMessageId, messages.length]);
+
   // A manual scroll away from the bottom cancels the forced jump.
   const handleScroll = () => {
     const element = scrollRef.current;
@@ -292,7 +313,15 @@ export function MessageList({
                 const showUnreadDivider = unreadFrom === index && !grouped;
 
                 return (
-                  <div key={message.id}>
+                  <div
+                    key={message.id}
+                    id={`message-${message.id}`}
+                    className={cn(
+                      "scroll-mt-20 rounded-xl transition-shadow",
+                      linkedMessageId === message.id &&
+                        "ring-2 ring-primary/70 ring-offset-2 ring-offset-background",
+                    )}
+                  >
                     {newDay && (
                       <div className="my-4 flex items-center gap-3">
                         <span className="h-px flex-1 bg-border/70" />
@@ -328,6 +357,7 @@ export function MessageList({
                       roleColors={roleColors}
                       mentionUsers={mentionUsers}
                       onOpenMedia={(url, label) => setMedia({ url, label })}
+                      onForward={() => setForwardMessage(message)}
                     />
                   </div>
                 );
@@ -356,6 +386,12 @@ export function MessageList({
           )}
         </DialogContent>
       </Dialog>
+      {forwardMessage && (
+        <ForwardMessageDialog
+          message={forwardMessage}
+          onOpenChange={(open) => !open && setForwardMessage(null)}
+        />
+      )}
     </>
   );
 }
@@ -392,6 +428,7 @@ function MessageRow({
   serverOwnerId,
   mentionUsers,
   onOpenMedia,
+  onForward,
 }: {
   message: MessageDto;
   grouped: boolean;
@@ -407,6 +444,7 @@ function MessageRow({
   roleColors?: Record<string, string>;
   mentionUsers: { id: string; name: string; username: string | null }[];
   onOpenMedia: (url: string, label: string) => void;
+  onForward: () => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(message.content);
@@ -415,10 +453,14 @@ function MessageRow({
   const toggleReaction = useMutation(api.messages.toggleReaction);
   const editMessage = useMutation(api.messages.edit);
   const deleteMessage = useMutation(api.messages.remove);
+  const markUnread = useMutation(api.messages.markUnread);
+  const togglePin = useMutation(api.messages.togglePin);
   const [reactionCustomEmojis, setReactionCustomEmojis] = useState<
     CustomEmoji[]
   >([]);
   const [reactionEmojisLoaded, setReactionEmojisLoaded] = useState(false);
+  const [reactionOpen, setReactionOpen] = useState(false);
+  const [translated, setTranslated] = useState<string | null>(null);
 
   const loadReactionEmojis = () => {
     if (reactionEmojisLoaded) return;
@@ -449,12 +491,12 @@ function MessageRow({
     [mentionUsers],
   );
 
-  /** Opening a profile uses the same ?user=<id> parameter as everywhere else. */
+  /** Open the compact preview first; it links onward to the full profile. */
   const openProfile = () => {
     if (!author) return;
     setParams((previous) => {
       const next = new URLSearchParams(previous);
-      next.set("user", author.id);
+      next.set("previewUser", author.id);
       return next;
     });
   };
@@ -464,7 +506,7 @@ function MessageRow({
     if (!userId) return;
     setParams((previous) => {
       const next = new URLSearchParams(previous);
-      next.set("user", userId);
+      next.set("previewUser", userId);
       return next;
     });
   };
@@ -474,6 +516,75 @@ function MessageRow({
       await toggleReaction({ messageId: message.id as Id<"messages">, emoji });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not react.");
+    }
+  };
+
+  const copyMessageLink = async () => {
+    const url = new URL(window.location.href);
+    url.searchParams.set("message", message.id);
+    await navigator.clipboard.writeText(url.toString());
+    toast.success("Message link copied.");
+  };
+
+  const markMessageUnread = async () => {
+    try {
+      await markUnread({ messageId: message.id as Id<"messages"> });
+      toast.success("Marked as unread.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not mark unread.",
+      );
+    }
+  };
+
+  const pinMessage = async () => {
+    try {
+      const result = await togglePin({
+        messageId: message.id as Id<"messages">,
+      });
+      toast.success(result.pinned ? "Message pinned." : "Message unpinned.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not pin message.",
+      );
+    }
+  };
+
+  const translateMessage = async () => {
+    const targetLanguage = navigator.language.split("-")[0] || "en";
+    try {
+      const browser = window as typeof window & {
+        Translator?: {
+          create: (options: {
+            sourceLanguage: string;
+            targetLanguage: string;
+          }) => Promise<{ translate: (text: string) => Promise<string> }>;
+        };
+        translation?: {
+          createTranslator: (options: {
+            sourceLanguage: string;
+            targetLanguage: string;
+          }) => Promise<{ translate: (text: string) => Promise<string> }>;
+        };
+      };
+      const translator = browser.Translator
+        ? await browser.Translator.create({
+            sourceLanguage: "auto",
+            targetLanguage,
+          })
+        : browser.translation
+          ? await browser.translation.createTranslator({
+              sourceLanguage: "auto",
+              targetLanguage,
+            })
+          : null;
+      if (!translator) {
+        toast.error("Translation isn't available in this browser yet.");
+        return;
+      }
+      setTranslated(await translator.translate(message.content));
+    } catch {
+      toast.error("This browser couldn't translate that message.");
     }
   };
 
@@ -569,6 +680,20 @@ function MessageRow({
               <span className="text-[11px] text-muted-foreground">
                 {dayLabel(message.createdAt)} {formatTime(message.createdAt)}
               </span>
+              {message.pinnedAt && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-primary">
+                  <Pin className="size-3" /> Pinned
+                </span>
+              )}
+            </div>
+          )}
+
+          {translated && !editing && (
+            <div className="mt-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-sm">
+              <p className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-primary">
+                <Globe className="size-3" /> Translation
+              </p>
+              <p className="whitespace-pre-wrap break-words">{translated}</p>
             </div>
           )}
 
@@ -752,7 +877,24 @@ function MessageRow({
 
       {/* Hover toolbar */}
       <div className="message-toolbar absolute -top-3 right-2 flex items-center gap-0.5 rounded-lg border border-border/70 bg-panel px-1 py-0.5 shadow-lg">
-        <Popover onOpenChange={(open) => open && loadReactionEmojis()}>
+        {["🎉", "👍", "🙂", "❤️"].map((emoji) => (
+          <button
+            key={emoji}
+            type="button"
+            aria-label={`React with ${emoji}`}
+            onClick={() => void send(emoji)}
+            className="hidden rounded p-1 text-sm hover:bg-surface sm:block"
+          >
+            {emoji}
+          </button>
+        ))}
+        <Popover
+          open={reactionOpen}
+          onOpenChange={(open) => {
+            setReactionOpen(open);
+            if (open) loadReactionEmojis();
+          }}
+        >
           <PopoverTrigger asChild>
             <button
               type="button"
@@ -795,7 +937,38 @@ function MessageRow({
               <Ellipsis className="size-4" />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
+          <DropdownMenuContent align="end" className="w-60">
+            <div className="flex items-center gap-1 border-b border-border/60 p-2">
+              {["🎉", "👍", "🙂", "❤️"].map((emoji) => (
+                <button
+                  key={emoji}
+                  type="button"
+                  onClick={() => void send(emoji)}
+                  className="flex size-9 items-center justify-center rounded-lg text-lg hover:bg-surface"
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+            <DropdownMenuItem
+              onClick={() => {
+                loadReactionEmojis();
+                window.setTimeout(() => setReactionOpen(true), 0);
+              }}
+            >
+              <SmilePlus className="size-4" /> Add reaction
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() =>
+                onReply({
+                  id: message.id,
+                  author: author?.name ?? "Unknown",
+                  excerpt: message.content.slice(0, 80),
+                })
+              }
+            >
+              <Reply className="size-4" /> Reply
+            </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => {
                 void navigator.clipboard
@@ -816,6 +989,40 @@ function MessageRow({
                 <Pencil className="size-4" /> Edit message
               </DropdownMenuItem>
             )}
+            <DropdownMenuItem onClick={onForward}>
+              <Forward className="size-4" /> Forward
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => void copyMessageLink()}>
+              <Link2 className="size-4" /> Copy message link
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => void markMessageUnread()}>
+              <EyeOff className="size-4" /> Mark unread
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => void translateMessage()}>
+              <Globe className="size-4" /> Translate
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => {
+                void navigator.clipboard.writeText(message.id);
+                toast.success("Message ID copied.");
+              }}
+            >
+              <Copy className="size-4" /> Copy message ID
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => {
+                void navigator.clipboard.writeText(message.authorId);
+                toast.success("User ID copied.");
+              }}
+            >
+              <Copy className="size-4" /> Copy user ID
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => void pinMessage()}>
+              <Pin className="size-4" />
+              {message.pinnedAt ? "Unpin message" : "Pin message"}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             {(isAuthor || canManageMessages) && (
               <DropdownMenuItem
                 className="text-destructive focus:text-destructive"
@@ -845,5 +1052,101 @@ function MessageRow({
         </DropdownMenu>
       </div>
     </div>
+  );
+}
+
+function ForwardMessageDialog({
+  message,
+  onOpenChange,
+}: {
+  message: MessageDto;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const conversations = useQuery(api.conversations.list);
+  const me = useQuery(api.users.me);
+  const sendMessage = useMutation(api.messages.send);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const forward = async (conversationId: string) => {
+    if (busyId) return;
+    setBusyId(conversationId);
+    const author = message.author?.username
+      ? `@${message.author.username}`
+      : (message.author?.name ?? "a Kyro member");
+    const source = message.content.trim() || "Shared an attachment";
+    const content = `↪ Forwarded from ${author}\n${source}`.slice(0, 2000);
+    try {
+      await sendMessage({
+        containerType: "conversation",
+        containerId: conversationId,
+        content,
+        clientId: crypto.randomUUID(),
+      });
+      toast.success("Message forwarded.");
+      onOpenChange(false);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not forward message.",
+      );
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  return (
+    <Dialog open onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Forward message</DialogTitle>
+          <DialogDescription>
+            Choose a direct message or group. Attachments stay in their original
+            conversation; the message text is forwarded.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="max-h-80 space-y-1 overflow-y-auto">
+          {conversations === undefined ? (
+            <div className="flex justify-center py-10">
+              <Loader2 className="size-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : conversations.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              Start a direct message before forwarding.
+            </p>
+          ) : (
+            conversations.map((conversation) => {
+              const others = conversation.participants.filter(
+                (participant) => participant.id !== me?.id,
+              );
+              const label =
+                conversation.name ??
+                (others.length > 0 ? others : conversation.participants)
+                  .map((participant) => participant.name)
+                  .join(", ") ??
+                "Conversation";
+              const avatar = others[0] ?? conversation.participants[0];
+              return (
+                <button
+                  key={conversation.id}
+                  type="button"
+                  disabled={busyId !== null}
+                  onClick={() => void forward(conversation.id)}
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left hover:bg-surface disabled:opacity-60"
+                >
+                  {avatar && <UserAvatar user={avatar} size="sm" />}
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                    {label}
+                  </span>
+                  {busyId === conversation.id ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Forward className="size-4 text-muted-foreground" />
+                  )}
+                </button>
+              );
+            })
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

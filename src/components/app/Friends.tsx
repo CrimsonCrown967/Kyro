@@ -84,7 +84,7 @@ export function FriendsView() {
 
   const openProfile = (userId: string) => {
     const next = new URLSearchParams(params);
-    next.set("user", userId);
+    next.set("previewUser", userId);
     setParams(next, { replace: false });
   };
 

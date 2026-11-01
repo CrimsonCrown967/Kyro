@@ -325,6 +325,8 @@ const schema = defineSchema(
       createdAt: v.number(),
       editedAt: v.optional(v.number()),
       replyToId: v.optional(v.id("messages")),
+      pinnedAt: v.optional(v.number()),
+      pinnedById: v.optional(v.id("users")),
       clientId: v.optional(v.string()),
       attachments: v.optional(
         v.array(

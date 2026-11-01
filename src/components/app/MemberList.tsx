@@ -51,7 +51,7 @@ export function MemberList({ serverId }: { serverId: string }) {
   const openProfile = (userId: string) => {
     setParams((previous) => {
       const next = new URLSearchParams(previous);
-      next.set("user", userId);
+      next.set("previewUser", userId);
       return next;
     });
   };

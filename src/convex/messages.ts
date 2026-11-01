@@ -279,6 +279,7 @@ export const list = query({
           callDurationMs: message.callDurationMs ?? null,
           createdAt: message.createdAt,
           editedAt: message.editedAt ?? null,
+          pinnedAt: message.pinnedAt ?? null,
           clientId: message.clientId ?? null,
           author: authors.get(message.authorId) ?? null,
           authorId: message.authorId as string,
@@ -807,6 +808,65 @@ export const toggleReaction = mutation({
       createdAt: Date.now(),
     });
     return { active: true };
+  },
+});
+
+export const togglePin = mutation({
+  args: { messageId: v.id("messages") },
+  handler: async (ctx, { messageId }) => {
+    const { id: userId } = await requireActiveUser(ctx);
+    const message = await ctx.db.get(messageId);
+    if (!message) throw new Error("That message no longer exists.");
+    const access = await requireReadAccess(
+      ctx,
+      userId,
+      message.containerType,
+      message.containerId,
+    );
+    if (
+      access.kind === "channel" &&
+      !can(access.permissions, PERMISSIONS.MANAGE_MESSAGES)
+    ) {
+      throw new Error("You need Manage Messages to pin messages here.");
+    }
+    const pinned = message.pinnedAt === undefined;
+    await ctx.db.patch(messageId, {
+      pinnedAt: pinned ? Date.now() : undefined,
+      pinnedById: pinned ? userId : undefined,
+    });
+    return { pinned };
+  },
+});
+
+export const markUnread = mutation({
+  args: { messageId: v.id("messages") },
+  handler: async (ctx, { messageId }) => {
+    const { id: userId } = await requireUser(ctx);
+    const message = await ctx.db.get(messageId);
+    if (!message) throw new Error("That message no longer exists.");
+    await requireReadAccess(
+      ctx,
+      userId,
+      message.containerType,
+      message.containerId,
+    );
+    const existing = await ctx.db
+      .query("reads")
+      .withIndex("by_user_key", (q) =>
+        q.eq("userId", userId).eq("key", message.containerId),
+      )
+      .unique();
+    const lastReadAt = Math.max(0, message.createdAt - 1);
+    if (existing) {
+      await ctx.db.patch(existing._id, { lastReadAt, updatedAt: Date.now() });
+    } else {
+      await ctx.db.insert("reads", {
+        userId,
+        key: message.containerId,
+        lastReadAt,
+        updatedAt: Date.now(),
+      });
+    }
   },
 });
 

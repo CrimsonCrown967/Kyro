@@ -27,6 +27,7 @@ import {
 } from "@/components/icons";
 import { UserAvatar } from "@/components/app/UserAvatar";
 import { StyledDisplayName } from "@/components/app/StyledDisplayName";
+import { ImageCropDialog } from "@/components/app/ImageCropDialog";
 import { CrownBadge } from "@/components/app/CrownBadge";
 import {
   DropdownMenu,
@@ -101,6 +102,10 @@ export function ServerSettings({ serverId }: { serverId: string }) {
   });
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState<"icon" | "banner" | null>(null);
+  const [cropRequest, setCropRequest] = useState<{
+    file: File;
+    kind: "icon" | "banner";
+  } | null>(null);
   const [confirmName, setConfirmName] = useState("");
   const [tagDraft, setTagDraft] = useState("");
   const [vanityDraft, setVanityDraft] = useState("");
@@ -247,6 +252,18 @@ export function ServerSettings({ serverId }: { serverId: string }) {
     } finally {
       setUploading(null);
     }
+  };
+
+  const requestImageCrop = (
+    kind: "icon" | "banner",
+    file: File | undefined,
+  ) => {
+    if (!file) return;
+    if (file.size > MAX_UPLOAD_BYTES) {
+      toast.error("Images must be under 10 MB.");
+      return;
+    }
+    setCropRequest({ file, kind });
   };
 
   const addTag = () => {
@@ -624,9 +641,10 @@ export function ServerSettings({ serverId }: { serverId: string }) {
                     type="file"
                     accept="image/*"
                     className="hidden"
-                    onChange={(event) =>
-                      void uploadImage("icon", event.target.files?.[0])
-                    }
+                    onChange={(event) => {
+                      requestImageCrop("icon", event.target.files?.[0]);
+                      event.target.value = "";
+                    }}
                   />
                 </label>
                 {server.iconUrl && (
@@ -664,9 +682,10 @@ export function ServerSettings({ serverId }: { serverId: string }) {
                     type="file"
                     accept="image/*"
                     className="hidden"
-                    onChange={(event) =>
-                      void uploadImage("banner", event.target.files?.[0])
-                    }
+                    onChange={(event) => {
+                      requestImageCrop("banner", event.target.files?.[0]);
+                      event.target.value = "";
+                    }}
                   />
                 </label>
                 {server.bannerUrl && (
@@ -1235,6 +1254,25 @@ export function ServerSettings({ serverId }: { serverId: string }) {
             </p>
           )}
         </motion.div>
+        {cropRequest && (
+          <ImageCropDialog
+            file={cropRequest.file}
+            title={
+              cropRequest.kind === "icon"
+                ? "Crop server icon"
+                : "Crop server banner"
+            }
+            aspect={cropRequest.kind === "icon" ? 1 : 16 / 5}
+            outputWidth={cropRequest.kind === "icon" ? 512 : 1600}
+            outputHeight={cropRequest.kind === "icon" ? 512 : 500}
+            rounded={cropRequest.kind === "icon"}
+            onCancel={() => setCropRequest(null)}
+            onComplete={async (file) => {
+              await uploadImage(cropRequest.kind, file);
+              setCropRequest(null);
+            }}
+          />
+        )}
       </div>
     </div>
   );
