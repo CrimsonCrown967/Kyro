@@ -94,7 +94,7 @@ class RootErrorBoundary extends React.Component<
  * which is what produced the runtime errors and the failed join requests on
  * kyro.nylix.org. Fall back to this project's known deployment so Kyro boots.
  */
-const DEFAULT_CONVEX_URL = "https://whimsical-salmon-744.convex.cloud";
+const DEFAULT_CONVEX_URL = "https://giant-cricket-958.convex.cloud";
 const configuredConvexUrl = import.meta.env.VITE_CONVEX_URL as
   | string
   | undefined;

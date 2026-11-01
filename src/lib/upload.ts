@@ -16,15 +16,13 @@ export interface PendingAttachment {
 }
 
 /**
- * Upload registration was added after Kyro's current production deployment.
- * Keep it opt-in until that deployment has the matching `files` mutation;
- * otherwise even a handled Convex mutation rejection is surfaced by the
- * realtime client as a scary server error. Once production is upgraded, set
- * `VITE_CONVEX_UPLOAD_REGISTRATION=true` and every upload gets ownership
- * tracking again without another code change.
+ * The current backend exposes `files:registerUpload`, so ownership tracking is
+ * enabled by default. The explicit `false` escape hatch keeps an older backend
+ * usable during an emergency rollback without reintroducing the original
+ * missing-function error for normal deployments.
  */
 const uploadRegistrationEnabled =
-  import.meta.env.VITE_CONVEX_UPLOAD_REGISTRATION === "true";
+  import.meta.env.VITE_CONVEX_UPLOAD_REGISTRATION !== "false";
 
 /**
  * Files go straight to object storage through a short-lived signed URL, so

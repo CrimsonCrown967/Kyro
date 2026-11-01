@@ -56,10 +56,13 @@ function detectDevice(): "desktop" | "mobile" | "tablet" {
  * keyboard shortcuts, search, the inbox and user settings.
  */
 export function AppShell({ children }: { children: ReactNode }) {
-  const { user, isLoading } = useAuth();
-  const me = useQuery(api.users.me);
+  const { user, isLoading, isAuthenticated } = useAuth();
+  const me = useQuery(api.users.me, isAuthenticated ? {} : "skip");
   const heartbeat = useMutation(api.users.heartbeat);
-  const unread = useQuery(api.notifications.unreadCount);
+  const unread = useQuery(
+    api.notifications.unreadCount,
+    isAuthenticated ? {} : "skip",
+  );
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -85,6 +88,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   // Each tick also reports which device we're on, powering the platform
   // indicator (phone / tablet / desktop) shown next to every profile.
   useEffect(() => {
+    if (!isAuthenticated) return;
     const tick = () => {
       void heartbeat({ device: detectDevice() }).catch(() => undefined);
     };
@@ -100,7 +104,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", tick);
     };
-  }, [heartbeat]);
+  }, [heartbeat, isAuthenticated]);
 
   // Notification ping: fires when unread notifications arrive while the tab
   // is in the background — gated by the "Notification sounds" menu toggle.
