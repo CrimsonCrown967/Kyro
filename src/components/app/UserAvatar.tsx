@@ -10,6 +10,7 @@ import {
   type PresenceState,
 } from "@/lib/format";
 import { findFrame } from "@/lib/frames";
+import { AvatarDecorationArt } from "@/components/app/DecorationArt";
 
 export interface AvatarUser {
   id: string;
@@ -20,6 +21,8 @@ export interface AvatarUser {
   presence?: PresenceState;
   /** Built-in avatar frame id — rendered as a gradient ring when set. */
   avatarFrame?: string | null;
+  /** Built-in decorative overlay rendered around the portrait. */
+  avatarDecoration?: string | null;
 }
 
 const SIZES = {
@@ -117,7 +120,8 @@ export function DeviceBadge({
   if (!device || !(device in DEVICE_META)) return null;
   const kind = device as DeviceKind;
   const meta = DEVICE_META[kind];
-  const Icon = kind === "mobile" ? Smartphone : kind === "tablet" ? Tablet : Monitor;
+  const Icon =
+    kind === "mobile" ? Smartphone : kind === "tablet" ? Tablet : Monitor;
   return (
     <span
       title={`Active on ${meta.label.toLowerCase()}`}
@@ -167,7 +171,7 @@ export function UserAvatar({
     <span className={cn("relative inline-flex shrink-0", className)}>
       <span
         className={cn(
-          "inline-flex rounded-full",
+          "relative z-10 inline-flex rounded-full",
           frame && `bg-gradient-to-br ${frame.gradient} p-[2px]`,
         )}
         title={frame ? `${frame.label} avatar frame` : undefined}
@@ -195,11 +199,12 @@ export function UserAvatar({
           )}
         </span>
       </span>
+      <AvatarDecorationArt decorationId={user.avatarDecoration} />
       {showStatus && (
         <PresenceDot
           presence={presence}
           size={size}
-          className="absolute -bottom-0.5 -right-0.5"
+          className="absolute -bottom-0.5 -right-0.5 z-30"
         />
       )}
     </span>
@@ -219,7 +224,11 @@ export function UserBanner({
   if (!user.bannerUrl) {
     return (
       <span className="flex items-center justify-center text-white font-semibold">
-        {user.name.split(" ").map((p) => p[0]).join("").slice(0, 2)}
+        {user.name
+          .split(" ")
+          .map((p) => p[0])
+          .join("")
+          .slice(0, 2)}
       </span>
     );
   }
@@ -227,7 +236,12 @@ export function UserBanner({
   return (
     <div className={cn("relative inline-flex shrink-0", className)}>
       {/* Banner strip */}
-      <div className={cn("overflow-hidden rounded-t-md bg-gradient-to-br from-brand to-cyan", bannerHeight)}>
+      <div
+        className={cn(
+          "overflow-hidden rounded-t-md bg-gradient-to-br from-brand to-cyan",
+          bannerHeight,
+        )}
+      >
         <img src={user.bannerUrl} alt="" className="size-full object-cover" />
       </div>
       {/* Roundel with optional ring */}
@@ -241,8 +255,17 @@ export function UserBanner({
               className={cn("size-full object-cover", roundelSize)}
             />
           ) : (
-            <span className={cn("flex items-center justify-center font-semibold text-white", roundelSize)}>
-              {user.name.split(" ").map((p) => p[0]).join("").slice(0, 2)}
+            <span
+              className={cn(
+                "flex items-center justify-center font-semibold text-white",
+                roundelSize,
+              )}
+            >
+              {user.name
+                .split(" ")
+                .map((p) => p[0])
+                .join("")
+                .slice(0, 2)}
             </span>
           )}
         </div>

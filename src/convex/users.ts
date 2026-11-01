@@ -14,6 +14,10 @@ import {
 } from "./lib";
 import { PROFILE_THEME_IDS } from "../lib/profileThemes";
 import { DISPLAY_NAME_FONT_IDS } from "../lib/displayName";
+import {
+  AVATAR_DECORATION_IDS,
+  PROFILE_DECORATION_IDS,
+} from "../lib/decorations";
 import { joinKyroHq } from "./servers";
 import {
   claimUpload,
@@ -157,9 +161,11 @@ export const updateProfile = mutation({
       ),
     ),
     avatarFrame: v.optional(v.union(v.string(), v.null())),
+    avatarDecoration: v.optional(v.union(v.string(), v.null())),
     pronouns: v.optional(v.string()),
     primaryBadge: v.optional(v.string()),
     profileTheme: v.optional(v.string()),
+    profileDecoration: v.optional(v.union(v.string(), v.null())),
     wornTag: v.optional(v.union(v.string(), v.null())),
     status: v.optional(
       v.union(
@@ -294,6 +300,13 @@ export const updateProfile = mutation({
           ? args.avatarFrame
           : undefined;
     }
+    if (args.avatarDecoration !== undefined) {
+      patch.avatarDecoration =
+        args.avatarDecoration &&
+        AVATAR_DECORATION_IDS.includes(args.avatarDecoration)
+          ? args.avatarDecoration
+          : undefined;
+    }
     if (args.pronouns !== undefined) {
       patch.pronouns = args.pronouns.trim().slice(0, 32);
     }
@@ -339,6 +352,13 @@ export const updateProfile = mutation({
       patch.profileTheme =
         args.profileTheme && PROFILE_THEME_IDS.includes(args.profileTheme)
           ? args.profileTheme
+          : undefined;
+    }
+    if (args.profileDecoration !== undefined) {
+      patch.profileDecoration =
+        args.profileDecoration &&
+        PROFILE_DECORATION_IDS.includes(args.profileDecoration)
+          ? args.profileDecoration
           : undefined;
     }
     if (args.wornTag !== undefined) {

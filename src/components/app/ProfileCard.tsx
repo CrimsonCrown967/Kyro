@@ -24,6 +24,7 @@ import {
   UserAvatar,
 } from "@/components/app/UserAvatar";
 import { StyledDisplayName } from "@/components/app/StyledDisplayName";
+import { ProfileDecorationLayer } from "@/components/app/DecorationArt";
 import { ServerTagChip } from "@/components/app/ServerTag";
 import {
   GlobalBadgeIcon,
@@ -154,7 +155,7 @@ export function ProfileCard() {
             : undefined
         }
         className={cn(
-          "flex max-h-[92vh] w-[calc(100vw-1.5rem)] flex-col gap-0 overflow-hidden rounded-2xl border-border/70 bg-background p-0 sm:max-w-[36rem]",
+          "relative isolate flex max-h-[92vh] w-[calc(100vw-1.5rem)] flex-col gap-0 overflow-hidden rounded-2xl border-border/70 bg-background p-0 sm:max-w-[36rem]",
           // Unmount instantly on close so the next member-sidebar click isn't
           // swallowed by the fading backdrop.
           "data-[state=closed]:duration-0",
@@ -163,7 +164,8 @@ export function ProfileCard() {
           "[&>button[data-slot=dialog-close]]:right-4 [&>button[data-slot=dialog-close]]:top-4 [&>button[data-slot=dialog-close]]:rounded-full [&>button[data-slot=dialog-close]]:bg-black/45 [&>button[data-slot=dialog-close]]:p-1.5 [&>button[data-slot=dialog-close]]:text-white [&>button[data-slot=dialog-close]]:opacity-90 [&>button[data-slot=dialog-close]]:shadow-sm [&>button[data-slot=dialog-close]]:hover:bg-black/65 [&>button[data-slot=dialog-close]]:hover:opacity-100",
         )}
       >
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        <ProfileDecorationLayer decorationId={user?.profileDecoration} />
+        <div className="relative z-10 min-h-0 flex-1 overflow-y-auto">
           {user ? (
             <>
               {/* Banner is the top edge of the card — the avatar overlaps it. */}
@@ -556,7 +558,7 @@ export function ProfileCard() {
         </div>
 
         {/* Fixed footer: the primary action never scrolls out of view. */}
-        <div className="shrink-0 border-t border-border/60 bg-background/95 p-4 backdrop-blur">
+        <div className="relative z-10 shrink-0 border-t border-border/60 bg-background/95 p-4 backdrop-blur">
           {isSelf ? (
             <Button
               className="h-10 w-full text-sm font-semibold"

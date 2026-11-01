@@ -145,6 +145,8 @@ export interface PublicUser {
   links: { label: string; url: string }[];
   /** Built-in avatar frame id, or null for a plain avatar. */
   avatarFrame: string | null;
+  /** Decorative overlay rendered around the avatar. */
+  avatarDecoration: string | null;
   /** Account creation timestamp, shown as "member since" on profiles. */
   memberSince: number | null;
   /** Device class the account was last seen on, for the platform indicator. */
@@ -155,6 +157,8 @@ export interface PublicUser {
   primaryBadge: string | null;
   /** Profile theme preset id, or null for the default look. */
   profileTheme: string | null;
+  /** Decorative overlay rendered across the full profile card. */
+  profileDecoration: string | null;
   /** Community tag worn next to the name, or null. */
   serverTag: string | null;
 }
@@ -282,11 +286,13 @@ export async function hydrateUser(
     badges,
     links: (user.links ?? []).slice(0, 6),
     avatarFrame: user.avatarFrame ?? null,
+    avatarDecoration: user.avatarDecoration ?? null,
     memberSince: user.createdAt ?? null,
     device: presenceDetailsVisible ? (user.device ?? null) : null,
     pronouns: user.pronouns ?? null,
     primaryBadge: user.primaryBadge ?? null,
     profileTheme: user.profileTheme ?? null,
+    profileDecoration: user.profileDecoration ?? null,
     serverTag: user.wornTag ?? null,
   };
 }

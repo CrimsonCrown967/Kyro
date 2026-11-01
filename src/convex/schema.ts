@@ -118,12 +118,16 @@ const schema = defineSchema(
       ),
       /** Built-in avatar frame id from the profile editor. */
       avatarFrame: v.optional(v.string()),
+      /** Decorative vector overlay rendered around the user's avatar. */
+      avatarDecoration: v.optional(v.string()),
       /** Pronouns shown on the profile card, e.g. "He/Him". */
       pronouns: v.optional(v.string()),
       /** Which badge shows next to the name in chat; `"none"` hides them. */
       primaryBadge: v.optional(v.string()),
       /** Profile theme preset id from the profile editor. */
       profileTheme: v.optional(v.string()),
+      /** Decorative animated/static overlay rendered across the profile card. */
+      profileDecoration: v.optional(v.string()),
       /** Opt-out of appearing on other people's Suggested friends tab. */
       suggestible: v.optional(v.boolean()),
       /** Community tag the user wears next to their name (2–4 chars). */

@@ -31,6 +31,8 @@ import { useNow } from "@/hooks/use-now";
 import { PresenceDot, UserAvatar } from "@/components/app/UserAvatar";
 import { DisplayNameStyleDialog } from "@/components/app/DisplayNameStyleDialog";
 import { StyledDisplayName } from "@/components/app/StyledDisplayName";
+import { DecorationPickerDialog } from "@/components/app/DecorationPickerDialog";
+import { ProfileDecorationLayer } from "@/components/app/DecorationArt";
 import { ConfirmDangerDialog } from "@/components/app/dialogs";
 import { Button } from "@/components/ui/button";
 import {
@@ -55,6 +57,7 @@ import { BUG_CATEGORY_IDS, BUG_CATEGORY_LABELS } from "@/lib/format";
 import { AVATAR_FRAMES } from "@/lib/frames";
 import { PROFILE_THEMES } from "@/lib/profileThemes";
 import { APP_TINTS } from "@/lib/tints";
+import { findAvatarDecoration, findProfileDecoration } from "@/lib/decorations";
 import {
   GLOBAL_BADGE_META,
   GlobalBadgeIcon,
@@ -1346,8 +1349,13 @@ function ProfileTab() {
   const [uploading, setUploading] = useState(false);
   const [uploadingBanner, setUploadingBanner] = useState(false);
   const [nameStyleOpen, setNameStyleOpen] = useState(false);
+  const [decorationPicker, setDecorationPicker] = useState<
+    "avatar" | "profile" | null
+  >(null);
 
   if (!me) return <p className="text-sm text-muted-foreground">Loading…</p>;
+  const avatarDecoration = findAvatarDecoration(me.avatarDecoration);
+  const profileDecoration = findProfileDecoration(me.profileDecoration);
 
   const save = async () => {
     setBusy(true);
@@ -1527,6 +1535,68 @@ function ProfileTab() {
                 profile.
               </p>
             </div>
+          </div>
+        </section>
+
+        <section>
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">
+            Decorations
+          </p>
+          <p className="mb-3 text-xs text-muted-foreground">
+            Add an original static or animated Kyro overlay to your avatar and
+            profile.
+          </p>
+          <div className="divide-y divide-border/60 overflow-hidden rounded-xl border border-border/70 bg-surface">
+            <button
+              type="button"
+              onClick={() => setDecorationPicker("avatar")}
+              className="flex w-full items-center gap-4 p-4 text-left transition-colors hover:bg-panel/60 sm:p-5"
+            >
+              <span className="flex size-16 shrink-0 items-center justify-center">
+                <UserAvatar user={me} size="md" showStatus={false} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="flex items-center gap-2 text-sm font-semibold">
+                  Avatar decoration
+                  {avatarDecoration?.animated && (
+                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-primary">
+                      Animated
+                    </span>
+                  )}
+                </span>
+                <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                  {avatarDecoration?.description ?? "None selected"}
+                </span>
+              </span>
+              <span className="text-lg text-muted-foreground">→</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setDecorationPicker("profile")}
+              className="flex w-full items-center gap-4 p-4 text-left transition-colors hover:bg-panel/60 sm:p-5"
+            >
+              <span className="relative h-14 w-20 shrink-0 overflow-hidden rounded-lg bg-gradient-to-br from-primary/40 via-panel to-background ring-1 ring-border/70">
+                <ProfileDecorationLayer decorationId={me.profileDecoration} />
+                <span className="relative z-10 flex size-full items-end p-2 text-[9px] font-bold">
+                  Profile
+                </span>
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="flex items-center gap-2 text-sm font-semibold">
+                  Profile decoration
+                  {profileDecoration?.animated && (
+                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-primary">
+                      Animated
+                    </span>
+                  )}
+                </span>
+                <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                  {profileDecoration?.description ?? "None selected"}
+                </span>
+              </span>
+              <span className="text-lg text-muted-foreground">→</span>
+            </button>
           </div>
         </section>
 
@@ -2094,6 +2164,20 @@ function ProfileTab() {
           onOpenChange={setNameStyleOpen}
         />
       )}
+      {decorationPicker && (
+        <DecorationPickerDialog
+          kind={decorationPicker}
+          user={me}
+          current={
+            decorationPicker === "avatar"
+              ? me.avatarDecoration
+              : me.profileDecoration
+          }
+          onOpenChange={(open) => {
+            if (!open) setDecorationPicker(null);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -2205,7 +2289,7 @@ function ProfilePreviewPane({
       </p>
 
       <div
-        className="overflow-hidden rounded-xl bg-zinc-950/95 text-zinc-100 shadow-lg ring-1 ring-white/10"
+        className="relative isolate overflow-hidden rounded-xl bg-zinc-950/95 text-zinc-100 shadow-lg ring-1 ring-white/10"
         style={
           themeEntry
             ? {
@@ -2214,6 +2298,7 @@ function ProfilePreviewPane({
             : undefined
         }
       >
+        <ProfileDecorationLayer decorationId={me.profileDecoration} />
         {/* Banner: current picture, else the chosen colour theme. */}
         <div
           className={cn(
@@ -2236,7 +2321,7 @@ function ProfilePreviewPane({
           />
         </div>
 
-        <div className="px-4 pb-4">
+        <div className="relative z-10 px-4 pb-4">
           <div className="-mt-8 inline-block rounded-full bg-zinc-950 p-1 ring-1 ring-white/10">
             <UserAvatar user={{ ...me, avatarFrame: frameValue }} size="lg" />
           </div>

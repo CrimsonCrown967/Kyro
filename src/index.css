@@ -386,6 +386,127 @@ html[data-tint] {
     padding-top: 0.5rem;
     padding-bottom: 0.5rem;
   }
+
+  .avatar-decoration-art g,
+  .profile-decoration-art g {
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+  .avatar-decoration-art[data-animated="true"] .deco-spin {
+    animation: kyro-deco-spin 7s linear infinite;
+  }
+  .avatar-decoration-art[data-animated="true"] .deco-twinkle,
+  .profile-decoration-art[data-animated="true"] .profile-deco-pulse {
+    animation: kyro-deco-pulse 2.1s ease-in-out infinite;
+  }
+  .avatar-decoration-art[data-animated="true"] .deco-bob {
+    animation: kyro-deco-bob 2.4s ease-in-out infinite;
+  }
+  .avatar-decoration-art[data-animated="true"] .deco-flap {
+    animation: kyro-deco-flap 1.9s ease-in-out infinite;
+  }
+  .avatar-decoration-art[data-animated="true"] .deco-flicker {
+    animation: kyro-deco-flicker 1.15s ease-in-out infinite alternate;
+  }
+  .avatar-decoration-art[data-animated="true"] .deco-drift,
+  .profile-decoration-art[data-animated="true"] .profile-deco-drift,
+  .profile-decoration-art[data-animated="true"] .profile-deco-fall,
+  .profile-decoration-art[data-animated="true"] .profile-deco-snow {
+    animation: kyro-deco-drift 5s ease-in-out infinite;
+  }
+  .profile-decoration-art[data-animated="true"] .profile-deco-wave {
+    animation: kyro-deco-wave 5.5s ease-in-out infinite;
+  }
+  .profile-decoration-art[data-animated="true"] .profile-deco-scan {
+    animation: kyro-deco-scan 4s linear infinite;
+  }
+  .profile-decoration-art[data-animated="true"] .profile-deco-rise {
+    animation: kyro-deco-rise 4.2s ease-in-out infinite;
+  }
+}
+
+@keyframes kyro-deco-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes kyro-deco-pulse {
+  0%,
+  100% {
+    opacity: 0.65;
+    transform: scale(0.96);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+}
+@keyframes kyro-deco-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+@keyframes kyro-deco-flap {
+  0%,
+  100% {
+    transform: scaleX(0.94) rotate(-1deg);
+  }
+  50% {
+    transform: scaleX(1.06) rotate(1deg);
+  }
+}
+@keyframes kyro-deco-flicker {
+  from {
+    opacity: 0.72;
+    transform: scaleY(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scaleY(1.08);
+  }
+}
+@keyframes kyro-deco-drift {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  50% {
+    transform: translate(2px, 5px) rotate(3deg);
+  }
+}
+@keyframes kyro-deco-wave {
+  0%,
+  100% {
+    transform: translateX(-2px) scaleY(0.94);
+  }
+  50% {
+    transform: translateX(3px) scaleY(1.08);
+  }
+}
+@keyframes kyro-deco-scan {
+  from {
+    transform: translateY(-8px);
+  }
+  to {
+    transform: translateY(8px);
+  }
+}
+@keyframes kyro-deco-rise {
+  0% {
+    opacity: 0.2;
+    transform: translateY(8px);
+  }
+  50% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 0.15;
+    transform: translateY(-10px);
+  }
 }
 
 /*
