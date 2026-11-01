@@ -26,6 +26,7 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { UserAvatar } from "@/components/app/UserAvatar";
 import { UserBar } from "@/components/app/UserBar";
+import { StyledDisplayName } from "@/components/app/StyledDisplayName";
 import { CreateChannelDialog, InviteDialog } from "@/components/app/dialogs";
 import { Button } from "@/components/ui/button";
 import {
@@ -55,7 +56,7 @@ export function Sidebar({
   onOpenSettings?: () => void;
 }) {
   return (
-    <div className="flex w-60 shrink-0 flex-col border-r border-border/60 bg-sidebar">
+    <div className="flex w-72 shrink-0 flex-col border-r border-border/70 bg-sidebar shadow-[6px_0_24px_rgba(0,0,0,.08)]">
       <div className="min-h-0 flex-1 overflow-y-auto">
         {activeServerId ? (
           <ServerSection serverId={activeServerId} />
@@ -111,7 +112,11 @@ function ServerSection({ serverId }: { serverId: string }) {
       await action;
       if (success) toast.success(success);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "That didn't work — try again.");
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "That didn't work — try again.",
+      );
     }
   };
 
@@ -158,11 +163,11 @@ function ServerSection({ serverId }: { serverId: string }) {
 
   return (
     <>
-      <div className="sticky top-0 z-10 border-b border-border/60 bg-sidebar/95 backdrop-blur">
+      <div className="sticky top-0 z-10 border-b border-border/70 bg-sidebar/90 backdrop-blur-xl">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm font-semibold hover:bg-sidebar-accent/60">
-              <span className="truncate">{server.name}</span>
+            <button className="flex h-14 w-full items-center justify-between gap-2 px-4 text-left text-base font-bold hover:bg-sidebar-accent/60">
+              <span className="truncate tracking-tight">{server.name}</span>
               <span className="text-xs text-muted-foreground">▾</span>
             </button>
           </DropdownMenuTrigger>
@@ -224,7 +229,9 @@ function ServerSection({ serverId }: { serverId: string }) {
                     });
                     toast.success("Category added");
                   } catch (error) {
-                    toast.error(error instanceof Error ? error.message : "Failed");
+                    toast.error(
+                      error instanceof Error ? error.message : "Failed",
+                    );
                   }
                 }}
               >
@@ -233,7 +240,9 @@ function ServerSection({ serverId }: { serverId: string }) {
             )}
             {canManageServer && (
               <DropdownMenuItem
-                onClick={() => navigate(`/dashboard/s/${serverId}/settings/overview`)}
+                onClick={() =>
+                  navigate(`/dashboard/s/${serverId}/settings/overview`)
+                }
               >
                 <Settings className="size-4" /> Server Settings
               </DropdownMenuItem>
@@ -246,7 +255,9 @@ function ServerSection({ serverId }: { serverId: string }) {
                     muted: !server.muted,
                   });
                 } catch (error) {
-                  toast.error(error instanceof Error ? error.message : "Failed");
+                  toast.error(
+                    error instanceof Error ? error.message : "Failed",
+                  );
                 }
               }}
             >
@@ -264,7 +275,9 @@ function ServerSection({ serverId }: { serverId: string }) {
                       navigate("/dashboard");
                       toast.success(`Left ${server.name}`);
                     } catch (error) {
-                      toast.error(error instanceof Error ? error.message : "Failed");
+                      toast.error(
+                        error instanceof Error ? error.message : "Failed",
+                      );
                     }
                   }}
                 >
@@ -276,7 +289,27 @@ function ServerSection({ serverId }: { serverId: string }) {
         </DropdownMenu>
       </div>
 
-      <div className="px-2 py-3">
+      {server.bannerUrl && (
+        <div className="relative h-24 overflow-hidden border-b border-border/60">
+          <img
+            src={server.bannerUrl}
+            alt=""
+            className="size-full object-cover"
+          />
+          <span className="absolute inset-0 bg-gradient-to-t from-sidebar via-transparent to-transparent" />
+        </div>
+      )}
+
+      <div className="px-3 py-3">
+        {canInvite && (
+          <button
+            type="button"
+            onClick={() => setInviteOpen(true)}
+            className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl bg-primary/15 px-3 py-2.5 text-sm font-semibold text-primary ring-1 ring-primary/20 transition-colors hover:bg-primary/25"
+          >
+            <UserPlus className="size-4" /> Invite people
+          </button>
+        )}
         {groups.map((group) => (
           <div key={group.id || "loose"} className="mb-4 last:mb-0">
             {group.id !== "" && (
@@ -324,10 +357,10 @@ function ServerSection({ serverId }: { serverId: string }) {
                     to={`/dashboard/s/${serverId}/${isVoice ? "v" : "c"}/${channel.id}`}
                     title={channel.topic ?? channel.name}
                     className={cn(
-                      "mb-0.5 flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
+                      "mb-1 flex items-center gap-2 rounded-lg border-l-2 px-2.5 py-2 text-sm transition-colors",
                       active
-                        ? "bg-sidebar-accent text-foreground"
-                        : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground",
+                        ? "border-primary bg-primary/15 font-semibold text-foreground shadow-sm"
+                        : "border-transparent text-muted-foreground hover:bg-sidebar-accent/70 hover:text-foreground",
                     )}
                   >
                     {isVoice ? (
@@ -340,7 +373,9 @@ function ServerSection({ serverId }: { serverId: string }) {
                     <span
                       className={cn(
                         "truncate",
-                        channel.unread && !active && "font-semibold text-foreground",
+                        channel.unread &&
+                          !active &&
+                          "font-semibold text-foreground",
                         channel.readOnly && "italic",
                       )}
                     >
@@ -512,7 +547,8 @@ function HomeSection() {
   const discoverMatch = useMatch("/dashboard/discover");
   const adminMatch = useMatch("/dashboard/admin");
 
-  const pending = (social?.incoming.length ?? 0) + (social?.outgoing.length ?? 0);
+  const pending =
+    (social?.incoming.length ?? 0) + (social?.outgoing.length ?? 0);
   const filtered = (conversations ?? []).filter((conversation) => {
     if (!query.trim()) return true;
     return conversationLabel(conversation, me?.id)
@@ -522,10 +558,13 @@ function HomeSection() {
 
   return (
     <div className="px-2 py-3">
+      <div className="-mx-2 -mt-3 mb-3 flex h-14 items-center border-b border-border/70 px-4 text-base font-bold tracking-tight">
+        Direct messages
+      </div>
       <Link
         to="/dashboard"
         className={cn(
-          "mb-1 flex items-center gap-2 rounded-md px-2 py-2 text-sm",
+          "mb-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm",
           friendsMatch && !findPeopleMatch
             ? "bg-sidebar-accent font-medium text-foreground"
             : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground",
@@ -543,7 +582,7 @@ function HomeSection() {
       <Link
         to="/dashboard?tab=add"
         className={cn(
-          "mb-1 flex items-center gap-2 rounded-md px-2 py-2 text-sm",
+          "mb-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm",
           findPeopleMatch
             ? "bg-sidebar-accent font-medium text-foreground"
             : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground",
@@ -556,7 +595,7 @@ function HomeSection() {
       <button
         type="button"
         onClick={() => setCreateGroupOpen(true)}
-        className="mb-1 flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm text-muted-foreground transition-colors hover:bg-sidebar-accent/60 hover:text-foreground"
+        className="mb-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition-colors hover:bg-sidebar-accent/70 hover:text-foreground"
       >
         <UserPlus className="size-4" />
         Create group
@@ -565,7 +604,7 @@ function HomeSection() {
       <Link
         to="/dashboard/discover"
         className={cn(
-          "mb-1 flex items-center gap-2 rounded-md px-2 py-2 text-sm",
+          "mb-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm",
           discoverMatch
             ? "bg-sidebar-accent font-medium text-foreground"
             : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground",
@@ -633,14 +672,16 @@ function HomeSection() {
             <Link
               key={conversation.id}
               to={`/dashboard/dm/${conversation.id}`}
-              className="mb-0.5 flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-sidebar-accent/60 hover:text-foreground"
+              className="mb-1 flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm text-muted-foreground transition-colors hover:bg-sidebar-accent/70 hover:text-foreground"
             >
               <UserAvatar
                 user={{
                   id: conversation.id,
                   name: label,
                   avatarUrl:
-                    conversation.type === "dm" ? (other?.avatarUrl ?? null) : null,
+                    conversation.type === "dm"
+                      ? (other?.avatarUrl ?? null)
+                      : null,
                   presence:
                     conversation.type === "dm" && other
                       ? other.presence
@@ -650,7 +691,15 @@ function HomeSection() {
                 showStatus={conversation.type === "dm"}
               />
               <span className="min-w-0 flex-1">
-                <span className="block truncate">{label}</span>
+                {conversation.type === "dm" && other ? (
+                  <StyledDisplayName
+                    user={other}
+                    name={label}
+                    className="block truncate"
+                  />
+                ) : (
+                  <span className="block truncate font-semibold">{label}</span>
+                )}
                 {missedCall && (
                   <span className="flex items-center gap-1 text-[11px] font-medium text-destructive">
                     <PhoneOff className="size-3" /> Missed call
@@ -730,7 +779,9 @@ function NewConversationDialog({
       setTerm("");
       navigate(`/dashboard/dm/${conversationId}`);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not start the chat.");
+      toast.error(
+        error instanceof Error ? error.message : "Could not start the chat.",
+      );
     } finally {
       setBusy(false);
     }
@@ -779,16 +830,25 @@ function NewConversationDialog({
                       @{friend.username}
                     </span>
                   </span>
-                  {isSelected && <span className="text-xs text-primary">✓</span>}
+                  {isSelected && (
+                    <span className="text-xs text-primary">✓</span>
+                  )}
                 </button>
               );
             })
           )}
         </div>
         {selected.length > 0 && (
-          <Button size="sm" className="mt-2 w-full" onClick={start} disabled={busy}>
+          <Button
+            size="sm"
+            className="mt-2 w-full"
+            onClick={start}
+            disabled={busy}
+          >
             <MessagesSquare className="mr-2 size-4" />
-            {selected.length === 1 ? "Message" : `Message ${selected.length} people`}
+            {selected.length === 1
+              ? "Message"
+              : `Message ${selected.length} people`}
           </Button>
         )}
       </DropdownMenuContent>

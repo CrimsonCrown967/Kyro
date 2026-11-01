@@ -18,7 +18,12 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { DeviceBadge, PresenceDot, UserAvatar } from "@/components/app/UserAvatar";
+import {
+  DeviceBadge,
+  PresenceDot,
+  UserAvatar,
+} from "@/components/app/UserAvatar";
+import { StyledDisplayName } from "@/components/app/StyledDisplayName";
 import { ServerTagChip } from "@/components/app/ServerTag";
 import {
   GlobalBadgeIcon,
@@ -126,7 +131,9 @@ export function ProfileCard() {
   const incoming = lists?.incoming.find((row) => row.user?.id === userId);
   const outgoing = lists?.outgoing.find((row) => row.user?.id === userId);
   const isFriend = social?.friendship === "accepted";
-  const isBlocked = (lists?.blocked ?? []).some((row) => row.user?.id === userId);
+  const isBlocked = (lists?.blocked ?? []).some(
+    (row) => row.user?.id === userId,
+  );
   /** Only site admins can grant or revoke global badges. */
   const canManageBadges = Boolean(me && (me.role === "admin" || me.isFounder));
   const presenceMeta = user
@@ -197,7 +204,7 @@ export function ProfileCard() {
 
                 <DialogHeader className="mt-3 space-y-1 text-left">
                   <DialogTitle className="flex flex-wrap items-center gap-x-2 gap-y-1 text-2xl font-bold leading-tight sm:text-3xl">
-                    <span className="break-words">{user.name}</span>
+                    <StyledDisplayName user={user} className="break-words" />
                     <InlineBadge
                       badges={user.badges}
                       primaryBadge={user.primaryBadge}
@@ -465,7 +472,10 @@ export function ProfileCard() {
                               >
                                 <GlobalBadgeIcon badge={badge} />
                                 {GLOBAL_BADGE_META[badge].label}
-                                <span aria-hidden="true" className="text-[10px]">
+                                <span
+                                  aria-hidden="true"
+                                  className="text-[10px]"
+                                >
                                   {granted ? "✓ grant" : "+ grant"}
                                 </span>
                               </button>
@@ -475,7 +485,9 @@ export function ProfileCard() {
                         <div className="mt-2 flex items-center gap-2">
                           <Input
                             value={warnReason}
-                            onChange={(event) => setWarnReason(event.target.value)}
+                            onChange={(event) =>
+                              setWarnReason(event.target.value)
+                            }
                             placeholder="Warning reason…"
                             maxLength={300}
                             className="h-8 flex-1 text-xs"
@@ -593,7 +605,8 @@ export function ProfileCard() {
                     onClick={() =>
                       void run(
                         cancel({
-                          connectionId: outgoing.connectionId as Id<"connections">,
+                          connectionId:
+                            outgoing.connectionId as Id<"connections">,
                         }),
                         "Request cancelled.",
                       )

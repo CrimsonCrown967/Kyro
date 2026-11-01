@@ -24,12 +24,17 @@ import { EmojiPicker } from "@/components/app/EmojiPicker";
 import { UserAvatar } from "@/components/app/UserAvatar";
 import type { CustomEmoji } from "@/lib/emoji";
 import { GifPicker } from "@/components/app/GifPicker";
+import { StyledDisplayName } from "@/components/app/StyledDisplayName";
 
 export interface MentionUser {
   id: string;
   name: string;
   username: string | null;
   avatarUrl?: string | null;
+  displayNameFont?: string | null;
+  displayNameColorMode?: "none" | "solid" | "gradient" | null;
+  displayNameColor?: string | null;
+  displayNameColor2?: string | null;
 }
 
 export function Composer({
@@ -195,14 +200,14 @@ export function Composer({
 
   if (disabledReason) {
     return (
-      <div className="border-t border-border/60 bg-panel px-4 py-4 text-center text-sm text-muted-foreground">
+      <div className="mx-4 mb-4 rounded-xl border border-border/70 bg-panel/80 px-4 py-3 text-center text-sm text-muted-foreground">
         {disabledReason}
       </div>
     );
   }
 
   return (
-    <div className="border-t border-border/60 bg-panel px-3 pb-4 pt-2 sm:px-6">
+    <div className="bg-transparent px-3 pb-4 pt-2 sm:px-5">
       {reply && (
         <div className="mb-1 flex items-center justify-between rounded-t-lg border border-b-0 border-border/70 bg-surface px-3 py-1.5 text-xs text-muted-foreground">
           <span className="truncate">
@@ -259,7 +264,7 @@ export function Composer({
 
       <div
         className={cn(
-          "relative flex items-end gap-1 rounded-lg border border-input bg-surface px-2 py-1.5 focus-within:border-primary/60",
+          "relative flex items-end gap-1 rounded-2xl border border-input bg-panel/90 px-2.5 py-2 shadow-[0_8px_30px_rgba(0,0,0,.13)] backdrop-blur-xl focus-within:border-primary/70 focus-within:ring-1 focus-within:ring-primary/25",
           (attachments.length > 0 || reply) && "rounded-t-none",
         )}
       >
@@ -366,9 +371,16 @@ export function Composer({
                     <UserAvatar user={user} size="xs" showStatus={false} />
                   )}
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium">
-                      {mass ? `@${user.username}` : user.name}
-                    </span>
+                    {mass ? (
+                      <span className="block truncate text-sm font-medium">
+                        @{user.username}
+                      </span>
+                    ) : (
+                      <StyledDisplayName
+                        user={user}
+                        className="block truncate text-sm"
+                      />
+                    )}
                     <span className="block truncate text-xs text-muted-foreground">
                       {mass
                         ? user.id === "everyone"

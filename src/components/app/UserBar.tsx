@@ -13,6 +13,7 @@ import { DeviceBadge, UserAvatar } from "@/components/app/UserAvatar";
 import { ServerTagChip } from "@/components/app/ServerTag";
 import { CrownBadge } from "@/components/app/CrownBadge";
 import { InlineBadge } from "@/components/app/GlobalBadges";
+import { StyledDisplayName } from "@/components/app/StyledDisplayName";
 import { useAuth } from "@/hooks/use-auth";
 import {
   DropdownMenu,
@@ -99,19 +100,20 @@ export function UserBar({ onOpenSettings }: { onOpenSettings?: () => void }) {
   };
 
   return (
-    <div className="border-t border-border/60 bg-sidebar p-2">
+    <div className="m-2 mt-1 rounded-2xl border border-border/70 bg-panel/75 p-2 shadow-[0_10px_28px_rgba(0,0,0,.18)] backdrop-blur-xl">
       {/* Non-modal so closing the status menu never leaves an invisible
           pointer-events guard behind — that guard is what forced a second
           click before the chat box accepted focus. */}
       <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
-          <button className="flex w-full items-center gap-2 rounded-md px-1.5 py-1.5 text-left hover:bg-sidebar-accent/70">
+          <button className="flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-left hover:bg-sidebar-accent/80">
             <UserAvatar user={me} size="sm" />
             <span className="min-w-0 flex-1">
               <span className="flex items-center gap-1.5">
-                <span className="truncate text-sm font-medium leading-tight">
-                  {me.name}
-                </span>
+                <StyledDisplayName
+                  user={me}
+                  className="truncate text-sm leading-tight"
+                />
                 {me.badges.length > 0 ? (
                   <InlineBadge
                     badges={me.badges}

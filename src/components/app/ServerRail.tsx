@@ -63,10 +63,10 @@ function RailButton({
   const body = (
     <span
       className={cn(
-        "relative flex size-12 items-center justify-center overflow-hidden rounded-2xl transition-all duration-200",
+        "relative flex size-[52px] items-center justify-center overflow-hidden rounded-[18px] ring-1 ring-white/5 transition-all duration-200",
         active
-          ? "rounded-xl bg-surface text-foreground"
-          : "rounded-2xl bg-surface/70 text-muted-foreground hover:rounded-xl hover:bg-surface hover:text-foreground",
+          ? "rounded-[15px] bg-surface text-foreground shadow-lg ring-primary/30"
+          : "bg-surface/65 text-muted-foreground hover:rounded-[15px] hover:bg-surface hover:text-foreground",
         className,
       )}
     >
@@ -139,7 +139,9 @@ export function ServerRail({ activeServerId }: { activeServerId?: string }) {
       if (success) toast.success(success);
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "That didn't work — try again.",
+        error instanceof Error
+          ? error.message
+          : "That didn't work — try again.",
       );
     }
   };
@@ -148,14 +150,14 @@ export function ServerRail({ activeServerId }: { activeServerId?: string }) {
     <>
       <nav
         aria-label="Communities"
-        className="flex w-[72px] shrink-0 flex-col items-center gap-2 overflow-y-auto overflow-x-hidden bg-rail py-3"
+        className="flex w-[88px] shrink-0 flex-col items-center gap-2 overflow-y-auto overflow-x-hidden border-r border-border/50 bg-rail px-2 py-2.5"
       >
         <RailButton
           label="Direct messages"
           active={!activeServerId}
           to="/dashboard"
         >
-          <KyroMark className="size-7" />
+          <KyroMark className="size-8" />
         </RailButton>
 
         <span className="my-1 h-px w-8 bg-border" />
@@ -232,16 +234,28 @@ export function ServerRail({ activeServerId }: { activeServerId?: string }) {
           ))
         )}
 
-        <RailButton label="Create a community" active={false} onClick={() => setCreateOpen(true)}>
+        <RailButton
+          label="Create a community"
+          active={false}
+          onClick={() => setCreateOpen(true)}
+        >
           <Plus className="size-5" />
         </RailButton>
-        <RailButton label="Explore communities" active={false} onClick={() => setDiscoverOpen(true)}>
+        <RailButton
+          label="Explore communities"
+          active={false}
+          onClick={() => setDiscoverOpen(true)}
+        >
           <Compass className="size-5" />
         </RailButton>
       </nav>
 
       <CreateCommunityDialog open={createOpen} onOpenChange={setCreateOpen} />
-      <DiscoverDialog open={discoverOpen} onOpenChange={setDiscoverOpen} onJoin={(id) => navigate(`/dashboard/s/${id}`)} />
+      <DiscoverDialog
+        open={discoverOpen}
+        onOpenChange={setDiscoverOpen}
+        onJoin={(id) => navigate(`/dashboard/s/${id}`)}
+      />
 
       {/* Right-click menu for a server: invite, mark read, mute. */}
       <DropdownMenu
@@ -287,9 +301,7 @@ export function ServerRail({ activeServerId }: { activeServerId?: string }) {
                     serverId: menuServer.id as Id<"servers">,
                     muted: !menuServer.muted,
                   }),
-                  menuServer.muted
-                    ? "Server unmuted."
-                    : "Server muted.",
+                  menuServer.muted ? "Server unmuted." : "Server muted.",
                 )
               }
             >
@@ -362,8 +374,8 @@ function DiscoverDialog({
         <DialogHeader>
           <DialogTitle>Explore communities</DialogTitle>
           <DialogDescription>
-            Public Kyro communities you can join right now — all free, no invites
-            required.
+            Public Kyro communities you can join right now — all free, no
+            invites required.
           </DialogDescription>
         </DialogHeader>
         <Input
@@ -390,22 +402,31 @@ function DiscoverDialog({
               >
                 <div className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-gradient-to-br from-brand to-cyan text-xs font-bold text-white">
                   {server.iconUrl ? (
-                    <img src={server.iconUrl} alt="" className="size-full object-cover" />
+                    <img
+                      src={server.iconUrl}
+                      alt=""
+                      className="size-full object-cover"
+                    />
                   ) : (
                     server.name.slice(0, 2).toUpperCase()
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold">{server.name}</p>
+                  <p className="truncate text-sm font-semibold">
+                    {server.name}
+                  </p>
                   <p className="truncate text-xs text-muted-foreground">
-                    {server.memberCount} member{server.memberCount === 1 ? "" : "s"}
+                    {server.memberCount} member
+                    {server.memberCount === 1 ? "" : "s"}
                     {server.description ? ` · ${server.description}` : ""}
                   </p>
                 </div>
                 <Button
                   size="sm"
                   onClick={() =>
-                    server.isJoined ? onJoin(server.id) : void joinNow(server.id)
+                    server.isJoined
+                      ? onJoin(server.id)
+                      : void joinNow(server.id)
                   }
                   disabled={busyId === server.id}
                 >

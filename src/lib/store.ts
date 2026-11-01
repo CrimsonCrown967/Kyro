@@ -85,6 +85,8 @@ const TINT_VARS = [
   "--tint-a",
   "--tint-b",
   "--tint-strength",
+  "--tint-keep",
+  "--tint-soft-keep",
 ];
 
 /** Recolours the app from the active tint (preset or custom colours). */
@@ -101,7 +103,15 @@ function applyTint(prefs: Preferences) {
     return;
   }
   // 0–100 maps to a 0–12% background wash; 75 (default) lands at 9%.
-  const strength = (Math.max(0, Math.min(100, prefs.tintIntensity) / 100) * 12).toFixed(2);
+  const strength = (
+    Math.max(0, Math.min(100, prefs.tintIntensity) / 100) * 12
+  ).toFixed(2);
+  const intensity = Math.max(0, Math.min(100, prefs.tintIntensity));
+  // The full app tint is deliberately much stronger than the decorative body
+  // wash: at the default 75%, backgrounds visibly adopt the selected colours
+  // while panels retain enough of their dark/light base for contrast.
+  const keep = (100 - intensity * 0.56).toFixed(2);
+  const softKeep = (100 - intensity * 0.37).toFixed(2);
   root.dataset.tint = prefs.tint;
   root.style.setProperty("--primary", tint.solid);
   root.style.setProperty("--brand", tint.solid);
@@ -113,12 +123,16 @@ function applyTint(prefs: Preferences) {
   root.style.setProperty("--tint-a", tint.a);
   root.style.setProperty("--tint-b", tint.b);
   root.style.setProperty("--tint-strength", `${strength}%`);
+  root.style.setProperty("--tint-keep", `${keep}%`);
+  root.style.setProperty("--tint-soft-keep", `${softKeep}%`);
 }
 
 export function applyPreferences(prefs: Preferences) {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
-  const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches;
+  const prefersDark = window.matchMedia?.(
+    "(prefers-color-scheme: dark)",
+  ).matches;
   const dark =
     prefs.theme === "dark" || (prefs.theme === "system" && prefersDark);
   root.classList.toggle("dark", dark);
@@ -133,7 +147,10 @@ interface AppState extends Preferences {
   searchOpen: boolean;
   inboxOpen: boolean;
   drafts: Record<string, string>;
-  setPreference: <K extends keyof Preferences>(key: K, value: Preferences[K]) => void;
+  setPreference: <K extends keyof Preferences>(
+    key: K,
+    value: Preferences[K],
+  ) => void;
   setMobileNav: (open: boolean) => void;
   toggleMemberList: () => void;
   setSearchOpen: (open: boolean) => void;

@@ -56,6 +56,19 @@ const PROFILE_BADGES = [
   "partner",
 ];
 
+const DISPLAY_NAME_FONTS = [
+  "default",
+  "rounded",
+  "serif",
+  "mono",
+  "handwritten",
+  "condensed",
+  "slab",
+  "pixel",
+];
+
+const HEX_COLOUR = /^#[0-9a-fA-F]{6}$/;
+
 /**
  * Full profile for the signed-in account, with the avatar resolved to a
  * signed URL. This is what the app renders in the user panel and settings.
@@ -63,7 +76,13 @@ const PROFILE_BADGES = [
 export const me = query({
   args: {},
   handler: async (ctx) => {
-    const { id, user } = await requireUser(ctx);
+    // This read query is mounted throughout the app shell. During sign-out or
+    // account deletion, auth can disappear one render before the route
+    // unmounts; return null instead of throwing and crashing that transition.
+    const id = await getAuthUserId(ctx);
+    if (id === null) return null;
+    const user = await ctx.db.get(id);
+    if (!user || user.deletedAt !== undefined) return null;
     const publicUser = await hydrateUser(ctx, user, id);
     return {
       ...publicUser,
@@ -114,7 +133,8 @@ export const claimProfile = mutation({
     await ctx.db.patch(id, {
       username: handle,
       name: displayName || handle,
-      usernameChangedAt: user.username === handle ? user.usernameChangedAt : Date.now(),
+      usernameChangedAt:
+        user.username === handle ? user.usernameChangedAt : Date.now(),
       createdAt: user.createdAt ?? Date.now(),
       status: user.status ?? "online",
       lastSeen: Date.now(),
@@ -130,6 +150,12 @@ export const updateProfile = mutation({
     bio: v.optional(v.string()),
     customStatus: v.optional(v.string()),
     accent: v.optional(v.string()),
+    displayNameFont: v.optional(v.string()),
+    displayNameColorMode: v.optional(
+      v.union(v.literal("none"), v.literal("solid"), v.literal("gradient")),
+    ),
+    displayNameColor: v.optional(v.string()),
+    displayNameColor2: v.optional(v.string()),
     avatarStorageId: v.optional(v.union(v.id("_storage"), v.null())),
     bannerStorageId: v.optional(v.union(v.id("_storage"), v.null())),
     links: v.optional(
@@ -145,20 +171,23 @@ export const updateProfile = mutation({
     primaryBadge: v.optional(v.string()),
     profileTheme: v.optional(v.string()),
     wornTag: v.optional(v.union(v.string(), v.null())),
-    status: v.optional(v.union(
-      v.literal("online"),
-      v.literal("idle"),
-      v.literal("dnd"),
-      v.literal("invisible"),
-      v.literal("offline"),
-    )),
+    status: v.optional(
+      v.union(
+        v.literal("online"),
+        v.literal("idle"),
+        v.literal("dnd"),
+        v.literal("invisible"),
+        v.literal("offline"),
+      ),
+    ),
   },
   handler: async (ctx, args) => {
     const { id, user } = await requireActiveUser(ctx);
     const patch: Partial<Doc<"users">> = {};
     if (args.name !== undefined) {
       const name = args.name.trim().slice(0, 64);
-      if (name.length < 2) throw new Error("Display names need at least 2 characters.");
+      if (name.length < 2)
+        throw new Error("Display names need at least 2 characters.");
       patch.name = name;
     }
     if (args.bio !== undefined) patch.bio = args.bio.trim().slice(0, 400);
@@ -171,31 +200,50 @@ export const updateProfile = mutation({
       }
       patch.accent = args.accent || undefined;
     }
+    if (args.displayNameFont !== undefined) {
+      if (!DISPLAY_NAME_FONTS.includes(args.displayNameFont)) {
+        throw new Error("That display-name font doesn't exist.");
+      }
+      patch.displayNameFont =
+        args.displayNameFont === "default" ? undefined : args.displayNameFont;
+    }
+    if (args.displayNameColorMode !== undefined) {
+      patch.displayNameColorMode =
+        args.displayNameColorMode === "none"
+          ? undefined
+          : args.displayNameColorMode;
+      if (args.displayNameColorMode === "none") {
+        patch.displayNameColor = undefined;
+        patch.displayNameColor2 = undefined;
+      }
+    }
+    if (args.displayNameColor !== undefined) {
+      if (args.displayNameColor && !HEX_COLOUR.test(args.displayNameColor)) {
+        throw new Error("Display-name colours must be six-digit hex values.");
+      }
+      patch.displayNameColor = args.displayNameColor || undefined;
+    }
+    if (args.displayNameColor2 !== undefined) {
+      if (args.displayNameColor2 && !HEX_COLOUR.test(args.displayNameColor2)) {
+        throw new Error("Display-name colours must be six-digit hex values.");
+      }
+      patch.displayNameColor2 = args.displayNameColor2 || undefined;
+    }
     if (args.status !== undefined) {
       patch.status = args.status;
       patch.lastSeen = Date.now();
     }
     if (args.avatarStorageId !== undefined) {
       if (args.avatarStorageId === null) {
-        await deleteClaimedUpload(
-          ctx,
-          user.avatarStorageId,
-          "user_avatar",
-          id,
-        );
+        await deleteClaimedUpload(ctx, user.avatarStorageId, "user_avatar", id);
         patch.avatarStorageId = undefined;
       } else {
         await requireOwnedUpload(ctx, id, args.avatarStorageId, {
           imageOnly: true,
         });
-        await claimUpload(
-          ctx,
-          id,
-          args.avatarStorageId,
-          "user_avatar",
-          id,
-          { imageOnly: true },
-        );
+        await claimUpload(ctx, id, args.avatarStorageId, "user_avatar", id, {
+          imageOnly: true,
+        });
         if (user.avatarStorageId !== args.avatarStorageId) {
           await deleteClaimedUpload(
             ctx,
@@ -209,25 +257,15 @@ export const updateProfile = mutation({
     }
     if (args.bannerStorageId !== undefined) {
       if (args.bannerStorageId === null) {
-        await deleteClaimedUpload(
-          ctx,
-          user.bannerStorageId,
-          "user_banner",
-          id,
-        );
+        await deleteClaimedUpload(ctx, user.bannerStorageId, "user_banner", id);
         patch.bannerStorageId = undefined;
       } else {
         await requireOwnedUpload(ctx, id, args.bannerStorageId, {
           imageOnly: true,
         });
-        await claimUpload(
-          ctx,
-          id,
-          args.bannerStorageId,
-          "user_banner",
-          id,
-          { imageOnly: true },
-        );
+        await claimUpload(ctx, id, args.bannerStorageId, "user_banner", id, {
+          imageOnly: true,
+        });
         if (user.bannerStorageId !== args.bannerStorageId) {
           await deleteClaimedUpload(
             ctx,
@@ -276,7 +314,8 @@ export const updateProfile = mutation({
       if (args.primaryBadge !== "none") {
         // Mirror hydrateUser's badge derivation: you can only wear one you hold.
         const isFounder = isFounderUser(user);
-        const founderAdminRemoved = isFounder && user.adminBadgeRemoved === true;
+        const founderAdminRemoved =
+          isFounder && user.adminBadgeRemoved === true;
         const held = new Set<string>();
         if (
           isFounder
@@ -484,17 +523,15 @@ export const setPresence = mutation({
 export const heartbeat = mutation({
   args: {
     device: v.optional(
-      v.union(
-        v.literal("desktop"),
-        v.literal("mobile"),
-        v.literal("tablet"),
-      ),
+      v.union(v.literal("desktop"), v.literal("mobile"), v.literal("tablet")),
     ),
   },
   handler: async (ctx, { device }) => {
     const { id, user } = await requireActiveUser(ctx);
     const status =
-      user.status === "idle" || user.status === "dnd" || user.status === "invisible"
+      user.status === "idle" ||
+      user.status === "dnd" ||
+      user.status === "invisible"
         ? user.status
         : "online";
     await ctx.db.patch(id, {
@@ -587,7 +624,9 @@ export const searchUsers = query({
     );
     return results
       .map((u) => users.get(u._id))
-      .filter((u): u is NonNullable<typeof u> => Boolean(u) && u!.id !== viewerId);
+      .filter(
+        (u): u is NonNullable<typeof u> => Boolean(u) && u!.id !== viewerId,
+      );
   },
 });
 
@@ -649,8 +688,11 @@ export const searchMessages = query({
             author: authors.get(message.authorId) ?? null,
           },
           serverId:
-            isChannel && container ? ((container as Doc<"channels">).serverId as string) : null,
-          containerName: container && "name" in container ? container.name : null,
+            isChannel && container
+              ? ((container as Doc<"channels">).serverId as string)
+              : null,
+          containerName:
+            container && "name" in container ? container.name : null,
         };
       }),
     );
@@ -682,7 +724,8 @@ export const revokeSession = mutation({
   handler: async (ctx, { sessionId }) => {
     const { id } = await requireUser(ctx);
     const session = await ctx.db.get(sessionId);
-    if (!session || session.userId !== id) throw new Error("Session not found.");
+    if (!session || session.userId !== id)
+      throw new Error("Session not found.");
     const tokens = await ctx.db
       .query("authRefreshTokens")
       .withIndex("sessionId", (q) => q.eq("sessionId", sessionId))
@@ -718,48 +761,58 @@ export const exportData = mutation({
   args: {},
   handler: async (ctx) => {
     const { id, user } = await requireUser(ctx);
-    const [outgoing, incoming, blocks, memberships, ownedServers, messages, notes, reads] =
-      await Promise.all([
-        ctx.db
-          .query("connections")
-          .withIndex("by_requester", (q) => q.eq("requesterId", id))
-          .collect(),
-        ctx.db
-          .query("connections")
-          .withIndex("by_addressee", (q) => q.eq("addresseeId", id))
-          .collect(),
-        ctx.db
-          .query("blocks")
-          .withIndex("by_blocker", (q) => q.eq("blockerId", id))
-          .collect(),
-        ctx.db
-          .query("serverMembers")
-          .withIndex("by_user", (q) => q.eq("userId", id))
-          .collect(),
-        ctx.db
-          .query("servers")
-          .withIndex("by_owner", (q) => q.eq("ownerId", id))
-          .collect(),
-        ctx.db
-          .query("messages")
-          .withIndex("by_author", (q) => q.eq("authorId", id))
-          .take(5000),
-        ctx.db
-          .query("notifications")
-          .withIndex("by_user", (q) => q.eq("userId", id))
-          .take(1000),
-        ctx.db
-          .query("reads")
-          .withIndex("by_user", (q) => q.eq("userId", id))
-          .collect(),
-      ]);
+    const [
+      outgoing,
+      incoming,
+      blocks,
+      memberships,
+      ownedServers,
+      messages,
+      notes,
+      reads,
+    ] = await Promise.all([
+      ctx.db
+        .query("connections")
+        .withIndex("by_requester", (q) => q.eq("requesterId", id))
+        .collect(),
+      ctx.db
+        .query("connections")
+        .withIndex("by_addressee", (q) => q.eq("addresseeId", id))
+        .collect(),
+      ctx.db
+        .query("blocks")
+        .withIndex("by_blocker", (q) => q.eq("blockerId", id))
+        .collect(),
+      ctx.db
+        .query("serverMembers")
+        .withIndex("by_user", (q) => q.eq("userId", id))
+        .collect(),
+      ctx.db
+        .query("servers")
+        .withIndex("by_owner", (q) => q.eq("ownerId", id))
+        .collect(),
+      ctx.db
+        .query("messages")
+        .withIndex("by_author", (q) => q.eq("authorId", id))
+        .take(5000),
+      ctx.db
+        .query("notifications")
+        .withIndex("by_user", (q) => q.eq("userId", id))
+        .take(1000),
+      ctx.db
+        .query("reads")
+        .withIndex("by_user", (q) => q.eq("userId", id))
+        .collect(),
+    ]);
 
     const connections = [...outgoing, ...incoming];
     const relevantConnections = connections;
     const friendIds = relevantConnections.map((c) =>
       c.requesterId === id ? c.addresseeId : c.requesterId,
     );
-    const friendDocs = await Promise.all(friendIds.map((fid) => ctx.db.get(fid)));
+    const friendDocs = await Promise.all(
+      friendIds.map((fid) => ctx.db.get(fid)),
+    );
 
     const payload = {
       exportedAt: new Date().toISOString(),
@@ -814,7 +867,7 @@ export const deleteAccount = mutation({
   handler: async (ctx, { confirm }) => {
     const { id, user } = await requireUser(ctx);
     if (confirm !== "DELETE") {
-      throw new Error('Type DELETE to confirm account deletion.');
+      throw new Error("Type DELETE to confirm account deletion.");
     }
     const owned = await ctx.db
       .query("servers")
@@ -826,26 +879,49 @@ export const deleteAccount = mutation({
       );
     }
 
-    const [memberships, notes, reads, outgoing, incoming, blocks, sessions, accounts] =
-      await Promise.all([
-        ctx.db.query("serverMembers").withIndex("by_user", (q) => q.eq("userId", id)).collect(),
-        ctx.db.query("notifications").withIndex("by_user", (q) => q.eq("userId", id)).collect(),
-        ctx.db.query("reads").withIndex("by_user", (q) => q.eq("userId", id)).collect(),
-        ctx.db
-          .query("connections")
-          .withIndex("by_requester", (q) => q.eq("requesterId", id))
-          .collect(),
-        ctx.db
-          .query("connections")
-          .withIndex("by_addressee", (q) => q.eq("addresseeId", id))
-          .collect(),
-        ctx.db.query("blocks").withIndex("by_blocker", (q) => q.eq("blockerId", id)).collect(),
-        ctx.db.query("authSessions").withIndex("userId", (q) => q.eq("userId", id)).collect(),
-        ctx.db
-          .query("authAccounts")
-          .withIndex("userIdAndProvider", (q) => q.eq("userId", id))
-          .collect(),
-      ]);
+    const [
+      memberships,
+      notes,
+      reads,
+      outgoing,
+      incoming,
+      blocks,
+      sessions,
+      accounts,
+    ] = await Promise.all([
+      ctx.db
+        .query("serverMembers")
+        .withIndex("by_user", (q) => q.eq("userId", id))
+        .collect(),
+      ctx.db
+        .query("notifications")
+        .withIndex("by_user", (q) => q.eq("userId", id))
+        .collect(),
+      ctx.db
+        .query("reads")
+        .withIndex("by_user", (q) => q.eq("userId", id))
+        .collect(),
+      ctx.db
+        .query("connections")
+        .withIndex("by_requester", (q) => q.eq("requesterId", id))
+        .collect(),
+      ctx.db
+        .query("connections")
+        .withIndex("by_addressee", (q) => q.eq("addresseeId", id))
+        .collect(),
+      ctx.db
+        .query("blocks")
+        .withIndex("by_blocker", (q) => q.eq("blockerId", id))
+        .collect(),
+      ctx.db
+        .query("authSessions")
+        .withIndex("userId", (q) => q.eq("userId", id))
+        .collect(),
+      ctx.db
+        .query("authAccounts")
+        .withIndex("userIdAndProvider", (q) => q.eq("userId", id))
+        .collect(),
+    ]);
 
     for (const membership of memberships) await ctx.db.delete(membership._id);
     for (const note of notes) await ctx.db.delete(note._id);
@@ -890,7 +966,8 @@ export const usernameAvailable = query({
   args: { username: v.string() },
   handler: async (ctx, { username }) => {
     const handle = normalizeUsername(username);
-    if (!USERNAME_PATTERN.test(handle) || isReservedUsername(handle)) return false;
+    if (!USERNAME_PATTERN.test(handle) || isReservedUsername(handle))
+      return false;
     const existing = await ctx.db
       .query("users")
       .withIndex("by_username", (q) => q.eq("username", handle))
@@ -915,14 +992,12 @@ export const suggest = query({
       .withIndex("by_user", (q) => q.eq("userId", id))
       .collect();
     const perServer = await Promise.all(
-      myMemberships
-        .slice(0, 20)
-        .map((row) =>
-          ctx.db
-            .query("serverMembers")
-            .withIndex("by_server", (q) => q.eq("serverId", row.serverId))
-            .collect(),
-        ),
+      myMemberships.slice(0, 20).map((row) =>
+        ctx.db
+          .query("serverMembers")
+          .withIndex("by_server", (q) => q.eq("serverId", row.serverId))
+          .collect(),
+      ),
     );
     const candidateIds = new Set<string>();
     for (const rows of perServer) {
@@ -965,8 +1040,7 @@ export const suggest = query({
     );
     const visibleIds = candidateDocs
       .filter(
-        (doc): doc is Doc<"users"> =>
-          doc !== null && doc.suggestible !== false,
+        (doc): doc is Doc<"users"> => doc !== null && doc.suggestible !== false,
       )
       .map((doc) => doc._id);
     const users = await hydrateUsers(ctx, visibleIds, id);

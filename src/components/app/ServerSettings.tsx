@@ -26,6 +26,7 @@ import {
   X,
 } from "@/components/icons";
 import { UserAvatar } from "@/components/app/UserAvatar";
+import { StyledDisplayName } from "@/components/app/StyledDisplayName";
 import { CrownBadge } from "@/components/app/CrownBadge";
 import {
   DropdownMenu,
@@ -2832,9 +2833,11 @@ function MembersTab({
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="flex min-w-0 items-baseline gap-1.5 truncate text-sm font-semibold">
-                    <span className="truncate">
-                      {member.nickname ?? member.user.name}
-                    </span>
+                    <StyledDisplayName
+                      user={member.user}
+                      name={member.nickname ?? member.user.name}
+                      className="truncate"
+                    />
                     <span className="truncate text-xs font-normal text-muted-foreground">
                       @{member.user.username}
                     </span>

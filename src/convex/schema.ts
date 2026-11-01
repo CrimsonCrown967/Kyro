@@ -91,6 +91,14 @@ const schema = defineSchema(
       lastSeen: v.optional(v.number()),
       /** Per-user accent colour used across their own interface. */
       accent: v.optional(v.string()),
+      /** Safe preset used to render this user's display name everywhere. */
+      displayNameFont: v.optional(v.string()),
+      /** Optional solid or two-colour gradient display-name treatment. */
+      displayNameColorMode: v.optional(
+        v.union(v.literal("solid"), v.literal("gradient")),
+      ),
+      displayNameColor: v.optional(v.string()),
+      displayNameColor2: v.optional(v.string()),
       /** Privacy controls, enforced server-side. */
       dmPolicy: v.optional(
         v.union(

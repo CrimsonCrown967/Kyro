@@ -42,6 +42,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { CustomEmoji } from "@/lib/emoji";
 import { EmojiPicker } from "@/components/app/EmojiPicker";
+import { StyledDisplayName } from "@/components/app/StyledDisplayName";
 import {
   Dialog,
   DialogContent,
@@ -63,6 +64,10 @@ export interface MessageAuthor {
   serverTag?: string | null;
   /** Device the author is on, for the platform indicator. */
   device?: string | null;
+  displayNameFont?: string | null;
+  displayNameColorMode?: "none" | "solid" | "gradient" | null;
+  displayNameColor?: string | null;
+  displayNameColor2?: string | null;
 }
 
 export interface MessageDto {
@@ -245,7 +250,7 @@ export function MessageList({
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        className="chat-scroll min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-6"
+        className="chat-scroll min-h-0 flex-1 overflow-y-auto bg-[radial-gradient(circle_at_50%_0%,color-mix(in_oklab,var(--primary)_5%,transparent),transparent_38%)] px-3 py-4 sm:px-5"
       >
         {latest === undefined ? (
           <div className="flex h-full items-center justify-center">
@@ -514,8 +519,8 @@ function MessageRow({
   return (
     <div
       className={cn(
-        "message-row group relative rounded-md px-2 py-1.5 hover:bg-surface/60",
-        grouped ? "mt-0 py-0.5" : "mt-2.5",
+        "message-row group relative rounded-xl px-3 py-1.5 transition-colors hover:bg-panel/45",
+        grouped ? "mt-0 py-0.5" : "mt-3",
       )}
     >
       <div className="flex gap-3">
@@ -538,14 +543,16 @@ function MessageRow({
               <button
                 type="button"
                 onClick={openProfile}
-                className="text-sm font-semibold hover:underline"
-                style={
-                  roleColors && author && roleColors[author.id]
-                    ? { color: roleColors[author.id] }
-                    : undefined
-                }
+                className="text-sm hover:underline"
               >
-                {author?.name ?? "Unknown user"}
+                {author ? (
+                  <StyledDisplayName
+                    user={author}
+                    roleColor={roleColors?.[author.id]}
+                  />
+                ) : (
+                  "Unknown user"
+                )}
               </button>
               {author?.badges && author.badges.length > 0 ? (
                 <InlineBadge
@@ -568,9 +575,16 @@ function MessageRow({
           {message.replyTo && (
             <div className="mb-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
               <CornerUpLeft className="size-3" />
-              <span className="font-medium text-foreground/80">
-                {message.replyTo.author?.name ?? "a message"}
-              </span>
+              {message.replyTo.author ? (
+                <StyledDisplayName
+                  user={message.replyTo.author}
+                  className="text-foreground/80"
+                />
+              ) : (
+                <span className="font-medium text-foreground/80">
+                  a message
+                </span>
+              )}
               <span className="truncate">{message.replyTo.excerpt}</span>
             </div>
           )}

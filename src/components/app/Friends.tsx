@@ -16,9 +16,15 @@ import { toast } from "sonner";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { UserAvatar } from "@/components/app/UserAvatar";
+import { StyledDisplayName } from "@/components/app/StyledDisplayName";
+import { WorkspaceActions } from "@/components/app/WorkspaceActions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { PRESENCE_META, formatRelative, type PresenceState } from "@/lib/format";
+import {
+  PRESENCE_META,
+  formatRelative,
+  type PresenceState,
+} from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 type Tab = "online" | "all" | "pending" | "blocked" | "suggested" | "add";
@@ -32,7 +38,14 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "add", label: "Add friend" },
 ];
 
-const TAB_IDS: Tab[] = ["online", "all", "pending", "blocked", "suggested", "add"];
+const TAB_IDS: Tab[] = [
+  "online",
+  "all",
+  "pending",
+  "blocked",
+  "suggested",
+  "add",
+];
 
 type PublicUser = {
   id: string;
@@ -41,6 +54,10 @@ type PublicUser = {
   avatarUrl: string | null;
   presence: PresenceState;
   customStatus: string | null;
+  displayNameFont?: string | null;
+  displayNameColorMode?: "none" | "solid" | "gradient" | null;
+  displayNameColor?: string | null;
+  displayNameColor2?: string | null;
 };
 
 /** The `/dashboard` home: friends, requests and discover-by-username. */
@@ -52,6 +69,7 @@ export function FriendsView() {
   // keeps deep-links working without a state-syncing effect.
   const tabParam = params.get("tab");
   const [fallbackTab, setFallbackTab] = useState<Tab>("online");
+  const [friendQuery, setFriendQuery] = useState("");
   const tab: Tab = TAB_IDS.includes(tabParam as Tab)
     ? (tabParam as Tab)
     : fallbackTab;
@@ -61,7 +79,8 @@ export function FriendsView() {
     nextParams.set("tab", next);
     setParams(nextParams, { replace: true });
   };
-  const pendingCount = (social?.incoming?.length ?? 0) + (social?.outgoing?.length ?? 0);
+  const pendingCount =
+    (social?.incoming?.length ?? 0) + (social?.outgoing?.length ?? 0);
 
   const openProfile = (userId: string) => {
     const next = new URLSearchParams(params);
@@ -71,11 +90,21 @@ export function FriendsView() {
 
   const friends = social?.friends ?? [];
   const online = friends.filter((user) => user.presence !== "offline");
+  const listedFriends = tab === "online" ? online : friends;
+  const visibleFriends = listedFriends.filter((user) => {
+    const needle = friendQuery.trim().toLowerCase();
+    if (!needle) return true;
+    return (
+      user.name.toLowerCase().includes(needle) ||
+      (user.username ?? "").toLowerCase().includes(needle) ||
+      (user.customStatus ?? "").toLowerCase().includes(needle)
+    );
+  });
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-surface">
-      <nav className="flex shrink-0 items-center gap-1 border-b border-border/60 bg-panel px-4 overflow-x-auto">
-        <span className="flex items-center gap-2 pr-2 text-sm font-semibold">
+    <div className="flex h-full min-h-0 flex-col bg-background">
+      <nav className="flex h-14 shrink-0 items-center gap-1 overflow-x-auto border-b border-border/70 bg-panel/90 px-4 shadow-sm backdrop-blur-xl">
+        <span className="flex items-center gap-2 border-r border-border/60 pr-4 text-base font-bold">
           <Users className="size-4 text-muted-foreground" /> Friends
         </span>
         {TABS.map((entry) => (
@@ -84,11 +113,11 @@ export function FriendsView() {
             type="button"
             onClick={() => setTab(entry.id)}
             className={cn(
-              "relative whitespace-nowrap rounded-md px-3 py-2 text-sm transition-colors",
+              "relative whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold transition-colors",
               tab === entry.id
                 ? entry.id === "add"
-                  ? "bg-primary/10 text-primary"
-                  : "bg-surface text-foreground"
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "bg-surface text-foreground shadow-sm"
                 : "text-muted-foreground hover:bg-surface/70 hover:text-foreground",
             )}
           >
@@ -103,13 +132,31 @@ export function FriendsView() {
             )}
           </button>
         ))}
+        <WorkspaceActions className="ml-auto hidden md:flex" />
       </nav>
+
+      {(tab === "online" || tab === "all") && (
+        <div className="border-b border-border/50 px-5 py-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={friendQuery}
+              onChange={(event) => setFriendQuery(event.target.value)}
+              placeholder="Search friends"
+              className="h-11 rounded-xl bg-panel/75 pl-10 shadow-inner"
+              aria-label="Search friends"
+            />
+          </div>
+        </div>
+      )}
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {tab === "add" ? (
           <AddFriendPanel />
         ) : social === undefined ? (
-          <p className="p-8 text-center text-sm text-muted-foreground">Loading…</p>
+          <p className="p-8 text-center text-sm text-muted-foreground">
+            Loading…
+          </p>
         ) : tab === "pending" ? (
           <PendingList
             incoming={social.incoming}
@@ -122,7 +169,7 @@ export function FriendsView() {
           <SuggestedPanel onOpenProfile={openProfile} />
         ) : (
           <UserList
-            users={tab === "online" ? online : friends}
+            users={visibleFriends}
             emptyHint={
               tab === "online"
                 ? "None of your friends are online right now."
@@ -178,9 +225,10 @@ function SuggestedPanel({
             >
               <UserAvatar user={user} size="md" />
               <span className="min-w-0">
-                <span className="block truncate text-sm font-medium">
-                  {user.name}
-                </span>
+                <StyledDisplayName
+                  user={user}
+                  className="block truncate text-sm"
+                />
                 <span className="block truncate text-xs text-muted-foreground">
                   @{user.username ?? "no username"} ·{" "}
                   {user.presence === "offline" ? "offline" : user.presence}
@@ -243,10 +291,14 @@ function RowActions({
     if (busy) return;
     setBusy(true);
     try {
-      const conversationId = await createDirect({ userId: user.id as Id<"users"> });
+      const conversationId = await createDirect({
+        userId: user.id as Id<"users">,
+      });
       navigate(`/dashboard/dm/${conversationId}`);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not open DM.");
+      toast.error(
+        error instanceof Error ? error.message : "Could not open DM.",
+      );
     } finally {
       setBusy(false);
     }
@@ -276,7 +328,9 @@ function RowActions({
         onClick={() => {
           void removeFriend({ userId: user.id as Id<"users"> }).catch((error) =>
             toast.error(
-              error instanceof Error ? error.message : "Could not remove friend.",
+              error instanceof Error
+                ? error.message
+                : "Could not remove friend.",
             ),
           );
         }}
@@ -314,14 +368,18 @@ function UserList({
   showPresence?: boolean;
 }) {
   if (users.length === 0) {
-    return <p className="p-8 text-center text-sm text-muted-foreground">{emptyHint}</p>;
+    return (
+      <p className="p-8 text-center text-sm text-muted-foreground">
+        {emptyHint}
+      </p>
+    );
   }
   return (
-    <ul className="mx-auto max-w-4xl divide-y divide-border/60 p-2">
+    <ul className="divide-y divide-border/50 px-5 py-3">
       {users.map((user) => (
         <li
           key={user.id}
-          className="list-row flex items-center gap-3 rounded-md px-3 py-2.5 hover:bg-panel"
+          className="list-row flex items-center gap-3 rounded-xl px-3 py-3 transition-colors hover:bg-panel/70"
         >
           <button
             type="button"
@@ -331,7 +389,7 @@ function UserList({
             <UserAvatar user={user} size="md" />
             <span className="min-w-0">
               <span className="flex items-baseline gap-1.5">
-                <span className="truncate text-sm font-semibold">{user.name}</span>
+                <StyledDisplayName user={user} className="truncate text-sm" />
                 {user.username && (
                   <span className="truncate text-xs text-muted-foreground">
                     @{user.username}
@@ -358,8 +416,16 @@ function PendingList({
   outgoing,
   onOpenProfile,
 }: {
-  incoming: { connectionId: string; createdAt: number; user: PublicUser | null }[];
-  outgoing: { connectionId: string; createdAt: number; user: PublicUser | null }[];
+  incoming: {
+    connectionId: string;
+    createdAt: number;
+    user: PublicUser | null;
+  }[];
+  outgoing: {
+    connectionId: string;
+    createdAt: number;
+    user: PublicUser | null;
+  }[];
   onOpenProfile: (userId: string) => void;
 }) {
   const respond = useMutation(api.social.respond);
@@ -367,7 +433,9 @@ function PendingList({
 
   const run = (action: Promise<unknown>) => {
     void action.catch((error) =>
-      toast.error(error instanceof Error ? error.message : "Something went wrong."),
+      toast.error(
+        error instanceof Error ? error.message : "Something went wrong.",
+      ),
     );
   };
 
@@ -403,9 +471,10 @@ function PendingList({
               >
                 <UserAvatar user={row.user!} size="md" />
                 <span className="min-w-0">
-                  <span className="block truncate text-sm font-semibold">
-                    {row.user!.name}
-                  </span>
+                  <StyledDisplayName
+                    user={row.user!}
+                    className="block truncate text-sm"
+                  />
                   <span className="block truncate text-xs text-muted-foreground">
                     {row.user!.username ? `@${row.user!.username} · ` : ""}
                     {formatRelative(row.createdAt)}
@@ -506,9 +575,10 @@ function BlockedList({
             >
               <UserAvatar user={row.user!} size="md" showStatus={false} />
               <span className="min-w-0">
-                <span className="block truncate text-sm font-semibold">
-                  {row.user!.name}
-                </span>
+                <StyledDisplayName
+                  user={row.user!}
+                  className="block truncate text-sm"
+                />
                 <span className="block truncate text-xs text-muted-foreground">
                   Blocked {formatRelative(row.createdAt)}
                 </span>
@@ -562,7 +632,9 @@ function AddFriendPanel() {
       setSent((previous) => [...previous, userId]);
       toast.success("Friend request sent.");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not send request.");
+      toast.error(
+        error instanceof Error ? error.message : "Could not send request.",
+      );
     }
   };
 
@@ -588,7 +660,8 @@ function AddFriendPanel() {
       <div className="mt-6 space-y-1">
         {debounced.length === 0 && (
           <p className="text-sm text-muted-foreground">
-            Search for people to add. You can also accept requests from the Pending tab.
+            Search for people to add. You can also accept requests from the
+            Pending tab.
           </p>
         )}
         {debounced.length > 0 && results === undefined && (
@@ -608,7 +681,10 @@ function AddFriendPanel() {
             >
               <UserAvatar user={user} size="md" />
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold">{user.name}</p>
+                <StyledDisplayName
+                  user={user}
+                  className="block truncate text-sm"
+                />
                 <p className="truncate text-xs text-muted-foreground">
                   {user.username ? `@${user.username}` : "no username yet"}
                 </p>
@@ -627,8 +703,8 @@ function AddFriendPanel() {
       </div>
 
       <p className="mt-8 flex items-center gap-2 text-xs text-muted-foreground">
-        <Clock className="size-3.5" /> Requests respect each person's privacy settings —
-        they can turn them off in Settings.
+        <Clock className="size-3.5" /> Requests respect each person's privacy
+        settings — they can turn them off in Settings.
       </p>
     </div>
   );

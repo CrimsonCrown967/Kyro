@@ -14,6 +14,8 @@ import {
 import { ReportDialog } from "@/components/app/dialogs";
 import { DmCallHeader, VoiceRoom } from "@/components/app/Voice";
 import { UserAvatar } from "@/components/app/UserAvatar";
+import { WorkspaceActions } from "@/components/app/WorkspaceActions";
+import { StyledDisplayName } from "@/components/app/StyledDisplayName";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import { useUiStore } from "@/lib/store";
 
@@ -21,6 +23,13 @@ type SurfaceProps = {
   containerType: "channel" | "conversation";
   containerId: string;
   title: string;
+  titleUser?: {
+    name: string;
+    displayNameFont?: string | null;
+    displayNameColorMode?: "none" | "solid" | "gradient" | null;
+    displayNameColor?: string | null;
+    displayNameColor2?: string | null;
+  };
   subtitle?: string | null;
   icon: ReactNode;
   /** Users shown in the header for a DM. */
@@ -47,6 +56,7 @@ function ChatSurface({
   containerType,
   containerId,
   title,
+  titleUser,
   subtitle,
   icon,
   participants,
@@ -103,13 +113,19 @@ function ChatSurface({
   const typers = (typing ?? []).map((user) => user.name);
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <div className="flex shrink-0 items-center gap-2 border-b border-border/60 bg-panel px-4 py-2.5">
-        <span className="flex size-7 items-center justify-center rounded-md bg-surface text-muted-foreground">
+    <div className="flex h-full min-h-0 flex-col bg-background">
+      <div className="flex h-14 shrink-0 items-center gap-3 border-b border-border/70 bg-panel/90 px-4 shadow-sm backdrop-blur-xl">
+        <span className="flex size-8 items-center justify-center rounded-lg bg-surface text-muted-foreground ring-1 ring-border/60">
           {icon}
         </span>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold">{title}</p>
+          <p className="truncate text-base font-bold tracking-tight">
+            {titleUser ? (
+              <StyledDisplayName user={titleUser} name={title} />
+            ) : (
+              title
+            )}
+          </p>
           {subtitle && (
             <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
           )}
@@ -132,6 +148,7 @@ function ChatSurface({
         {containerType === "conversation" && (
           <DmCallHeader conversationId={containerId} />
         )}
+        <WorkspaceActions showMemberToggle={containerType === "channel"} />
         {headerAction}
       </div>
 
@@ -332,6 +349,7 @@ export function DirectChat({ conversationId }: { conversationId: string }) {
       containerType="conversation"
       containerId={conversation.id}
       title={title}
+      titleUser={conversation.type === "dm" ? others[0] : undefined}
       subtitle={
         conversation.type === "group"
           ? `${conversation.participants.length} members`

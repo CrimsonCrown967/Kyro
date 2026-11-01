@@ -1,11 +1,19 @@
 import { useMutation, useQuery } from "convex/react";
 import { useEffect, useState, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router";
-import { Hash, Loader2, MessagesSquare, Search, UserPlus, Users } from "@/components/icons";
+import {
+  Hash,
+  Loader2,
+  MessagesSquare,
+  Search,
+  UserPlus,
+  Users,
+} from "@/components/icons";
 import { toast } from "sonner";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { UserAvatar } from "@/components/app/UserAvatar";
+import { StyledDisplayName } from "@/components/app/StyledDisplayName";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -53,9 +61,18 @@ export function SearchOverlay({
   }, [term, open]);
 
   const query = debounced.length === 0 ? "skip" : debounced;
-  const people = useQuery(api.users.searchUsers, query === "skip" ? "skip" : { term: query });
-  const messages = useQuery(api.users.searchMessages, query === "skip" ? "skip" : { term: query });
-  const communities = useQuery(api.servers.discover, query === "skip" ? "skip" : { term: query });
+  const people = useQuery(
+    api.users.searchUsers,
+    query === "skip" ? "skip" : { term: query },
+  );
+  const messages = useQuery(
+    api.users.searchMessages,
+    query === "skip" ? "skip" : { term: query },
+  );
+  const communities = useQuery(
+    api.servers.discover,
+    query === "skip" ? "skip" : { term: query },
+  );
 
   const close = () => onOpenChange(false);
 
@@ -82,10 +99,14 @@ export function SearchOverlay({
 
   const addFriend = async (userId: string, username: string | null) => {
     try {
-      await sendRequest(username ? { username } : { userId: userId as Id<"users"> });
+      await sendRequest(
+        username ? { username } : { userId: userId as Id<"users"> },
+      );
       toast.success("Friend request sent.");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not send request.");
+      toast.error(
+        error instanceof Error ? error.message : "Could not send request.",
+      );
     }
   };
 
@@ -112,7 +133,9 @@ export function SearchOverlay({
             className="h-8 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
             aria-label="Search Kyro"
           />
-          {loading && <Loader2 className="size-4 animate-spin text-muted-foreground" />}
+          {loading && (
+            <Loader2 className="size-4 animate-spin text-muted-foreground" />
+          )}
         </div>
 
         <div className="flex gap-1 border-b border-border/60 px-3 py-2">
@@ -154,11 +177,14 @@ export function SearchOverlay({
                   >
                     <UserAvatar user={user} size="md" />
                     <span className="min-w-0">
-                      <span className="block truncate text-sm font-semibold">
-                        {user.name}
-                      </span>
+                      <StyledDisplayName
+                        user={user}
+                        className="block truncate text-sm"
+                      />
                       <span className="block truncate text-xs text-muted-foreground">
-                        {user.username ? `@${user.username}` : "no username yet"}
+                        {user.username
+                          ? `@${user.username}`
+                          : "no username yet"}
                       </span>
                     </span>
                   </button>
@@ -175,7 +201,10 @@ export function SearchOverlay({
           )}
 
           {searching && section === "messages" && (
-            <Results loading={messages === undefined} empty="No messages matched.">
+            <Results
+              loading={messages === undefined}
+              empty="No messages matched."
+            >
               {messages?.map((hit) => (
                 <button
                   key={hit.message.id}
@@ -275,9 +304,15 @@ function Results({
   empty: string;
   children?: ReactNode;
 }) {
-  const items = Array.isArray(children) ? children.filter(Boolean) : children ? [children] : [];
+  const items = Array.isArray(children)
+    ? children.filter(Boolean)
+    : children
+      ? [children]
+      : [];
   if (loading) {
-    return <p className="px-3 py-6 text-sm text-muted-foreground">Searching…</p>;
+    return (
+      <p className="px-3 py-6 text-sm text-muted-foreground">Searching…</p>
+    );
   }
   if (items.length === 0) {
     return <p className="px-3 py-6 text-sm text-muted-foreground">{empty}</p>;

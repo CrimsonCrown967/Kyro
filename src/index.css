@@ -58,19 +58,25 @@
   --radius: 0.625rem;
   color-scheme: light;
 
-  --background: #f5f6f9;
+  --base-background: #f5f6f9;
+  --background: var(--base-background);
   --foreground: #14161c;
-  --card: #ffffff;
+  --base-card: #ffffff;
+  --card: var(--base-card);
   --card-foreground: #14161c;
-  --popover: #ffffff;
+  --base-popover: #ffffff;
+  --popover: var(--base-popover);
   --popover-foreground: #14161c;
   --primary: #4c57d6;
   --primary-foreground: #ffffff;
-  --secondary: #e9ebf2;
+  --base-secondary: #e9ebf2;
+  --secondary: var(--base-secondary);
   --secondary-foreground: #14161c;
-  --muted: #e9ebf2;
+  --base-muted: #e9ebf2;
+  --muted: var(--base-muted);
   --muted-foreground: #5b6270;
-  --accent: #e6e9f4;
+  --base-accent: #e6e9f4;
+  --accent: var(--base-accent);
   --accent-foreground: #14161c;
   --destructive: #dc2626;
   --border: rgba(17, 20, 27, 0.1);
@@ -81,18 +87,23 @@
   --chart-3: #16a34a;
   --chart-4: #d97706;
   --chart-5: #db2777;
-  --sidebar: #eef0f5;
+  --base-sidebar: #eef0f5;
+  --sidebar: var(--base-sidebar);
   --sidebar-foreground: #14161c;
   --sidebar-primary: #4c57d6;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #e2e5ee;
+  --base-sidebar-accent: #e2e5ee;
+  --sidebar-accent: var(--base-sidebar-accent);
   --sidebar-accent-foreground: #14161c;
   --sidebar-border: rgba(17, 20, 27, 0.09);
   --sidebar-ring: rgba(76, 87, 214, 0.5);
 
-  --rail: #e6e8ef;
-  --panel: #ffffff;
-  --surface: #f7f8fb;
+  --base-rail: #e6e8ef;
+  --base-panel: #ffffff;
+  --base-surface: #f7f8fb;
+  --rail: var(--base-rail);
+  --panel: var(--base-panel);
+  --surface: var(--base-surface);
   --brand: #4c57d6;
   --cyan: #0891b2;
   --success: #16a34a;
@@ -101,19 +112,25 @@
 
 .dark {
   color-scheme: dark;
-  --background: #0b0d12;
+  --base-background: #0b0d12;
+  --background: var(--base-background);
   --foreground: #f3f4f6;
-  --card: #11141b;
+  --base-card: #11141b;
+  --card: var(--base-card);
   --card-foreground: #f3f4f6;
-  --popover: #181d27;
+  --base-popover: #181d27;
+  --popover: var(--base-popover);
   --popover-foreground: #f3f4f6;
   --primary: #5865f2;
   --primary-foreground: #ffffff;
-  --secondary: #171b24;
+  --base-secondary: #171b24;
+  --secondary: var(--base-secondary);
   --secondary-foreground: #f3f4f6;
-  --muted: #171b24;
+  --base-muted: #171b24;
+  --muted: var(--base-muted);
   --muted-foreground: #9ca3af;
-  --accent: #1d2331;
+  --base-accent: #1d2331;
+  --accent: var(--base-accent);
   --accent-foreground: #f3f4f6;
   --destructive: #ef4444;
   --border: rgba(255, 255, 255, 0.07);
@@ -124,18 +141,23 @@
   --chart-3: #22c55e;
   --chart-4: #f59e0b;
   --chart-5: #ec4899;
-  --sidebar: #0e1117;
+  --base-sidebar: #0e1117;
+  --sidebar: var(--base-sidebar);
   --sidebar-foreground: #f3f4f6;
   --sidebar-primary: #5865f2;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #1a1f2b;
+  --base-sidebar-accent: #1a1f2b;
+  --sidebar-accent: var(--base-sidebar-accent);
   --sidebar-accent-foreground: #f3f4f6;
   --sidebar-border: rgba(255, 255, 255, 0.06);
   --sidebar-ring: rgba(88, 101, 242, 0.6);
 
-  --rail: #0a0c10;
-  --panel: #11141b;
-  --surface: #181d27;
+  --base-rail: #0a0c10;
+  --base-panel: #11141b;
+  --base-surface: #181d27;
+  --rail: var(--base-rail);
+  --panel: var(--base-panel);
+  --surface: var(--base-surface);
   --brand: #5865f2;
   --cyan: #67e8f9;
   --success: #22c55e;
@@ -180,6 +202,69 @@ html[data-accent="amber"] {
   --brand: #f59e0b;
 }
 
+/*
+ * Colour themes tint the real app surfaces, not just buttons. The base tokens
+ * above remain stable when light/dark mode changes; these derived tokens then
+ * remap every existing `bg-background`, `bg-panel`, `bg-sidebar`, etc.
+ */
+html[data-tint] {
+  --background: color-mix(
+    in oklab,
+    var(--base-background) var(--tint-keep, 58%),
+    var(--tint-a)
+  );
+  --panel: color-mix(
+    in oklab,
+    var(--base-panel) var(--tint-soft-keep, 72%),
+    var(--tint-a)
+  );
+  --surface: color-mix(
+    in oklab,
+    var(--base-surface) var(--tint-soft-keep, 72%),
+    var(--tint-b)
+  );
+  --sidebar: color-mix(
+    in oklab,
+    var(--base-sidebar) var(--tint-keep, 58%),
+    var(--tint-a)
+  );
+  --sidebar-accent: color-mix(
+    in oklab,
+    var(--base-sidebar-accent) var(--tint-soft-keep, 72%),
+    var(--tint-b)
+  );
+  --rail: color-mix(
+    in oklab,
+    var(--base-rail) var(--tint-keep, 58%),
+    var(--tint-a)
+  );
+  --card: color-mix(
+    in oklab,
+    var(--base-card) var(--tint-soft-keep, 72%),
+    var(--tint-a)
+  );
+  --popover: color-mix(
+    in oklab,
+    var(--base-popover) var(--tint-soft-keep, 72%),
+    var(--tint-b)
+  );
+  --secondary: color-mix(
+    in oklab,
+    var(--base-secondary) var(--tint-soft-keep, 72%),
+    var(--tint-b)
+  );
+  --muted: color-mix(
+    in oklab,
+    var(--base-muted) var(--tint-soft-keep, 72%),
+    var(--tint-a)
+  );
+  --accent: color-mix(
+    in oklab,
+    var(--base-accent) var(--tint-soft-keep, 72%),
+    var(--tint-b)
+  );
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -196,7 +281,11 @@ html[data-accent="amber"] {
   }
   * {
     scrollbar-width: thin;
-    scrollbar-color: color-mix(in oklab, var(--muted-foreground) 40%, transparent)
+    scrollbar-color: color-mix(
+        in oklab,
+        var(--muted-foreground) 40%,
+        transparent
+      )
       transparent;
   }
   *::-webkit-scrollbar {
@@ -247,13 +336,29 @@ html[data-accent="amber"] {
   }
   .kyro-grid {
     background-image:
-      linear-gradient(to right, color-mix(in oklab, var(--border) 90%, transparent) 1px, transparent 1px),
-      linear-gradient(to bottom, color-mix(in oklab, var(--border) 90%, transparent) 1px, transparent 1px);
+      linear-gradient(
+        to right,
+        color-mix(in oklab, var(--border) 90%, transparent) 1px,
+        transparent 1px
+      ),
+      linear-gradient(
+        to bottom,
+        color-mix(in oklab, var(--border) 90%, transparent) 1px,
+        transparent 1px
+      );
     background-size: 56px 56px;
-    mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 40%, transparent 100%);
+    mask-image: radial-gradient(
+      ellipse 80% 60% at 50% 0%,
+      black 40%,
+      transparent 100%
+    );
   }
   .kyro-orb {
-    background: radial-gradient(circle, color-mix(in oklab, var(--brand) 55%, transparent), transparent 65%);
+    background: radial-gradient(
+      circle,
+      color-mix(in oklab, var(--brand) 55%, transparent),
+      transparent 65%
+    );
     filter: blur(60px);
   }
   /* Message hover toolbar: hidden until the row is hovered or focused. */
@@ -293,12 +398,22 @@ html[data-tint] body {
   background-image:
     linear-gradient(
       160deg,
-      color-mix(in oklab, var(--background) calc(100% - var(--tint-strength, 9%)), var(--tint-a)) 0%,
+      color-mix(
+          in oklab,
+          var(--background) calc(100% - var(--tint-strength, 9%)),
+          var(--tint-a)
+        )
+        0%,
       transparent 48%
     ),
     linear-gradient(
       340deg,
-      color-mix(in oklab, var(--background) calc(100% - var(--tint-strength, 9%)), var(--tint-b)) 0%,
+      color-mix(
+          in oklab,
+          var(--background) calc(100% - var(--tint-strength, 9%)),
+          var(--tint-b)
+        )
+        0%,
       transparent 40%
     );
 }

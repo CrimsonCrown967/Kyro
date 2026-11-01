@@ -95,12 +95,7 @@ export async function requireActiveUser(
   return authed;
 }
 
-export type PresenceState =
-  | "online"
-  | "idle"
-  | "dnd"
-  | "invisible"
-  | "offline";
+export type PresenceState = "online" | "idle" | "dnd" | "invisible" | "offline";
 
 /** Resolves the presence a given viewer is allowed to see. */
 export function visiblePresence(
@@ -109,7 +104,8 @@ export function visiblePresence(
 ): PresenceState {
   const now = Date.now();
   if (user.showPresence === false && !viewerIsSelf) return "offline";
-  if (user.status === "invisible") return viewerIsSelf ? "invisible" : "offline";
+  if (user.status === "invisible")
+    return viewerIsSelf ? "invisible" : "offline";
   if (user.status === "offline") return "offline";
   const recentlyActive =
     user.lastSeen !== undefined && now - user.lastSeen < PRESENCE_TIMEOUT_MS;
@@ -130,6 +126,10 @@ export interface PublicUser {
   customStatus: string | null;
   bio: string | null;
   accent: string | null;
+  displayNameFont: string;
+  displayNameColorMode: "none" | "solid" | "gradient";
+  displayNameColor: string | null;
+  displayNameColor2: string | null;
   lastSeen: number | null;
   isAnonymous: boolean;
   /** Kyro's founder: their crown badge is shown to every viewer, everywhere. */
@@ -272,6 +272,10 @@ export async function hydrateUser(
     customStatus: presenceDetailsVisible ? (user.customStatus ?? null) : null,
     bio: user.bio ?? null,
     accent: user.accent ?? null,
+    displayNameFont: user.displayNameFont ?? "default",
+    displayNameColorMode: user.displayNameColorMode ?? "none",
+    displayNameColor: user.displayNameColor ?? null,
+    displayNameColor2: user.displayNameColor2 ?? null,
     lastSeen: presenceDetailsVisible ? (user.lastSeen ?? null) : null,
     isAnonymous: user.isAnonymous === true,
     isFounder,
@@ -367,7 +371,9 @@ export async function assertNoBlockedPairs(
   for (let left = 0; left < userIds.length; left += 1) {
     for (let right = left + 1; right < userIds.length; right += 1) {
       if (await isBlockedBetween(ctx, userIds[left], userIds[right])) {
-        throw new Error("People who have blocked each other can't share a group.");
+        throw new Error(
+          "People who have blocked each other can't share a group.",
+        );
       }
     }
   }
@@ -419,7 +425,11 @@ export async function getServerAccess(
     )
     .unique();
   if (!member) return null;
-  return { server, member, permissions: await permissionsFor(ctx, server, member) };
+  return {
+    server,
+    member,
+    permissions: await permissionsFor(ctx, server, member),
+  };
 }
 
 export async function requireServerAccess(
@@ -491,7 +501,13 @@ export async function notify(
   ctx: MutationCtx,
   args: {
     userId: Id<"users">;
-    type: "friend_request" | "friend_accept" | "mention" | "reply" | "moderation" | "system";
+    type:
+      | "friend_request"
+      | "friend_accept"
+      | "mention"
+      | "reply"
+      | "moderation"
+      | "system";
     title: string;
     body?: string;
     actorId?: Id<"users">;
@@ -528,11 +544,19 @@ export async function markRead(
     .unique();
   if (existing) {
     if (at >= existing.lastReadAt) {
-      await ctx.db.patch(existing._id, { lastReadAt: at, updatedAt: Date.now() });
+      await ctx.db.patch(existing._id, {
+        lastReadAt: at,
+        updatedAt: Date.now(),
+      });
     }
     return;
   }
-  await ctx.db.insert("reads", { userId, key, lastReadAt: at, updatedAt: Date.now() });
+  await ctx.db.insert("reads", {
+    userId,
+    key,
+    lastReadAt: at,
+    updatedAt: Date.now(),
+  });
 }
 
 /** True when either user has blocked the other. Used by DM entry points. */
@@ -566,7 +590,10 @@ export async function canSendDirectMessage(
         )
         .unique());
     if (!friendship || friendship.status !== "accepted") {
-      return { ok: false, reason: "This user only accepts messages from friends." };
+      return {
+        ok: false,
+        reason: "This user only accepts messages from friends.",
+      };
     }
   }
   return { ok: true };

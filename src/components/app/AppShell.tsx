@@ -1,13 +1,5 @@
 import { useMutation, useQuery } from "convex/react";
-import {
-  Bell,
-  Home,
-  Loader2,
-  Menu,
-  PanelRight,
-  Search,
-  User,
-} from "@/components/icons";
+import { Bell, Home, Loader2, Menu, Search, User } from "@/components/icons";
 import { useEffect, useRef, type ReactNode } from "react";
 import {
   useLocation,
@@ -24,7 +16,7 @@ import { ServerRail } from "@/components/app/ServerRail";
 import { SettingsDialog } from "@/components/app/Settings";
 import { Sidebar } from "@/components/app/Sidebar";
 import { IncomingCallBanner } from "@/components/app/Voice";
-import { Button } from "@/components/ui/button";
+import { KyroMark } from "@/components/KyroMark";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { useAuth } from "@/hooks/use-auth";
 import { useUiStore } from "@/lib/store";
@@ -164,120 +156,113 @@ export function AppShell({ children }: { children: ReactNode }) {
   );
 
   return (
-    <div className="flex h-dvh w-full overflow-hidden bg-background text-foreground">
-      <div className="hidden md:flex">{rail}</div>
-      <div className="hidden md:flex">{sidebar}</div>
+    <div className="kyro-app-shell flex h-dvh w-full flex-col overflow-hidden bg-background text-foreground">
+      <div className="relative hidden h-9 shrink-0 items-center justify-center border-b border-white/10 bg-[linear-gradient(100deg,color-mix(in_oklab,var(--primary)_82%,#111827),color-mix(in_oklab,var(--brand)_68%,#431407))] text-white shadow-sm md:flex">
+        <span className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_-80%,rgba(255,255,255,.28),transparent_60%)]" />
+        <span className="relative flex items-center gap-2 text-xs font-bold tracking-wide">
+          <KyroMark className="size-4" /> Kyro
+        </span>
+      </div>
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border/60 bg-panel/95 px-2 backdrop-blur sm:px-3">
-          <button
-            type="button"
-            aria-label="Open navigation"
-            className="rounded-md p-1.5 text-muted-foreground hover:bg-surface hover:text-foreground md:hidden"
-            onClick={() => setMobileNav(true)}
-          >
-            <Menu className="size-5" />
-          </button>
+      <div className="flex min-h-0 flex-1">
+        <div className="hidden md:flex">{rail}</div>
+        <div className="hidden md:flex">{sidebar}</div>
 
-          <button
-            type="button"
-            onClick={() => setSearchOpen(true)}
-            className="flex h-8 flex-1 items-center gap-2 rounded-full border border-border/70 bg-surface px-3 text-left text-sm text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground sm:max-w-md sm:rounded-md"
-          >
-            <Search className="size-4" />
-            <span className="truncate">Search Kyro</span>
-            <span className="ml-auto hidden rounded border border-border/70 px-1.5 text-[11px] sm:inline">
-              ⌘K
+        <div className="flex min-w-0 flex-1 flex-col">
+          <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border/70 bg-panel/90 px-2 backdrop-blur-xl md:hidden">
+            <button
+              type="button"
+              aria-label="Open navigation"
+              className="rounded-lg p-1.5 text-muted-foreground hover:bg-surface hover:text-foreground"
+              onClick={() => setMobileNav(true)}
+            >
+              <Menu className="size-5" />
+            </button>
+
+            <span className="flex min-w-0 flex-1 items-center gap-2 text-sm font-bold">
+              <KyroMark className="size-6" /> Kyro
             </span>
-          </button>
 
-          <div className="ml-auto flex items-center gap-1">
-            <button
-              type="button"
-              aria-label="Inbox"
-              onClick={() => setInboxOpen(!inboxOpen)}
-              className="relative rounded-md p-1.5 text-muted-foreground hover:bg-surface hover:text-foreground"
-            >
-              <Bell className="size-5" />
-              {(unread ?? 0) > 0 && (
-                <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-white">
-                  {unread! > 9 ? "9+" : unread}
-                </span>
-              )}
-            </button>
-            <button
-              type="button"
-              aria-label="Toggle member list"
-              onClick={() => useUiStore.getState().toggleMemberList()}
-              className="hidden rounded-md p-1.5 text-muted-foreground hover:bg-surface hover:text-foreground md:block"
-            >
-              <PanelRight className="size-5" />
-            </button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="hidden md:inline-flex"
-              onClick={openSettings}
-            >
-              Settings
-            </Button>
-          </div>
-        </header>
+            <div className="ml-auto flex items-center gap-1">
+              <button
+                type="button"
+                aria-label="Search Kyro"
+                onClick={() => setSearchOpen(true)}
+                className="rounded-lg p-1.5 text-muted-foreground hover:bg-surface hover:text-foreground"
+              >
+                <Search className="size-5" />
+              </button>
+              <button
+                type="button"
+                aria-label="Inbox"
+                onClick={() => setInboxOpen(!inboxOpen)}
+                className="relative rounded-lg p-1.5 text-muted-foreground hover:bg-surface hover:text-foreground"
+              >
+                <Bell className="size-5" />
+                {(unread ?? 0) > 0 && (
+                  <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-white">
+                    {unread! > 9 ? "9+" : unread}
+                  </span>
+                )}
+              </button>
+            </div>
+          </header>
 
-        <main className="min-h-0 flex-1">{children}</main>
+          <main className="min-h-0 flex-1 bg-background">{children}</main>
 
-        {/* Phone-first dock: large touch targets, safe-area padding and one
+          {/* Phone-first dock: large touch targets, safe-area padding and one
             thumb-reachable route to every core surface. Account/status tools
             remain in the navigation sheet's UserBar. */}
-        <nav className="grid shrink-0 grid-cols-5 border-t border-border/70 bg-panel/95 px-1 pb-[max(.35rem,env(safe-area-inset-bottom))] pt-1 backdrop-blur md:hidden">
-          {[
-            {
-              label: "Home",
-              icon: Home,
-              active: location.pathname === "/dashboard",
-              action: () => navigate("/dashboard"),
-            },
-            {
-              label: "Servers",
-              icon: Menu,
-              active: location.pathname.includes("/dashboard/s/"),
-              action: () => setMobileNav(true),
-            },
-            {
-              label: "Inbox",
-              icon: Bell,
-              active: inboxOpen,
-              action: () => setInboxOpen(true),
-            },
-            {
-              label: "Search",
-              icon: Search,
-              active: searchOpen,
-              action: () => setSearchOpen(true),
-            },
-            {
-              label: "You",
-              icon: User,
-              active: settingsOpen,
-              action: openSettings,
-            },
-          ].map((entry) => (
-            <button
-              key={entry.label}
-              type="button"
-              onClick={entry.action}
-              className={cn(
-                "flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] font-medium transition-colors",
-                entry.active
-                  ? "bg-primary/15 text-primary"
-                  : "text-muted-foreground active:bg-surface active:text-foreground",
-              )}
-            >
-              <entry.icon className="size-5" />
-              {entry.label}
-            </button>
-          ))}
-        </nav>
+          <nav className="grid shrink-0 grid-cols-5 border-t border-border/70 bg-panel/95 px-1 pb-[max(.35rem,env(safe-area-inset-bottom))] pt-1 backdrop-blur md:hidden">
+            {[
+              {
+                label: "Home",
+                icon: Home,
+                active: location.pathname === "/dashboard",
+                action: () => navigate("/dashboard"),
+              },
+              {
+                label: "Servers",
+                icon: Menu,
+                active: location.pathname.includes("/dashboard/s/"),
+                action: () => setMobileNav(true),
+              },
+              {
+                label: "Inbox",
+                icon: Bell,
+                active: inboxOpen,
+                action: () => setInboxOpen(true),
+              },
+              {
+                label: "Search",
+                icon: Search,
+                active: searchOpen,
+                action: () => setSearchOpen(true),
+              },
+              {
+                label: "You",
+                icon: User,
+                active: settingsOpen,
+                action: openSettings,
+              },
+            ].map((entry) => (
+              <button
+                key={entry.label}
+                type="button"
+                onClick={entry.action}
+                className={cn(
+                  "flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] font-medium transition-colors",
+                  entry.active
+                    ? "bg-primary/15 text-primary"
+                    : "text-muted-foreground active:bg-surface active:text-foreground",
+                )}
+              >
+                <entry.icon className="size-5" />
+                {entry.label}
+              </button>
+            ))}
+          </nav>
+        </div>
       </div>
 
       {/* Mobile navigation drawer keeps the rail + sidebar reachable. */}
@@ -288,7 +273,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         >
           <SheetTitle className="sr-only">Navigation</SheetTitle>
           <div className="flex h-full">
-            <div className="w-14 shrink-0 overflow-y-auto">{rail}</div>
+            <div className="w-[88px] shrink-0 overflow-y-auto">{rail}</div>
             <div className="min-w-0 flex-1">{sidebar}</div>
           </div>
         </SheetContent>

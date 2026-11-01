@@ -29,6 +29,8 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useNow } from "@/hooks/use-now";
 import { PresenceDot, UserAvatar } from "@/components/app/UserAvatar";
+import { DisplayNameStyleDialog } from "@/components/app/DisplayNameStyleDialog";
+import { StyledDisplayName } from "@/components/app/StyledDisplayName";
 import { ConfirmDangerDialog } from "@/components/app/dialogs";
 import { Button } from "@/components/ui/button";
 import {
@@ -49,10 +51,7 @@ import {
   type Density,
   type ThemeChoice,
 } from "@/lib/store";
-import {
-  BUG_CATEGORY_IDS,
-  BUG_CATEGORY_LABELS,
-} from "@/lib/format";
+import { BUG_CATEGORY_IDS, BUG_CATEGORY_LABELS } from "@/lib/format";
 import { AVATAR_FRAMES } from "@/lib/frames";
 import { PROFILE_THEMES } from "@/lib/profileThemes";
 import { APP_TINTS } from "@/lib/tints";
@@ -103,7 +102,6 @@ function maskEmail(email: string): string {
   if (at < 1) return email;
   return `${email.slice(0, 1)}***${email.slice(at)}`;
 }
-
 
 export function SettingsDialog({
   open,
@@ -345,7 +343,9 @@ function ChangePasswordDialog({
       close(false);
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Could not change your password.",
+        error instanceof Error
+          ? error.message
+          : "Could not change your password.",
       );
     } finally {
       setBusy(false);
@@ -476,7 +476,10 @@ function AccountStanding() {
           <div className="absolute inset-x-[12%] top-1.5 h-px bg-border" />
           <div className="relative flex">
             {STANDING_LABELS.map((label, index) => (
-              <div key={label} className="flex w-1/4 flex-col items-center gap-2">
+              <div
+                key={label}
+                className="flex w-1/4 flex-col items-center gap-2"
+              >
                 <span
                   className="size-3 rounded-full"
                   style={
@@ -891,7 +894,9 @@ function AccountTab({ onEditProfile }: { onEditProfile: () => void }) {
                       }
                       onClick={() => void save("name")}
                     >
-                      {busy && <Loader2 className="mr-1.5 size-4 animate-spin" />}
+                      {busy && (
+                        <Loader2 className="mr-1.5 size-4 animate-spin" />
+                      )}
                       Save
                     </Button>
                   </div>
@@ -950,7 +955,9 @@ function AccountTab({ onEditProfile }: { onEditProfile: () => void }) {
                       }
                       onClick={() => void save("username")}
                     >
-                      {busy && <Loader2 className="mr-1.5 size-4 animate-spin" />}
+                      {busy && (
+                        <Loader2 className="mr-1.5 size-4 animate-spin" />
+                      )}
                       Save
                     </Button>
                   </div>
@@ -973,7 +980,9 @@ function AccountTab({ onEditProfile }: { onEditProfile: () => void }) {
                 <Input
                   autoFocus
                   value={userDraft}
-                  onChange={(event) => setUserDraft(event.target.value.toLowerCase())}
+                  onChange={(event) =>
+                    setUserDraft(event.target.value.toLowerCase())
+                  }
                   maxLength={32}
                   className="h-9"
                   aria-label="Username"
@@ -1190,12 +1199,10 @@ function ProfilePreviewCard({
             {me.name}
           </h3>
           <div className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
-            <PresenceDot
-              presence={me.presence}
-              size="sm"
-              ringClassName=""
-            />
-            <span className="min-w-0 truncate">@{me.username ?? "no username"}</span>
+            <PresenceDot presence={me.presence} size="sm" ringClassName="" />
+            <span className="min-w-0 truncate">
+              @{me.username ?? "no username"}
+            </span>
             <button
               type="button"
               title="Copy handle"
@@ -1283,11 +1290,7 @@ function ProfilePreviewCard({
             <Button
               variant="outline"
               className="w-full"
-              onClick={() =>
-                navigate(
-                  `/dashboard?user=${me.id}`,
-                )
-              }
+              onClick={() => navigate(`/dashboard?user=${me.id}`)}
             >
               View my profile
             </Button>
@@ -1328,14 +1331,21 @@ function ProfileTab() {
   const [wornTagSel, setWornTagSel] = useState<string | null | undefined>(
     undefined,
   );
-  const [badgeSel, setBadgeSel] = useState<string | null | undefined>(undefined);
-  const [themeSel, setThemeSel] = useState<string | null | undefined>(undefined);
+  const [badgeSel, setBadgeSel] = useState<string | null | undefined>(
+    undefined,
+  );
+  const [themeSel, setThemeSel] = useState<string | null | undefined>(
+    undefined,
+  );
   // undefined = not touched yet, null = plain avatar (no frame).
-  const [frameSel, setFrameSel] = useState<string | null | undefined>(undefined);
+  const [frameSel, setFrameSel] = useState<string | null | undefined>(
+    undefined,
+  );
   const [linksBusy, setLinksBusy] = useState(false);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadingBanner, setUploadingBanner] = useState(false);
+  const [nameStyleOpen, setNameStyleOpen] = useState(false);
 
   if (!me) return <p className="text-sm text-muted-foreground">Loading…</p>;
 
@@ -1376,521 +1386,476 @@ function ProfileTab() {
         </h2>
         <ProfilePromoCard />
 
-      <section>
-        <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">
-          Look
-        </p>
-        <div className="overflow-hidden rounded-xl border border-border/70 bg-surface divide-y divide-border/60">
-          <div className="p-4 sm:p-5">
-            <FieldRow label="Profile picture">
-              <div className="mt-3 flex flex-wrap items-center gap-4">
-                <UserAvatar user={me} size="lg" />
-                <div className="flex flex-wrap gap-2">
-                  <label
-                    className={cn(
-                      "inline-flex cursor-pointer items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90",
-                      uploading && "pointer-events-none opacity-70",
-                    )}
-                  >
-                    {uploading ? (
-                      <Loader2 className="mr-1.5 size-4 animate-spin" />
-                    ) : (
-                      <UserIcon className="mr-1.5 size-4" />
-                    )}
-                    Upload picture
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={async (event) => {
-                  const file = event.target.files?.[0];
-                  if (!file) return;
-                  if (file.size > MAX_UPLOAD_BYTES) {
-                    toast.error("Images must be under 10 MB.");
-                    return;
-                  }
-                  setUploading(true);
-                  try {
-                    const attachment = await upload(file);
-                    await update({ avatarStorageId: attachment.storageId });
-                    toast.success("Avatar updated");
-                  } catch (error) {
-                    toast.error(
-                      error instanceof Error ? error.message : "Upload failed.",
-                    );
-                  } finally {
-                    setUploading(false);
-                  }
-                }}
+        <section>
+          <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">
+            Look
+          </p>
+          <div className="overflow-hidden rounded-xl border border-border/70 bg-surface divide-y divide-border/60">
+            <div className="p-4 sm:p-5">
+              <FieldRow label="Profile picture">
+                <div className="mt-3 flex flex-wrap items-center gap-4">
+                  <UserAvatar user={me} size="lg" />
+                  <div className="flex flex-wrap gap-2">
+                    <label
+                      className={cn(
+                        "inline-flex cursor-pointer items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90",
+                        uploading && "pointer-events-none opacity-70",
+                      )}
+                    >
+                      {uploading ? (
+                        <Loader2 className="mr-1.5 size-4 animate-spin" />
+                      ) : (
+                        <UserIcon className="mr-1.5 size-4" />
+                      )}
+                      Upload picture
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={async (event) => {
+                          const file = event.target.files?.[0];
+                          if (!file) return;
+                          if (file.size > MAX_UPLOAD_BYTES) {
+                            toast.error("Images must be under 10 MB.");
+                            return;
+                          }
+                          setUploading(true);
+                          try {
+                            const attachment = await upload(file);
+                            await update({
+                              avatarStorageId: attachment.storageId,
+                            });
+                            toast.success("Avatar updated");
+                          } catch (error) {
+                            toast.error(
+                              error instanceof Error
+                                ? error.message
+                                : "Upload failed.",
+                            );
+                          } finally {
+                            setUploading(false);
+                          }
+                        }}
                       />
                     </label>
-                  {me.avatarUrl && (
-                    <button
-                      type="button"
-                      className="rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
-                      onClick={() => void update({ avatarStorageId: null })}
-                    >
-                      Remove
-                    </button>
-                  )}
+                    {me.avatarUrl && (
+                      <button
+                        type="button"
+                        className="rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+                        onClick={() => void update({ avatarStorageId: null })}
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </FieldRow>
-            <p className="mt-3 text-xs text-muted-foreground">
-              JPEG, PNG, or GIF — animated avatars play everywhere in Kyro.
-            </p>
-          </div>
+              </FieldRow>
+              <p className="mt-3 text-xs text-muted-foreground">
+                JPEG, PNG, or GIF — animated avatars play everywhere in Kyro.
+              </p>
+            </div>
 
-          <div className="p-4 sm:p-5">
-            <FieldRow label="Banner">
-              <div className="mt-3 flex flex-wrap items-center gap-4">
-                <div className="h-16 w-44 overflow-hidden rounded-lg border border-border/70 bg-gradient-to-br from-brand/80 to-cyan/80">
-                  {me.bannerUrl && (
-                    <img
-                      src={me.bannerUrl}
-                      alt="Your profile banner"
-                      className="size-full object-cover"
-                    />
-                  )}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <label
-                    className={cn(
-                      "inline-flex cursor-pointer items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90",
-                      uploadingBanner && "pointer-events-none opacity-70",
+            <div className="p-4 sm:p-5">
+              <FieldRow label="Banner">
+                <div className="mt-3 flex flex-wrap items-center gap-4">
+                  <div className="h-16 w-44 overflow-hidden rounded-lg border border-border/70 bg-gradient-to-br from-brand/80 to-cyan/80">
+                    {me.bannerUrl && (
+                      <img
+                        src={me.bannerUrl}
+                        alt="Your profile banner"
+                        className="size-full object-cover"
+                      />
                     )}
-                  >
-                    {uploadingBanner ? (
-                      <Loader2 className="mr-1.5 size-4 animate-spin" />
-                    ) : (
-                      <Palette className="mr-1.5 size-4" />
-                    )}
-                    Upload banner
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={async (event) => {
-                  const file = event.target.files?.[0];
-                  if (!file) return;
-                  if (file.size > MAX_UPLOAD_BYTES) {
-                    toast.error("Images must be under 10 MB.");
-                    return;
-                  }
-                  setUploadingBanner(true);
-                  try {
-                    const attachment = await upload(file);
-                    await update({ bannerStorageId: attachment.storageId });
-                    toast.success("Banner updated");
-                  } catch (error) {
-                    toast.error(
-                      error instanceof Error ? error.message : "Upload failed.",
-                    );
-                  } finally {
-                    setUploadingBanner(false);
-                  }
-                }}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <label
+                      className={cn(
+                        "inline-flex cursor-pointer items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90",
+                        uploadingBanner && "pointer-events-none opacity-70",
+                      )}
+                    >
+                      {uploadingBanner ? (
+                        <Loader2 className="mr-1.5 size-4 animate-spin" />
+                      ) : (
+                        <Palette className="mr-1.5 size-4" />
+                      )}
+                      Upload banner
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={async (event) => {
+                          const file = event.target.files?.[0];
+                          if (!file) return;
+                          if (file.size > MAX_UPLOAD_BYTES) {
+                            toast.error("Images must be under 10 MB.");
+                            return;
+                          }
+                          setUploadingBanner(true);
+                          try {
+                            const attachment = await upload(file);
+                            await update({
+                              bannerStorageId: attachment.storageId,
+                            });
+                            toast.success("Banner updated");
+                          } catch (error) {
+                            toast.error(
+                              error instanceof Error
+                                ? error.message
+                                : "Upload failed.",
+                            );
+                          } finally {
+                            setUploadingBanner(false);
+                          }
+                        }}
                       />
                     </label>
-                  {me.bannerUrl && (
-                    <button
-                      type="button"
-                      className="rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
-                      onClick={() => void update({ bannerStorageId: null })}
-                    >
-                      Remove
-                    </button>
-                  )}
+                    {me.bannerUrl && (
+                      <button
+                        type="button"
+                        className="rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+                        onClick={() => void update({ bannerStorageId: null })}
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </FieldRow>
-            <p className="mt-3 text-xs text-muted-foreground">
-              Images and GIFs both work — animated banners play on your
-              profile.
-            </p>
+              </FieldRow>
+              <p className="mt-3 text-xs text-muted-foreground">
+                Images and GIFs both work — animated banners play on your
+                profile.
+              </p>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <section>
-        <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">
-          Server tag
-        </p>
-        <p className="mb-3 text-xs text-muted-foreground">
-          Wear one of your communities' tags next to your name everywhere on
-          Kyro.
-        </p>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <button
-            type="button"
-            onClick={() => {
-              if ((wornTagSel === undefined ? me.serverTag : wornTagSel) === null)
-                return;
-              setWornTagSel(null);
-              void update({ wornTag: null }).catch((error) => {
-                setWornTagSel(undefined);
-                toast.error(
-                  error instanceof Error
-                    ? error.message
-                    : "Could not remove the tag.",
-                );
-              });
-            }}
-            className={cn(
-              "relative flex flex-col items-center gap-2 rounded-xl border bg-surface p-3 text-xs transition-colors",
-              (wornTagSel === undefined ? me.serverTag : wornTagSel) === null
-                ? "border-primary ring-1 ring-primary/40 text-foreground"
-                : "border-border/70 text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {(wornTagSel === undefined ? me.serverTag : wornTagSel) === null && (
-              <span className="absolute right-2.5 top-2.5 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
-                ✓
+        <section>
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">
+            Server tag
+          </p>
+          <p className="mb-3 text-xs text-muted-foreground">
+            Wear one of your communities' tags next to your name everywhere on
+            Kyro.
+          </p>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <button
+              type="button"
+              onClick={() => {
+                if (
+                  (wornTagSel === undefined ? me.serverTag : wornTagSel) ===
+                  null
+                )
+                  return;
+                setWornTagSel(null);
+                void update({ wornTag: null }).catch((error) => {
+                  setWornTagSel(undefined);
+                  toast.error(
+                    error instanceof Error
+                      ? error.message
+                      : "Could not remove the tag.",
+                  );
+                });
+              }}
+              className={cn(
+                "relative flex flex-col items-center gap-2 rounded-xl border bg-surface p-3 text-xs transition-colors",
+                (wornTagSel === undefined ? me.serverTag : wornTagSel) === null
+                  ? "border-primary ring-1 ring-primary/40 text-foreground"
+                  : "border-border/70 text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {(wornTagSel === undefined ? me.serverTag : wornTagSel) ===
+                null && (
+                <span className="absolute right-2.5 top-2.5 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+                  ✓
+                </span>
+              )}
+              <span className="flex h-9 min-w-12 items-center justify-center rounded-lg border border-dashed border-border px-3 font-bold uppercase tracking-wider">
+                —
               </span>
+              <span className="w-full truncate text-center">None</span>
+            </button>
+            {(myServers ?? [])
+              .filter((entry) => entry.tag)
+              .map((entry) => {
+                const active =
+                  (wornTagSel === undefined ? me.serverTag : wornTagSel) ===
+                  entry.tag;
+                return (
+                  <button
+                    key={entry.id}
+                    type="button"
+                    onClick={() => {
+                      setWornTagSel(entry.tag);
+                      void update({ wornTag: entry.tag }).catch((error) => {
+                        setWornTagSel(undefined);
+                        toast.error(
+                          error instanceof Error
+                            ? error.message
+                            : "Could not wear that tag.",
+                        );
+                      });
+                    }}
+                    className={cn(
+                      "relative flex flex-col items-center gap-2 rounded-xl border bg-surface p-3 text-xs transition-colors",
+                      active
+                        ? "border-primary ring-1 ring-primary/40 text-foreground"
+                        : "border-border/70 text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {active && (
+                      <span className="absolute right-2.5 top-2.5 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+                        ✓
+                      </span>
+                    )}
+                    <span className="flex h-9 min-w-12 items-center justify-center rounded-lg border border-border bg-panel px-3 text-xs font-bold uppercase tracking-wider">
+                      {entry.tag}
+                    </span>
+                    <span className="w-full truncate text-center">
+                      {entry.name}
+                    </span>
+                  </button>
+                );
+              })}
+            {(myServers ?? []).every((entry) => !entry.tag) && (
+              <p className="col-span-full text-xs text-muted-foreground">
+                None of your communities have a tag yet — owners can add one in
+                Server settings → Overview.
+              </p>
             )}
-            <span className="flex h-9 min-w-12 items-center justify-center rounded-lg border border-dashed border-border px-3 font-bold uppercase tracking-wider">
-              —
-            </span>
-            <span className="w-full truncate text-center">None</span>
-          </button>
-          {(myServers ?? [])
-            .filter((entry) => entry.tag)
-            .map((entry) => {
+          </div>
+        </section>
+
+        <section>
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">
+            Identity
+          </p>
+          <div className="rounded-xl border border-border/70 bg-surface divide-y divide-border/60">
+            <div className="grid gap-2 p-4 sm:p-5">
+              <Label htmlFor="profile-username">Username</Label>
+              <Input
+                id="profile-username"
+                value={usernameDraft ?? me.username ?? ""}
+                onChange={(event) =>
+                  setUsernameDraft(event.target.value.toLowerCase())
+                }
+                maxLength={32}
+              />
+              <p className="text-xs text-muted-foreground">
+                You can change your username once every hour.
+              </p>
+            </div>
+            <div className="grid gap-2 p-4 sm:p-5">
+              <Label htmlFor="profile-name">Display name</Label>
+              <Input
+                id="profile-name"
+                value={name ?? me.name}
+                onChange={(event) => setName(event.target.value)}
+                maxLength={64}
+              />
+              <div className="mt-1 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/70 bg-panel/50 px-3 py-2.5">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Name style
+                  </p>
+                  <StyledDisplayName
+                    user={{ ...me, name: name ?? me.name }}
+                    className="block max-w-52 truncate text-base"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setNameStyleOpen(true)}
+                >
+                  <Palette className="mr-1.5 size-4" /> Customize
+                </Button>
+              </div>
+            </div>
+            <div className="grid gap-2 p-4 sm:p-5">
+              <Label htmlFor="profile-pronouns">Pronouns</Label>
+              <Input
+                id="profile-pronouns"
+                value={pronouns ?? me.pronouns ?? ""}
+                onChange={(event) => setPronouns(event.target.value)}
+                placeholder="He/Him"
+                maxLength={32}
+              />
+            </div>
+            <div className="grid gap-2 p-4 sm:p-5">
+              <Label htmlFor="profile-status">Custom status</Label>
+              <Input
+                id="profile-status"
+                value={status ?? me.customStatus ?? ""}
+                onChange={(event) => setStatus(event.target.value)}
+                placeholder="Grinding ranked"
+                maxLength={100}
+              />
+            </div>
+            <div className="grid gap-2 p-4 sm:p-5">
+              <Label htmlFor="profile-bio">About me</Label>
+              <Textarea
+                id="profile-bio"
+                rows={3}
+                value={bio ?? me.bio ?? ""}
+                onChange={(event) => setBio(event.target.value)}
+                maxLength={400}
+              />
+              <p className="text-right text-xs text-muted-foreground">
+                {400 - (bio ?? me.bio ?? "").length} left
+              </p>
+            </div>
+            <div className="p-4 sm:p-5">
+              <Button onClick={save} disabled={busy}>
+                {busy && <Loader2 className="mr-2 size-4 animate-spin" />}
+                Save profile
+              </Button>
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">
+            Badge
+          </p>
+          <p className="mb-3 text-xs text-muted-foreground">
+            This one shows next to your name in chat and the member list. Your
+            profile card shows all of them. None hides them everywhere.
+          </p>
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+            {me.badges.map((badge) => {
               const active =
-                (wornTagSel === undefined ? me.serverTag : wornTagSel) ===
-                entry.tag;
+                (badgeSel === undefined
+                  ? (me.primaryBadge ?? me.badges[0] ?? "none")
+                  : badgeSel) === badge;
               return (
                 <button
-                  key={entry.id}
+                  key={badge}
                   type="button"
                   onClick={() => {
-                    setWornTagSel(entry.tag);
-                    void update({ wornTag: entry.tag }).catch((error) => {
-                      setWornTagSel(undefined);
+                    setBadgeSel(badge);
+                    void update({ primaryBadge: badge }).catch((error) => {
+                      setBadgeSel(undefined);
                       toast.error(
                         error instanceof Error
                           ? error.message
-                          : "Could not wear that tag.",
+                          : "Could not save that badge.",
                       );
                     });
                   }}
                   className={cn(
-                    "relative flex flex-col items-center gap-2 rounded-xl border bg-surface p-3 text-xs transition-colors",
+                    "relative flex flex-col items-center gap-1.5 rounded-lg border p-3 text-xs transition-colors",
                     active
-                      ? "border-primary ring-1 ring-primary/40 text-foreground"
-                      : "border-border/70 text-muted-foreground hover:text-foreground",
+                      ? "border-primary ring-1 ring-primary/40 bg-primary/10 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
+                      : "border-border/70 bg-surface/40 text-muted-foreground hover:text-foreground",
                   )}
                 >
                   {active && (
-                    <span className="absolute right-2.5 top-2.5 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+                    <span className="absolute right-1.5 top-1.5 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
                       ✓
                     </span>
                   )}
-                  <span className="flex h-9 min-w-12 items-center justify-center rounded-lg border border-border bg-panel px-3 text-xs font-bold uppercase tracking-wider">
-                    {entry.tag}
-                  </span>
-                  <span className="w-full truncate text-center">
-                    {entry.name}
-                  </span>
+                  <GlobalBadgeIcon badge={badge} className="size-5" />
+                  {GLOBAL_BADGE_META[badge].label}
                 </button>
               );
             })}
-          {(myServers ?? []).every((entry) => !entry.tag) && (
-            <p className="col-span-full text-xs text-muted-foreground">
-              None of your communities have a tag yet — owners can add one in
-              Server settings → Overview.
-            </p>
-          )}
-        </div>
-      </section>
-
-      <section>
-        <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">
-          Identity
-        </p>
-        <div className="rounded-xl border border-border/70 bg-surface divide-y divide-border/60">
-          <div className="grid gap-2 p-4 sm:p-5">
-            <Label htmlFor="profile-username">Username</Label>
-            <Input
-              id="profile-username"
-              value={usernameDraft ?? me.username ?? ""}
-              onChange={(event) =>
-                setUsernameDraft(event.target.value.toLowerCase())
-              }
-              maxLength={32}
-            />
-            <p className="text-xs text-muted-foreground">
-              You can change your username once every hour.
-            </p>
-          </div>
-          <div className="grid gap-2 p-4 sm:p-5">
-            <Label htmlFor="profile-name">Display name</Label>
-            <Input
-              id="profile-name"
-              value={name ?? me.name}
-              onChange={(event) => setName(event.target.value)}
-              maxLength={64}
-            />
-          </div>
-          <div className="grid gap-2 p-4 sm:p-5">
-            <Label htmlFor="profile-pronouns">Pronouns</Label>
-            <Input
-              id="profile-pronouns"
-              value={pronouns ?? me.pronouns ?? ""}
-              onChange={(event) => setPronouns(event.target.value)}
-              placeholder="He/Him"
-              maxLength={32}
-            />
-          </div>
-          <div className="grid gap-2 p-4 sm:p-5">
-            <Label htmlFor="profile-status">Custom status</Label>
-            <Input
-              id="profile-status"
-              value={status ?? me.customStatus ?? ""}
-              onChange={(event) => setStatus(event.target.value)}
-              placeholder="Grinding ranked"
-              maxLength={100}
-            />
-          </div>
-          <div className="grid gap-2 p-4 sm:p-5">
-            <Label htmlFor="profile-bio">About me</Label>
-            <Textarea
-              id="profile-bio"
-              rows={3}
-              value={bio ?? me.bio ?? ""}
-              onChange={(event) => setBio(event.target.value)}
-              maxLength={400}
-            />
-            <p className="text-right text-xs text-muted-foreground">
-              {400 - (bio ?? me.bio ?? "").length} left
-            </p>
-          </div>
-          <div className="p-4 sm:p-5">
-            <Button onClick={save} disabled={busy}>
-              {busy && <Loader2 className="mr-2 size-4 animate-spin" />}
-              Save profile
-            </Button>
-          </div>
-        </div>
-      </section>
-
-      <section>
-        <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">
-          Badge
-        </p>
-        <p className="mb-3 text-xs text-muted-foreground">
-          This one shows next to your name in chat and the member list. Your
-          profile card shows all of them. None hides them everywhere.
-        </p>
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-          {me.badges.map((badge) => {
-            const active =
-              (badgeSel === undefined
-                ? (me.primaryBadge ?? me.badges[0] ?? "none")
-                : badgeSel) === badge;
-            return (
-              <button
-                key={badge}
-                type="button"
-                onClick={() => {
-                  setBadgeSel(badge);
-                  void update({ primaryBadge: badge }).catch((error) => {
-                    setBadgeSel(undefined);
-                    toast.error(
-                      error instanceof Error
-                        ? error.message
-                        : "Could not save that badge.",
-                    );
-                  });
-                }}
-                className={cn(
-                  "relative flex flex-col items-center gap-1.5 rounded-lg border p-3 text-xs transition-colors",
-                  active
-                    ? "border-primary ring-1 ring-primary/40 bg-primary/10 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
-                    : "border-border/70 bg-surface/40 text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {active && (
-                  <span className="absolute right-1.5 top-1.5 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
-                    ✓
-                  </span>
-                )}
-                <GlobalBadgeIcon badge={badge} className="size-5" />
-                {GLOBAL_BADGE_META[badge].label}
-              </button>
-            );
-          })}
-          {(() => {
-            const active =
-              (badgeSel === undefined
-                ? (me.primaryBadge ?? me.badges[0] ?? "none")
-                : badgeSel) === "none";
-            return (
-              <button
-                type="button"
-                onClick={() => {
-                  setBadgeSel("none");
-                  void update({ primaryBadge: "none" }).catch((error) => {
-                    setBadgeSel(undefined);
-                    toast.error(
-                      error instanceof Error
-                        ? error.message
-                        : "Could not save that.",
-                    );
-                  });
-                }}
-                className={cn(
-                  "relative flex flex-col items-center justify-center gap-1.5 rounded-lg border p-3 text-xs transition-colors",
-                  active
-                    ? "border-primary ring-1 ring-primary/40 bg-primary/10 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
-                    : "border-border/70 bg-surface/40 text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {active && (
-                  <span className="absolute right-1.5 top-1.5 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
-                    ✓
-                  </span>
-                )}
-                <span className="flex size-5 items-center justify-center rounded-full border border-dashed border-border">
-                  <X className="size-3" />
-                </span>
-                None
-              </button>
-            );
-          })()}
-        </div>
-      </section>
-
-      <section>
-        <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">
-          Profile theme
-        </p>
-        <p className="mb-3 text-xs text-muted-foreground">
-          Colours your profile card and its banner when you have no picture.
-        </p>
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-          <button
-            type="button"
-            onClick={() => {
-              if ((themeSel === undefined ? me.profileTheme : themeSel) === null)
-                return;
-              setThemeSel(null);
-              void update({ profileTheme: "" }).catch((error) => {
-                setThemeSel(undefined);
-                toast.error(
-                  error instanceof Error
-                    ? error.message
-                    : "Could not remove the theme.",
-                );
-              });
-            }}
-            className={cn(
-              "flex flex-col items-center gap-1.5 rounded-lg border p-2.5 text-xs transition-colors",
-              (themeSel === undefined ? me.profileTheme : themeSel) === null
-                ? "border-primary ring-1 ring-primary/40 text-foreground"
-                : "border-border/70 text-muted-foreground hover:text-foreground",
-            )}
-          >
-            <span className="flex size-10 items-center justify-center rounded-full border border-dashed border-border">
-              <X className="size-4" />
-            </span>
-            None
-          </button>
-          {PROFILE_THEMES.map((theme) => {
-            const active =
-              (themeSel === undefined ? me.profileTheme : themeSel) === theme.id;
-            return (
-              <button
-                key={theme.id}
-                type="button"
-                onClick={() => {
-                  setThemeSel(theme.id);
-                  void update({ profileTheme: theme.id }).catch((error) => {
-                    setThemeSel(undefined);
-                    toast.error(
-                      error instanceof Error
-                        ? error.message
-                        : "Could not save that theme.",
-                    );
-                  });
-                }}
-                className={cn(
-                  "flex flex-col items-center gap-1.5 rounded-lg border p-2.5 text-xs transition-colors",
-                  active
-                    ? "border-primary ring-1 ring-primary/40 text-foreground"
-                    : "border-border/70 text-muted-foreground hover:text-foreground",
-                )}
-              >
-                <span
+            {(() => {
+              const active =
+                (badgeSel === undefined
+                  ? (me.primaryBadge ?? me.badges[0] ?? "none")
+                  : badgeSel) === "none";
+              return (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBadgeSel("none");
+                    void update({ primaryBadge: "none" }).catch((error) => {
+                      setBadgeSel(undefined);
+                      toast.error(
+                        error instanceof Error
+                          ? error.message
+                          : "Could not save that.",
+                      );
+                    });
+                  }}
                   className={cn(
-                    "size-10 rounded-full bg-gradient-to-br",
-                    theme.gradient,
+                    "relative flex flex-col items-center justify-center gap-1.5 rounded-lg border p-3 text-xs transition-colors",
+                    active
+                      ? "border-primary ring-1 ring-primary/40 bg-primary/10 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
+                      : "border-border/70 bg-surface/40 text-muted-foreground hover:text-foreground",
                   )}
-                />
-                {theme.label}
-              </button>
-            );
-          })}
-        </div>
-      </section>
-
-      <section id="frames" className="scroll-mt-8">
-        <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">
-          Avatar frame
-        </p>
-        <p className="mb-3 text-xs text-muted-foreground">
-          Give your profile a fresh look — a frame around your picture.
-          Built-in ones are free.
-        </p>
-        <div className="flex flex-wrap items-start gap-6">
-          <div className="flex flex-col items-center gap-2">
-            <UserAvatar
-              user={{ ...me, avatarFrame: frameSel === undefined ? me.avatarFrame : frameSel }}
-              size="xl"
-            />
-            <span className="text-xs text-muted-foreground">
-              {(() => {
-                const id = frameSel === undefined ? me.avatarFrame : frameSel;
-                return AVATAR_FRAMES.find((frame) => frame.id === id)?.label ?? "No frame";
-              })()}
-            </span>
+                >
+                  {active && (
+                    <span className="absolute right-1.5 top-1.5 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+                      ✓
+                    </span>
+                  )}
+                  <span className="flex size-5 items-center justify-center rounded-full border border-dashed border-border">
+                    <X className="size-3" />
+                  </span>
+                  None
+                </button>
+              );
+            })()}
           </div>
+        </section>
+
+        <section>
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">
+            Profile theme
+          </p>
+          <p className="mb-3 text-xs text-muted-foreground">
+            Colours your profile card and its banner when you have no picture.
+          </p>
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
             <button
               type="button"
               onClick={() => {
-                if ((frameSel === undefined ? me.avatarFrame : frameSel) === null) return;
-                setFrameSel(null);
-                void update({ avatarFrame: null }).catch((error) => {
-                  setFrameSel(undefined);
+                if (
+                  (themeSel === undefined ? me.profileTheme : themeSel) === null
+                )
+                  return;
+                setThemeSel(null);
+                void update({ profileTheme: "" }).catch((error) => {
+                  setThemeSel(undefined);
                   toast.error(
-                    error instanceof Error ? error.message : "Could not remove the frame.",
+                    error instanceof Error
+                      ? error.message
+                      : "Could not remove the theme.",
                   );
                 });
               }}
               className={cn(
                 "flex flex-col items-center gap-1.5 rounded-lg border p-2.5 text-xs transition-colors",
-                (frameSel === undefined ? me.avatarFrame : frameSel) === null
+                (themeSel === undefined ? me.profileTheme : themeSel) === null
                   ? "border-primary ring-1 ring-primary/40 text-foreground"
                   : "border-border/70 text-muted-foreground hover:text-foreground",
               )}
             >
-              <span className="flex size-10 items-center justify-center rounded-full border border-dashed border-border text-muted-foreground">
+              <span className="flex size-10 items-center justify-center rounded-full border border-dashed border-border">
                 <X className="size-4" />
               </span>
               None
             </button>
-            {AVATAR_FRAMES.map((frame) => {
-              const active = (frameSel === undefined ? me.avatarFrame : frameSel) === frame.id;
+            {PROFILE_THEMES.map((theme) => {
+              const active =
+                (themeSel === undefined ? me.profileTheme : themeSel) ===
+                theme.id;
               return (
                 <button
-                  key={frame.id}
+                  key={theme.id}
                   type="button"
                   onClick={() => {
-                    setFrameSel(frame.id);
-                    void update({ avatarFrame: frame.id }).catch((error) => {
-                      setFrameSel(undefined);
-                      toast.error(error instanceof Error ? error.message : "Could not save the frame.");
+                    setThemeSel(theme.id);
+                    void update({ profileTheme: theme.id }).catch((error) => {
+                      setThemeSel(undefined);
+                      toast.error(
+                        error instanceof Error
+                          ? error.message
+                          : "Could not save that theme.",
+                      );
                     });
                   }}
                   className={cn(
@@ -1902,113 +1867,213 @@ function ProfileTab() {
                 >
                   <span
                     className={cn(
-                      "size-10 rounded-full bg-gradient-to-br p-[3px]",
-                      frame.gradient,
+                      "size-10 rounded-full bg-gradient-to-br",
+                      theme.gradient,
                     )}
-                  >
-                    <span className="flex size-full items-center justify-center rounded-full bg-panel text-[10px] font-semibold">
-                      {frame.label.slice(0, 2)}
-                    </span>
-                  </span>
-                  {frame.label}
+                  />
+                  {theme.label}
                 </button>
               );
             })}
           </div>
-        </div>
-      </section>
+        </section>
 
-      <section>
-        <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">
-          Links
-        </p>
-        <p className="mb-3 text-xs text-muted-foreground">
-          Shown on your profile — up to 6. Think YouTube, portfolio, a site
-          you run.
-        </p>
-        <div className="space-y-2">
-          {(links ?? me.links).map((link, index) => (
-            <div key={index} className="flex gap-2">
-              <Input
-                value={link.label}
-                placeholder="Label (e.g. YouTube)"
-                maxLength={40}
-                className="w-40 flex-none"
-                onChange={(event) => {
-                  const next = [...(links ?? me.links)];
-                  next[index] = { ...next[index], label: event.target.value };
-                  setLinks(next);
+        <section id="frames" className="scroll-mt-8">
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">
+            Avatar frame
+          </p>
+          <p className="mb-3 text-xs text-muted-foreground">
+            Give your profile a fresh look — a frame around your picture.
+            Built-in ones are free.
+          </p>
+          <div className="flex flex-wrap items-start gap-6">
+            <div className="flex flex-col items-center gap-2">
+              <UserAvatar
+                user={{
+                  ...me,
+                  avatarFrame:
+                    frameSel === undefined ? me.avatarFrame : frameSel,
                 }}
+                size="xl"
               />
-              <Input
-                value={link.url}
-                placeholder="https://…"
-                maxLength={200}
-                className="flex-1"
-                onChange={(event) => {
-                  const next = [...(links ?? me.links)];
-                  next[index] = { ...next[index], url: event.target.value };
-                  setLinks(next);
-                }}
-              />
+              <span className="text-xs text-muted-foreground">
+                {(() => {
+                  const id = frameSel === undefined ? me.avatarFrame : frameSel;
+                  return (
+                    AVATAR_FRAMES.find((frame) => frame.id === id)?.label ??
+                    "No frame"
+                  );
+                })()}
+              </span>
+            </div>
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
               <button
                 type="button"
-                aria-label={`Remove link ${link.label || index + 1}`}
-                className="rounded-md border border-border/70 px-2 text-muted-foreground hover:text-destructive"
+                onClick={() => {
+                  if (
+                    (frameSel === undefined ? me.avatarFrame : frameSel) ===
+                    null
+                  )
+                    return;
+                  setFrameSel(null);
+                  void update({ avatarFrame: null }).catch((error) => {
+                    setFrameSel(undefined);
+                    toast.error(
+                      error instanceof Error
+                        ? error.message
+                        : "Could not remove the frame.",
+                    );
+                  });
+                }}
+                className={cn(
+                  "flex flex-col items-center gap-1.5 rounded-lg border p-2.5 text-xs transition-colors",
+                  (frameSel === undefined ? me.avatarFrame : frameSel) === null
+                    ? "border-primary ring-1 ring-primary/40 text-foreground"
+                    : "border-border/70 text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <span className="flex size-10 items-center justify-center rounded-full border border-dashed border-border text-muted-foreground">
+                  <X className="size-4" />
+                </span>
+                None
+              </button>
+              {AVATAR_FRAMES.map((frame) => {
+                const active =
+                  (frameSel === undefined ? me.avatarFrame : frameSel) ===
+                  frame.id;
+                return (
+                  <button
+                    key={frame.id}
+                    type="button"
+                    onClick={() => {
+                      setFrameSel(frame.id);
+                      void update({ avatarFrame: frame.id }).catch((error) => {
+                        setFrameSel(undefined);
+                        toast.error(
+                          error instanceof Error
+                            ? error.message
+                            : "Could not save the frame.",
+                        );
+                      });
+                    }}
+                    className={cn(
+                      "flex flex-col items-center gap-1.5 rounded-lg border p-2.5 text-xs transition-colors",
+                      active
+                        ? "border-primary ring-1 ring-primary/40 text-foreground"
+                        : "border-border/70 text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "size-10 rounded-full bg-gradient-to-br p-[3px]",
+                        frame.gradient,
+                      )}
+                    >
+                      <span className="flex size-full items-center justify-center rounded-full bg-panel text-[10px] font-semibold">
+                        {frame.label.slice(0, 2)}
+                      </span>
+                    </span>
+                    {frame.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">
+            Links
+          </p>
+          <p className="mb-3 text-xs text-muted-foreground">
+            Shown on your profile — up to 6. Think YouTube, portfolio, a site
+            you run.
+          </p>
+          <div className="space-y-2">
+            {(links ?? me.links).map((link, index) => (
+              <div key={index} className="flex gap-2">
+                <Input
+                  value={link.label}
+                  placeholder="Label (e.g. YouTube)"
+                  maxLength={40}
+                  className="w-40 flex-none"
+                  onChange={(event) => {
+                    const next = [...(links ?? me.links)];
+                    next[index] = { ...next[index], label: event.target.value };
+                    setLinks(next);
+                  }}
+                />
+                <Input
+                  value={link.url}
+                  placeholder="https://…"
+                  maxLength={200}
+                  className="flex-1"
+                  onChange={(event) => {
+                    const next = [...(links ?? me.links)];
+                    next[index] = { ...next[index], url: event.target.value };
+                    setLinks(next);
+                  }}
+                />
+                <button
+                  type="button"
+                  aria-label={`Remove link ${link.label || index + 1}`}
+                  className="rounded-md border border-border/70 px-2 text-muted-foreground hover:text-destructive"
+                  onClick={() =>
+                    setLinks((links ?? me.links).filter((_, i) => i !== index))
+                  }
+                >
+                  <Trash2 className="size-4" />
+                </button>
+              </div>
+            ))}
+            {(links ?? me.links).length === 0 && (
+              <p className="text-sm text-muted-foreground">No links yet.</p>
+            )}
+            <div className="flex items-center justify-between gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={(links ?? me.links).length >= 6}
                 onClick={() =>
-                  setLinks((links ?? me.links).filter((_, i) => i !== index))
+                  setLinks([...(links ?? me.links), { label: "", url: "" }])
                 }
               >
-                <Trash2 className="size-4" />
-              </button>
-            </div>
-          ))}
-          {(links ?? me.links).length === 0 && (
-            <p className="text-sm text-muted-foreground">No links yet.</p>
-          )}
-          <div className="flex items-center justify-between gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={(links ?? me.links).length >= 6}
-              onClick={() =>
-                setLinks([...(links ?? me.links), { label: "", url: "" }])
-              }
-            >
-              <Plus className="mr-1.5 size-4" /> Add link
-            </Button>
-            <Button
-              size="sm"
-              disabled={linksBusy || links === null}
-              onClick={async () => {
-                const rows = (links ?? []).filter(
-                  (link) => link.label.trim() && link.url.trim(),
-                );
-                for (const row of rows) {
-                  if (!/^https?:\/\//i.test(row.url.trim())) {
-                    row.url = `https://${row.url.trim()}`;
-                  }
-                }
-                setLinksBusy(true);
-                try {
-                  await update({ links: rows });
-                  toast.success("Links saved");
-                  setLinks(null);
-                } catch (error) {
-                  toast.error(
-                    error instanceof Error ? error.message : "Could not save links.",
+                <Plus className="mr-1.5 size-4" /> Add link
+              </Button>
+              <Button
+                size="sm"
+                disabled={linksBusy || links === null}
+                onClick={async () => {
+                  const rows = (links ?? []).filter(
+                    (link) => link.label.trim() && link.url.trim(),
                   );
-                } finally {
-                  setLinksBusy(false);
-                }
-              }}
-            >
-              {linksBusy && <Loader2 className="mr-2 size-4 animate-spin" />}
-              Save links
-            </Button>
+                  for (const row of rows) {
+                    if (!/^https?:\/\//i.test(row.url.trim())) {
+                      row.url = `https://${row.url.trim()}`;
+                    }
+                  }
+                  setLinksBusy(true);
+                  try {
+                    await update({ links: rows });
+                    toast.success("Links saved");
+                    setLinks(null);
+                  } catch (error) {
+                    toast.error(
+                      error instanceof Error
+                        ? error.message
+                        : "Could not save links.",
+                    );
+                  } finally {
+                    setLinksBusy(false);
+                  }
+                }}
+              >
+                {linksBusy && <Loader2 className="mr-2 size-4 animate-spin" />}
+                Save links
+              </Button>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
       </div>
 
       <ProfilePreviewPane
@@ -2023,18 +2088,18 @@ function ProfileTab() {
         theme={themeSel}
         frame={frameSel}
       />
+      {nameStyleOpen && (
+        <DisplayNameStyleDialog
+          user={{ ...me, name: name ?? me.name }}
+          onOpenChange={setNameStyleOpen}
+        />
+      )}
     </div>
   );
 }
 
 /** Caps micro-label above a settings field, mirroring the reference look. */
-function FieldRow({
-  label,
-  children,
-}: {
-  label: string;
-  children: ReactNode;
-}) {
+function FieldRow({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div>
       <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">
@@ -2070,8 +2135,8 @@ function ProfilePromoCard() {
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold">Give your profile a fresh look</p>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          A frame around your picture: built-in ones are free, or pick one
-          made by artists.
+          A frame around your picture: built-in ones are free, or pick one made
+          by artists.
         </p>
       </div>
       <Button
@@ -2164,14 +2229,11 @@ function ProfilePreviewPane({
 
         <div className="px-4 pb-4">
           <div className="-mt-8 inline-block rounded-full bg-zinc-950 p-1 ring-1 ring-white/10">
-            <UserAvatar
-              user={{ ...me, avatarFrame: frameValue }}
-              size="lg"
-            />
+            <UserAvatar user={{ ...me, avatarFrame: frameValue }} size="lg" />
           </div>
 
           <h3 className="mt-2 break-words text-lg font-semibold leading-snug">
-            {nameValue}
+            <StyledDisplayName user={{ ...me, name: nameValue }} />
             <span className="ml-2 inline-flex items-center gap-1 align-middle">
               <InlineBadge badges={me.badges} primaryBadge={badgeId} />
               {me.badges.length > 1 && (
@@ -2437,7 +2499,9 @@ function AppearanceTab() {
           <span className="text-sm">Show the member list by default</span>
           <Switch
             checked={showMemberList}
-            onCheckedChange={(checked) => setPreference("showMemberList", checked)}
+            onCheckedChange={(checked) =>
+              setPreference("showMemberList", checked)
+            }
           />
         </label>
       </Section>
@@ -2532,7 +2596,9 @@ function PrivacyTab() {
             </span>
             <Switch
               checked={me.showPresence}
-              onCheckedChange={(checked) => void update({ showPresence: checked })}
+              onCheckedChange={(checked) =>
+                void update({ showPresence: checked })
+              }
             />
           </label>
         </div>
@@ -2555,7 +2621,9 @@ function SessionsTab() {
         {sessions === undefined ? (
           <p className="text-sm text-muted-foreground">Loading…</p>
         ) : sessions.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No active sessions found.</p>
+          <p className="text-sm text-muted-foreground">
+            No active sessions found.
+          </p>
         ) : (
           sessions.map((session) => (
             <div
@@ -2567,7 +2635,8 @@ function SessionsTab() {
                   {session.current ? "This device" : "Another device"}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Valid until {new Date(session.expirationTime).toLocaleDateString()}
+                  Valid until{" "}
+                  {new Date(session.expirationTime).toLocaleDateString()}
                 </p>
               </div>
               {!session.current && (
