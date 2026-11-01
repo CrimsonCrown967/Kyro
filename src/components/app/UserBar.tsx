@@ -4,6 +4,7 @@ import {
   Settings,
   ShieldCheck,
   User,
+  UserPlus,
   Volume2,
   VolumeX,
 } from "@/components/icons";
@@ -27,6 +28,7 @@ import { useUiStore, type StatusChoice } from "@/lib/store";
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { toast } from "sonner";
+import { rememberAccount } from "@/lib/accounts";
 
 const STATUS_OPTIONS: {
   value: StatusChoice;
@@ -79,9 +81,7 @@ export function UserBar({ onOpenSettings }: { onOpenSettings?: () => void }) {
   if (!me) return null;
 
   const isStaff =
-    me.role === "admin" ||
-    me.isFounder ||
-    me.badges.includes("moderator");
+    me.role === "admin" || me.isFounder || me.badges.includes("moderator");
 
   const ownsServer = (servers ?? []).some((server) => server.isOwner);
 
@@ -269,6 +269,23 @@ export function UserBar({ onOpenSettings }: { onOpenSettings?: () => void }) {
               <ShieldCheck className="size-4" /> Admin portal
             </DropdownMenuItem>
           )}
+          <DropdownMenuItem
+            onClick={() => {
+              if (me.email) {
+                rememberAccount({
+                  email: me.email,
+                  name: me.name,
+                  username: me.username ?? undefined,
+                  avatarUrl: me.avatarUrl,
+                });
+              }
+              void signOut().then(() =>
+                navigate("/auth?switch=1&returnTo=/dashboard"),
+              );
+            }}
+          >
+            <UserPlus className="size-4" /> Switch account
+          </DropdownMenuItem>
           <DropdownMenuItem onClick={() => void signOut()}>
             <LogOut className="size-4" /> Sign out
           </DropdownMenuItem>

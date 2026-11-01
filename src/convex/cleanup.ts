@@ -112,42 +112,59 @@ export async function deleteServerData(
   server: Doc<"servers">,
 ): Promise<void> {
   const serverId = server._id;
-  const [channels, categories, roles, members, invites, bans, audits, reports] =
-    await Promise.all([
-      ctx.db
-        .query("channels")
-        .withIndex("by_server", (q) => q.eq("serverId", serverId))
-        .collect(),
-      ctx.db
-        .query("categories")
-        .withIndex("by_server", (q) => q.eq("serverId", serverId))
-        .collect(),
-      ctx.db
-        .query("serverRoles")
-        .withIndex("by_server", (q) => q.eq("serverId", serverId))
-        .collect(),
-      ctx.db
-        .query("serverMembers")
-        .withIndex("by_server", (q) => q.eq("serverId", serverId))
-        .collect(),
-      ctx.db
-        .query("invites")
-        .withIndex("by_server", (q) => q.eq("serverId", serverId))
-        .collect(),
-      ctx.db
-        .query("bans")
-        .withIndex("by_server", (q) => q.eq("serverId", serverId))
-        .collect(),
-      ctx.db
-        .query("auditLogs")
-        .withIndex("by_server", (q) => q.eq("serverId", serverId))
-        .collect(),
-      ctx.db
-        .query("reports")
-        .withIndex("by_server", (q) => q.eq("serverId", serverId))
-        .collect(),
-    ]);
+  const [
+    channels,
+    categories,
+    roles,
+    members,
+    invites,
+    bans,
+    audits,
+    reports,
+    emojis,
+  ] = await Promise.all([
+    ctx.db
+      .query("channels")
+      .withIndex("by_server", (q) => q.eq("serverId", serverId))
+      .collect(),
+    ctx.db
+      .query("categories")
+      .withIndex("by_server", (q) => q.eq("serverId", serverId))
+      .collect(),
+    ctx.db
+      .query("serverRoles")
+      .withIndex("by_server", (q) => q.eq("serverId", serverId))
+      .collect(),
+    ctx.db
+      .query("serverMembers")
+      .withIndex("by_server", (q) => q.eq("serverId", serverId))
+      .collect(),
+    ctx.db
+      .query("invites")
+      .withIndex("by_server", (q) => q.eq("serverId", serverId))
+      .collect(),
+    ctx.db
+      .query("bans")
+      .withIndex("by_server", (q) => q.eq("serverId", serverId))
+      .collect(),
+    ctx.db
+      .query("auditLogs")
+      .withIndex("by_server", (q) => q.eq("serverId", serverId))
+      .collect(),
+    ctx.db
+      .query("reports")
+      .withIndex("by_server", (q) => q.eq("serverId", serverId))
+      .collect(),
+    ctx.db
+      .query("serverEmojis")
+      .withIndex("by_server", (q) => q.eq("serverId", serverId))
+      .collect(),
+  ]);
   for (const channel of channels) await deleteChannelData(ctx, channel);
+  for (const emoji of emojis) {
+    await deleteClaimedUpload(ctx, emoji.storageId, "server_emoji", emoji._id);
+    await ctx.db.delete(emoji._id);
+  }
   for (const row of [
     ...categories,
     ...roles,

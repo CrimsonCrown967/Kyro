@@ -1,7 +1,12 @@
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
-import { parseMentions, PERMISSIONS } from "../lib/permissions";
+import { CUSTOM_EMOJI_TOKEN, customEmojiIds } from "../lib/emoji";
+import {
+  channelPermissions,
+  parseMentions,
+  PERMISSIONS,
+} from "../lib/permissions";
 import {
   blockedUserIds,
   can,
@@ -13,6 +18,7 @@ import {
   MAX_ATTACHMENTS,
   MAX_MESSAGE_LENGTH,
   notify,
+  PRESENCE_TIMEOUT_MS,
   isBlockedBetween,
   requireActiveUser,
   requireConversationAccess,
@@ -51,12 +57,29 @@ async function requireReadAccess(
     const channel = await ctx.db.get(containerId as Id<"channels">);
     if (!channel) throw new Error("That channel no longer exists.");
     const access = await requireServerAccess(ctx, channel.serverId, userId);
+    const defaultRole = await ctx.db
+      .query("serverRoles")
+      .withIndex("by_server", (q) => q.eq("serverId", channel.serverId))
+      .filter((q) => q.eq(q.field("isDefault"), true))
+      .first();
+    const permissions =
+      access.server.ownerId === userId
+        ? access.permissions
+        : channelPermissions(
+            access.permissions,
+            access.member.roleIds,
+            defaultRole?._id ?? null,
+            channel.permissionOverwrites,
+          );
+    if (!permissions.includes(PERMISSIONS.VIEW_CHANNEL)) {
+      throw new Error("You don't have permission to view this channel.");
+    }
     return {
       kind: "channel",
       channel,
       server: access.server,
       member: access.member,
-      permissions: access.permissions,
+      permissions,
     };
   }
   const conversation = await requireConversationAccess(
@@ -78,6 +101,41 @@ function containerLink(
     : `/dashboard/dm/${containerId}`;
 }
 
+/**
+ * Custom emojis travel as stable `<:name:id>` tokens. Only members of the
+ * emoji's source community may send or react with it, even in another server
+ * or a direct message.
+ */
+async function requireUsableCustomEmojis(
+  ctx: Ctx,
+  userId: Id<"users">,
+  content: string,
+): Promise<void> {
+  const ids = customEmojiIds(content);
+  await Promise.all(
+    ids.map(async (emojiId) => {
+      let emoji: Doc<"serverEmojis"> | null = null;
+      try {
+        emoji = await ctx.db.get(emojiId as Id<"serverEmojis">);
+      } catch {
+        // User-authored ids are untrusted and may not be valid Convex ids.
+      }
+      if (!emoji) throw new Error("That custom emoji is no longer available.");
+      const membership = await ctx.db
+        .query("serverMembers")
+        .withIndex("by_server_user", (q) =>
+          q.eq("serverId", emoji.serverId).eq("userId", userId),
+        )
+        .unique();
+      if (!membership) {
+        throw new Error(
+          "You must be a member of the emoji's community to use it.",
+        );
+      }
+    }),
+  );
+}
+
 export const list = query({
   args: {
     containerType: v.union(v.literal("channel"), v.literal("conversation")),
@@ -93,13 +151,13 @@ export const list = query({
     const blocked = await blockedUserIds(ctx, viewerId);
     const rows = (
       await ctx.db
-      .query("messages")
-      .withIndex("by_container", (q) =>
-        before !== undefined
-          ? q.eq("containerId", containerId).lt("createdAt", before)
-          : q.eq("containerId", containerId),
-      )
-      .order("desc")
+        .query("messages")
+        .withIndex("by_container", (q) =>
+          before !== undefined
+            ? q.eq("containerId", containerId).lt("createdAt", before)
+            : q.eq("containerId", containerId),
+        )
+        .order("desc")
         .take(take * 2 + 1)
     ).filter((message) => !blocked.has(message.authorId));
 
@@ -139,6 +197,59 @@ export const list = query({
       viewerId,
     );
 
+    const emojiIds = Array.from(
+      new Set(page.flatMap((message) => [...customEmojiIds(message.content)])),
+    );
+    const emojiDocs = await Promise.all(
+      emojiIds.map(async (emojiId) => {
+        // Message content is user-authored: a malformed `<:name:id>` token
+        // must render as text, not break the whole channel query.
+        try {
+          return await ctx.db.get(emojiId as Id<"serverEmojis">);
+        } catch {
+          return null;
+        }
+      }),
+    );
+    const customEmojiMap = new Map(
+      await Promise.all(
+        emojiDocs
+          .filter((emoji): emoji is Doc<"serverEmojis"> => emoji !== null)
+          .map(
+            async (emoji) =>
+              [
+                emoji._id as string,
+                {
+                  id: emoji._id as string,
+                  name: emoji.name,
+                  url: await ctx.storage.getUrl(emoji.storageId),
+                  animated: emoji.animated,
+                  serverId: emoji.serverId as string,
+                },
+              ] as const,
+          ),
+      ),
+    );
+
+    // Reaction emojis can be custom tokens too. Resolve each unique token once
+    // so the reaction bar can render the image instead of raw markup.
+    const reactionUrls = new Map<string, string | null>();
+    const reactionEmojiUrl = async (emoji: string): Promise<string | null> => {
+      if (reactionUrls.has(emoji)) return reactionUrls.get(emoji) ?? null;
+      const emojiId = customEmojiIds(emoji)[0];
+      let url: string | null = null;
+      if (emojiId) {
+        try {
+          const doc = await ctx.db.get(emojiId as Id<"serverEmojis">);
+          if (doc) url = await ctx.storage.getUrl(doc.storageId);
+        } catch {
+          url = null;
+        }
+      }
+      reactionUrls.set(emoji, url);
+      return url;
+    };
+
     const hydrated = await Promise.all(
       page.map(async (message) => {
         const reactions = await ctx.db
@@ -172,12 +283,15 @@ export const list = query({
           author: authors.get(message.authorId) ?? null,
           authorId: message.authorId as string,
           attachments,
-          reactions: Array.from(grouped.entries()).map(([emoji, userIds]) => ({
-            emoji,
-            userIds,
-            count: userIds.length,
-            mine: userIds.includes(viewerId),
-          })),
+          reactions: await Promise.all(
+            Array.from(grouped.entries()).map(async ([emoji, userIds]) => ({
+              emoji,
+              userIds,
+              count: userIds.length,
+              mine: userIds.includes(viewerId),
+              url: await reactionEmojiUrl(emoji),
+            })),
+          ),
           replyTo: reply
             ? {
                 id: reply._id,
@@ -185,13 +299,20 @@ export const list = query({
                 author: replyAuthors.get(reply.authorId) ?? null,
               }
             : null,
+          customEmojis: customEmojiIds(message.content)
+            .map((emojiId) => customEmojiMap.get(emojiId))
+            .filter((emoji): emoji is NonNullable<typeof emoji> =>
+              Boolean(emoji),
+            ),
         };
       }),
     );
 
     const read = await ctx.db
       .query("reads")
-      .withIndex("by_user_key", (q) => q.eq("userId", viewerId).eq("key", containerId))
+      .withIndex("by_user_key", (q) =>
+        q.eq("userId", viewerId).eq("key", containerId),
+      )
       .unique();
 
     return {
@@ -235,7 +356,9 @@ export const send = mutation({
     const content = args.content.trim();
     const attachmentInputs = args.attachments ?? [];
     if (content.length > MAX_MESSAGE_LENGTH) {
-      throw new Error(`Messages are limited to ${MAX_MESSAGE_LENGTH} characters.`);
+      throw new Error(
+        `Messages are limited to ${MAX_MESSAGE_LENGTH} characters.`,
+      );
     }
     if (attachmentInputs.length > MAX_ATTACHMENTS) {
       throw new Error(`You can attach up to ${MAX_ATTACHMENTS} files.`);
@@ -253,6 +376,7 @@ export const send = mutation({
       args.containerType,
       args.containerId,
     );
+    await requireUsableCustomEmojis(ctx, userId, content);
 
     // Authorization comes before idempotency so a leaked container/client id
     // never acts as an existence oracle. A client id is also scoped to author.
@@ -346,12 +470,15 @@ export const send = mutation({
       if (channel.slowMode && channel.slowMode > 0) {
         const recent = await ctx.db
           .query("messages")
-          .withIndex("by_container", (q) => q.eq("containerId", args.containerId))
+          .withIndex("by_container", (q) =>
+            q.eq("containerId", args.containerId),
+          )
           .order("desc")
           .take(30);
         const mine = recent.find((message) => message.authorId === userId);
         if (mine) {
-          const waitMs = channel.slowMode * 1000 - (Date.now() - mine.createdAt);
+          const waitMs =
+            channel.slowMode * 1000 - (Date.now() - mine.createdAt);
           if (waitMs > 0) {
             throw new Error(
               `Slow mode is on — wait ${Math.ceil(waitMs / 1000)}s before posting again.`,
@@ -361,8 +488,13 @@ export const send = mutation({
       }
     } else {
       dmConversation = access.conversation;
-      if (dmConversation.type === "dm" && dmConversation.participantIds.length === 2) {
-        const other = dmConversation.participantIds.find((id) => id !== userId)!;
+      if (
+        dmConversation.type === "dm" &&
+        dmConversation.participantIds.length === 2
+      ) {
+        const other = dmConversation.participantIds.find(
+          (id) => id !== userId,
+        )!;
         const check = await canSendDirectMessage(ctx, userId, other);
         if (!check.ok) throw new Error(check.reason);
       } else {
@@ -387,7 +519,9 @@ export const send = mutation({
         reply.containerType !== args.containerType ||
         reply.containerId !== args.containerId
       ) {
-        throw new Error("You can only reply to a message in this conversation.");
+        throw new Error(
+          "You can only reply to a message in this conversation.",
+        );
       }
       replyToId = reply._id;
     }
@@ -444,14 +578,70 @@ export const send = mutation({
     await markRead(ctx, userId, args.containerId);
 
     // Mentions and replies notify real people, never the sender.
-    const mentionedNames = new Set(parseMentions(content));
+    const mentionedNames = new Set(
+      parseMentions(content).filter(
+        (name) => name !== "everyone" && name !== "here",
+      ),
+    );
     const notified = new Set<string>();
     const link = containerLink(args.containerType, args.containerId, serverId);
 
     if (args.containerType === "channel") {
+      const mentionEveryone = /(^|\s)@everyone\b/i.test(content);
+      const mentionHere = /(^|\s)@here\b/i.test(content);
+      if (
+        (mentionEveryone || mentionHere) &&
+        !can(permissions, PERMISSIONS.MENTION_EVERYONE)
+      ) {
+        throw new Error(
+          "You don't have permission to mention @everyone or @here.",
+        );
+      }
+
+      if (mentionEveryone || mentionHere) {
+        const memberships = await ctx.db
+          .query("serverMembers")
+          .withIndex("by_server", (q) => q.eq("serverId", serverId!))
+          .take(1000);
+        const now = Date.now();
+        for (const membership of memberships) {
+          if (
+            membership.userId === userId ||
+            membership.muted ||
+            notified.has(membership.userId)
+          ) {
+            continue;
+          }
+          const target = await ctx.db.get(membership.userId);
+          if (!target || target.deletedAt !== undefined) continue;
+          if (
+            mentionHere &&
+            (target.status === "invisible" ||
+              target.status === "offline" ||
+              target.lastSeen === undefined ||
+              now - target.lastSeen > PRESENCE_TIMEOUT_MS)
+          ) {
+            continue;
+          }
+          notified.add(target._id);
+          await notify(ctx, {
+            userId: target._id,
+            type: "mention",
+            title: `${user.name ?? user.username} mentioned ${
+              mentionEveryone ? "@everyone" : "@here"
+            }`,
+            body: content.slice(0, 160),
+            actorId: userId,
+            link,
+            containerKey: args.containerId,
+          });
+        }
+      }
+
       for (const username of mentionedNames) {
         const target = await getUserByUsername(ctx, username);
-        if (!target || notified.has(target._id)) continue;
+        if (!target || target._id === userId || notified.has(target._id))
+          continue;
         const membership = await ctx.db
           .query("serverMembers")
           .withIndex("by_server_user", (q) =>
@@ -538,9 +728,12 @@ export const edit = mutation({
     );
     const trimmed = content.trim();
     if (trimmed.length > MAX_MESSAGE_LENGTH) {
-      throw new Error(`Messages are limited to ${MAX_MESSAGE_LENGTH} characters.`);
+      throw new Error(
+        `Messages are limited to ${MAX_MESSAGE_LENGTH} characters.`,
+      );
     }
     if (!trimmed) throw new Error("A message can't be empty.");
+    await requireUsableCustomEmojis(ctx, userId, trimmed);
     await ctx.db.patch(messageId, { content: trimmed, editedAt: Date.now() });
   },
 });
@@ -559,7 +752,9 @@ export const remove = mutation({
       if (!channel) throw new Error("That channel no longer exists.");
       const access = await requireServerAccess(ctx, channel.serverId, userId);
       if (!can(access.permissions, PERMISSIONS.MANAGE_MESSAGES)) {
-        throw new Error("You need Manage Messages to delete other people's posts.");
+        throw new Error(
+          "You need Manage Messages to delete other people's posts.",
+        );
       }
       await logAudit(ctx, {
         serverId: channel.serverId,
@@ -579,7 +774,8 @@ export const toggleReaction = mutation({
   handler: async (ctx, { messageId, emoji }) => {
     const { id: userId } = await requireActiveUser(ctx);
     const normalized = emoji.trim();
-    if (!normalized || normalized.length > 32) {
+    const customToken = CUSTOM_EMOJI_TOKEN.test(normalized);
+    if (!normalized || (!customToken && normalized.length > 32)) {
       throw new Error("That reaction isn't valid.");
     }
     const message = await ctx.db.get(messageId);
@@ -600,6 +796,9 @@ export const toggleReaction = mutation({
     if (mine) {
       await ctx.db.delete(mine._id);
       return { active: false };
+    }
+    if (customToken) {
+      await requireUsableCustomEmojis(ctx, userId, normalized);
     }
     await ctx.db.insert("reactions", {
       messageId,
@@ -627,7 +826,8 @@ export const markContainerRead = mutation({
       )
       .collect();
     for (const note of notes) {
-      if (note.containerKey === containerId) await ctx.db.patch(note._id, { read: true });
+      if (note.containerKey === containerId)
+        await ctx.db.patch(note._id, { read: true });
     }
   },
 });
@@ -645,7 +845,9 @@ export const markServerRead = mutation({
     for (const channel of channels) {
       await markRead(ctx, userId, channel._id);
     }
-    const channelIds = new Set(channels.map((channel) => channel._id as string));
+    const channelIds = new Set(
+      channels.map((channel) => channel._id as string),
+    );
     const notes = await ctx.db
       .query("notifications")
       .withIndex("by_user_unread", (q) =>
@@ -675,7 +877,8 @@ export const setTyping = mutation({
       .withIndex("by_key", (q) => q.eq("key", containerId))
       .collect();
     for (const row of rows) {
-      if (row.expiresAt < now || row.userId === userId) await ctx.db.delete(row._id);
+      if (row.expiresAt < now || row.userId === userId)
+        await ctx.db.delete(row._id);
     }
     await ctx.db.insert("typing", {
       key: containerId,

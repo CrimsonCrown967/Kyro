@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from "convex/react";
+import { useConvex, useMutation, useQuery } from "convex/react";
 import {
   AlertTriangle,
   Copy,
@@ -31,11 +31,23 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { dayKey, dayLabel, formatTime, type PresenceState } from "@/lib/format";
 import { renderMessage } from "@/lib/markdown";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import type { CustomEmoji } from "@/lib/emoji";
+import { EmojiPicker } from "@/components/app/EmojiPicker";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export interface MessageAuthor {
   id: string;
@@ -44,13 +56,13 @@ export interface MessageAuthor {
   avatarUrl: string | null;
   presence: PresenceState;
   isFounder?: boolean;
-  /** Global badges (hydrated server-side) — highest is shown inline. */    badges?: string[];
-    /** The badge this author picked to show next to their name. */
-    primaryBadge?: string | null;
-    /** Community tag worn next to the name, e.g. "HTML". */
-    serverTag?: string | null;
-    /** Device the author is on, for the platform indicator. */
-    device?: string | null;
+  /** Global badges (hydrated server-side) — highest is shown inline. */ badges?: string[];
+  /** The badge this author picked to show next to their name. */
+  primaryBadge?: string | null;
+  /** Community tag worn next to the name, e.g. "HTML". */
+  serverTag?: string | null;
+  /** Device the author is on, for the platform indicator. */
+  device?: string | null;
 }
 
 export interface MessageDto {
@@ -70,8 +82,16 @@ export interface MessageDto {
     mimeType: string;
     url: string | null;
   }[];
-  reactions: { emoji: string; userIds: string[]; count: number; mine: boolean }[];
+  reactions: {
+    emoji: string;
+    userIds: string[];
+    count: number;
+    mine: boolean;
+    /** Resolved URL when the reaction is a server's custom emoji. */
+    url?: string | null;
+  }[];
   replyTo: { id: string; excerpt: string; author: MessageAuthor | null } | null;
+  customEmojis?: CustomEmoji[];
 }
 
 export interface MessageListResult {
@@ -87,10 +107,15 @@ export interface ReplyTarget {
   excerpt: string;
 }
 
-const QUICK_EMOJI = [
-  "👍", "👎", "😂", "😮", "😍", "🔥", "🎉", "😭", "🙏", "👀",
-  "✅", "❤️", "🚀", "😅", "🤝", "💡", "🏆", "😴", "🤔", "💬",
-];
+const DIRECT_MEDIA_PATTERN =
+  /https?:\/\/[^\s<>()]+\.(?:gif|png|jpe?g|webp|avif)(?:[?#][^\s<>()]*)?/gi;
+
+function mediaUrls(content: string): string[] {
+  return Array.from(new Set(content.match(DIRECT_MEDIA_PATTERN) ?? [])).slice(
+    0,
+    4,
+  );
+}
 
 export function MessageList({
   containerType,
@@ -102,6 +127,7 @@ export function MessageList({
   onReply,
   onReport,
   roleColors,
+  mentionUsers = [],
 }: {
   containerType: "channel" | "conversation";
   containerId: string;
@@ -114,15 +140,20 @@ export function MessageList({
   onReply: (target: ReplyTarget) => void;
   onReport: (message: MessageDto) => void;
   roleColors?: Record<string, string>;
+  mentionUsers?: { id: string; name: string; username: string | null }[];
 }) {
   const [olderPages, setOlderPages] = useState<MessageDto[][]>([]);
-  const [cursor, setCursor] = useState<{ container: string; at: number } | null>(
-    null,
-  );
+  const [cursor, setCursor] = useState<{
+    container: string;
+    at: number;
+  } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   // Jump straight to the newest message when a conversation is (re)opened;
   // without this the list starts at the top and shows the oldest history.
   const jumpToBottomRef = useRef(true);
+  const [media, setMedia] = useState<{ url: string; label: string } | null>(
+    null,
+  );
 
   const latest = useQuery(api.messages.list, {
     containerType,
@@ -203,93 +234,124 @@ export function MessageList({
 
   const lastReadAt = latest?.lastReadAt ?? 0;
   const unreadFrom = messages.findIndex(
-    (message) => message.createdAt > lastReadAt && lastReadAt > 0 && message.authorId !== currentUserId,
+    (message) =>
+      message.createdAt > lastReadAt &&
+      lastReadAt > 0 &&
+      message.authorId !== currentUserId,
   );
 
   return (
-    <div
-      ref={scrollRef}
-      onScroll={handleScroll}
-      className="chat-scroll min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-6"
-    >
-      {latest === undefined ? (
-        <div className="flex h-full items-center justify-center">
-          <Loader2 className="size-5 animate-spin text-muted-foreground" />
-        </div>
-      ) : (
-        <>
-          <div className="mb-3 flex justify-center">
-            {activeCursor === null && latest.hasMore ? (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() =>
-                  latest.oldest !== null &&
-                  setCursor({ container: containerId, at: latest.oldest })
-                }
-              >
-                Load earlier messages
-              </Button>
-            ) : activeCursor !== null ? (
-              <Loader2 className="size-4 animate-spin text-muted-foreground" />
-            ) : null}
+    <>
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="chat-scroll min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-6"
+      >
+        {latest === undefined ? (
+          <div className="flex h-full items-center justify-center">
+            <Loader2 className="size-5 animate-spin text-muted-foreground" />
           </div>
+        ) : (
+          <>
+            <div className="mb-3 flex justify-center">
+              {activeCursor === null && latest.hasMore ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() =>
+                    latest.oldest !== null &&
+                    setCursor({ container: containerId, at: latest.oldest })
+                  }
+                >
+                  Load earlier messages
+                </Button>
+              ) : activeCursor !== null ? (
+                <Loader2 className="size-4 animate-spin text-muted-foreground" />
+              ) : null}
+            </div>
 
-          {messages.length === 0 ? (
-            <EmptyConversation containerType={containerType} />
-          ) : (
-            messages.map((message, index) => {
-              const previous = messages[index - 1];
-              const next = messages[index + 1];
-              const newDay = !previous || dayKey(previous.createdAt) !== dayKey(message.createdAt);
-              const grouped =
-                !newDay &&
-                previous?.authorId === message.authorId &&
-                message.createdAt - previous.createdAt < 5 * 60_000 &&
-                !previous.replyTo;
-              const showUnreadDivider = unreadFrom === index && !grouped;
+            {messages.length === 0 ? (
+              <EmptyConversation containerType={containerType} />
+            ) : (
+              messages.map((message, index) => {
+                const previous = messages[index - 1];
+                const next = messages[index + 1];
+                const newDay =
+                  !previous ||
+                  dayKey(previous.createdAt) !== dayKey(message.createdAt);
+                const grouped =
+                  !newDay &&
+                  previous?.authorId === message.authorId &&
+                  message.createdAt - previous.createdAt < 5 * 60_000 &&
+                  !previous.replyTo;
+                const showUnreadDivider = unreadFrom === index && !grouped;
 
-              return (
-                <div key={message.id}>
-                  {newDay && (
-                    <div className="my-4 flex items-center gap-3">
-                      <span className="h-px flex-1 bg-border/70" />
-                      <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                        {dayLabel(message.createdAt)}
-                      </span>
-                      <span className="h-px flex-1 bg-border/70" />
-                    </div>
-                  )}
-                  {showUnreadDivider && (
-                    <div className="my-2 flex items-center gap-3">
-                      <span className="h-px flex-1 bg-destructive/60" />
-                      <span className="text-[11px] font-semibold uppercase text-destructive">
-                        New messages
-                      </span>
-                      <span className="h-px flex-1 bg-destructive/60" />
-                    </div>
-                  )}
-                  <MessageRow
-                    message={message}
-                    grouped={grouped}
-                    containerType={containerType}
-                    containerId={containerId}
-                    serverId={serverId}
-                    serverOwnerId={serverOwnerId}
-                    currentUserId={currentUserId}
-                    canManageMessages={canManageMessages}
-                    isLast={next === undefined || next.authorId !== message.authorId}
-                    onReply={onReply}
-                    onReport={onReport}
-                    roleColors={roleColors}
-                  />
-                </div>
-              );
-            })
+                return (
+                  <div key={message.id}>
+                    {newDay && (
+                      <div className="my-4 flex items-center gap-3">
+                        <span className="h-px flex-1 bg-border/70" />
+                        <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                          {dayLabel(message.createdAt)}
+                        </span>
+                        <span className="h-px flex-1 bg-border/70" />
+                      </div>
+                    )}
+                    {showUnreadDivider && (
+                      <div className="my-2 flex items-center gap-3">
+                        <span className="h-px flex-1 bg-destructive/60" />
+                        <span className="text-[11px] font-semibold uppercase text-destructive">
+                          New messages
+                        </span>
+                        <span className="h-px flex-1 bg-destructive/60" />
+                      </div>
+                    )}
+                    <MessageRow
+                      message={message}
+                      grouped={grouped}
+                      containerType={containerType}
+                      containerId={containerId}
+                      serverId={serverId}
+                      serverOwnerId={serverOwnerId}
+                      currentUserId={currentUserId}
+                      canManageMessages={canManageMessages}
+                      isLast={
+                        next === undefined || next.authorId !== message.authorId
+                      }
+                      onReply={onReply}
+                      onReport={onReport}
+                      roleColors={roleColors}
+                      mentionUsers={mentionUsers}
+                      onOpenMedia={(url, label) => setMedia({ url, label })}
+                    />
+                  </div>
+                );
+              })
+            )}
+          </>
+        )}
+      </div>
+      <Dialog
+        open={media !== null}
+        onOpenChange={(open) => !open && setMedia(null)}
+      >
+        <DialogContent className="max-h-[92dvh] max-w-[94vw] overflow-hidden border-border/70 bg-black/95 p-3 sm:max-w-5xl">
+          <DialogTitle className="sr-only">
+            {media?.label ?? "Media preview"}
+          </DialogTitle>
+          <DialogDescription className="sr-only">
+            Image preview inside Kyro. Press Escape to close.
+          </DialogDescription>
+          {media && (
+            <img
+              src={media.url}
+              alt={media.label}
+              className="max-h-[86dvh] w-full object-contain"
+            />
           )}
-        </>
-      )}
-    </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -301,7 +363,9 @@ function EmptyConversation({
   return (
     <div className="mx-auto mt-10 max-w-md rounded-2xl border border-border/70 bg-surface p-6 text-center">
       <h3 className="text-lg font-semibold">
-        {containerType === "channel" ? "This is the start of the channel" : "Say hello"}
+        {containerType === "channel"
+          ? "This is the start of the channel"
+          : "Say hello"}
       </h3>
       <p className="mt-1.5 text-sm text-muted-foreground">
         {containerType === "channel"
@@ -321,6 +385,8 @@ function MessageRow({
   onReport,
   roleColors,
   serverOwnerId,
+  mentionUsers,
+  onOpenMedia,
 }: {
   message: MessageDto;
   grouped: boolean;
@@ -334,19 +400,48 @@ function MessageRow({
   onReply: (target: ReplyTarget) => void;
   onReport: (message: MessageDto) => void;
   roleColors?: Record<string, string>;
+  mentionUsers: { id: string; name: string; username: string | null }[];
+  onOpenMedia: (url: string, label: string) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(message.content);
   const [, setParams] = useSearchParams();
+  const convex = useConvex();
   const toggleReaction = useMutation(api.messages.toggleReaction);
   const editMessage = useMutation(api.messages.edit);
   const deleteMessage = useMutation(api.messages.remove);
+  const [reactionCustomEmojis, setReactionCustomEmojis] = useState<
+    CustomEmoji[]
+  >([]);
+  const [reactionEmojisLoaded, setReactionEmojisLoaded] = useState(false);
+
+  const loadReactionEmojis = () => {
+    if (reactionEmojisLoaded) return;
+    setReactionEmojisLoaded(true);
+    void convex
+      .query(api.emojis.available, {})
+      .then((rows) => setReactionCustomEmojis(rows))
+      .catch(() => setReactionCustomEmojis([]));
+  };
   const isAuthor = message.authorId === currentUserId;
   const author = message.author;
   // Any invite link pasted into chat gets a community preview underneath it.
   const inviteCodes = useMemo(
     () => extractInviteCodes(message.content),
     [message.content],
+  );
+  const embeddedMedia = useMemo(
+    () => mediaUrls(message.content),
+    [message.content],
+  );
+  const mentionMap = useMemo(
+    () =>
+      new Map(
+        mentionUsers
+          .filter((user) => Boolean(user.username))
+          .map((user) => [user.username!.toLowerCase(), user.id]),
+      ),
+    [mentionUsers],
   );
 
   /** Opening a profile uses the same ?user=<id> parameter as everywhere else. */
@@ -355,6 +450,16 @@ function MessageRow({
     setParams((previous) => {
       const next = new URLSearchParams(previous);
       next.set("user", author.id);
+      return next;
+    });
+  };
+
+  const openMention = (username: string) => {
+    const userId = mentionMap.get(username);
+    if (!userId) return;
+    setParams((previous) => {
+      const next = new URLSearchParams(previous);
+      next.set("user", userId);
       return next;
     });
   };
@@ -390,7 +495,11 @@ function MessageRow({
               : "bg-success/15 text-success",
           )}
         >
-          {missed ? <PhoneOff className="size-3.5" /> : <Phone className="size-3.5" />}
+          {missed ? (
+            <PhoneOff className="size-3.5" />
+          ) : (
+            <Phone className="size-3.5" />
+          )}
         </span>
         <div className="min-w-0">
           <p className="truncate text-sm font-medium">{label}</p>
@@ -418,11 +527,7 @@ function MessageRow({
               aria-label={`Open ${author.name}'s profile`}
               className="mt-0.5 block rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              <UserAvatar
-                user={author}
-                size="md"
-                showStatus={false}
-              />
+              <UserAvatar user={author} size="md" showStatus={false} />
             </button>
           )}
         </div>
@@ -451,10 +556,7 @@ function MessageRow({
                 <CrownBadge label="Server owner" />
               ) : null}
               {author?.serverTag && (
-                <ServerTagChip
-                  tag={author.serverTag}
-                  ownerName={author.name}
-                />
+                <ServerTagChip tag={author.serverTag} ownerName={author.name} />
               )}
               <DeviceBadge device={author?.device} />
               <span className="text-[11px] text-muted-foreground">
@@ -491,7 +593,9 @@ function MessageRow({
                         setEditing(false);
                       } catch (error) {
                         toast.error(
-                          error instanceof Error ? error.message : "Could not edit.",
+                          error instanceof Error
+                            ? error.message
+                            : "Could not edit.",
                         );
                       }
                     }
@@ -510,9 +614,15 @@ function MessageRow({
             </div>
           ) : (
             <div className="whitespace-pre-wrap break-words text-sm leading-6 text-foreground/95">
-              {renderMessage(message.content)}
+              {renderMessage(message.content, {
+                customEmojis: message.customEmojis,
+                onMention: openMention,
+                onMedia: (url) => onOpenMedia(url, "Shared image"),
+              })}
               {message.editedAt && (
-                <span className="ml-1.5 text-[10px] text-muted-foreground">(edited)</span>
+                <span className="ml-1.5 text-[10px] text-muted-foreground">
+                  (edited)
+                </span>
               )}
             </div>
           )}
@@ -525,23 +635,47 @@ function MessageRow({
             </div>
           )}
 
+          {embeddedMedia.length > 0 && !editing && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {embeddedMedia.map((url) => (
+                <button
+                  key={url}
+                  type="button"
+                  onClick={() => onOpenMedia(url, "Shared image or GIF")}
+                  className="block overflow-hidden rounded-lg border border-border/70 bg-black/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  <img
+                    src={url}
+                    alt="Shared image or GIF"
+                    loading="lazy"
+                    className="max-h-72 max-w-xs object-contain sm:max-w-sm"
+                  />
+                </button>
+              ))}
+            </div>
+          )}
+
           {message.attachments.length > 0 && (
-            <div className="mt-1.5 flex flex-wrap gap-2">                {message.attachments.map((attachment) =>
-                  attachment.mimeType.startsWith("video/") && attachment.url ? (
-                    <video
-                      key={attachment.storageId}
-                      src={attachment.url}
-                      controls
-                      playsInline
-                      preload="metadata"
-                      className="max-h-72 max-w-xs rounded-lg border border-border/70 bg-black"
-                    />
-                  ) : attachment.mimeType.startsWith("image/") && attachment.url ? (
-                  <a
+            <div className="mt-1.5 flex flex-wrap gap-2">
+              {" "}
+              {message.attachments.map((attachment) =>
+                attachment.mimeType.startsWith("video/") && attachment.url ? (
+                  <video
                     key={attachment.storageId}
-                    href={attachment.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    src={attachment.url}
+                    controls
+                    playsInline
+                    preload="metadata"
+                    className="max-h-72 max-w-xs rounded-lg border border-border/70 bg-black"
+                  />
+                ) : attachment.mimeType.startsWith("image/") &&
+                  attachment.url ? (
+                  <button
+                    key={attachment.storageId}
+                    type="button"
+                    onClick={() =>
+                      onOpenMedia(attachment.url!, attachment.name)
+                    }
                     className="block overflow-hidden rounded-lg border border-border/70"
                   >
                     <img
@@ -550,7 +684,7 @@ function MessageRow({
                       loading="lazy"
                       className="max-h-72 max-w-xs object-cover"
                     />
-                  </a>
+                  </button>
                 ) : (
                   <a
                     key={attachment.storageId}
@@ -559,7 +693,9 @@ function MessageRow({
                     rel="noopener noreferrer"
                     className="flex max-w-xs items-center gap-2 rounded-lg border border-border/70 bg-surface px-3 py-2 text-xs hover:border-primary/40"
                   >
-                    <span className="truncate font-medium">{attachment.name}</span>
+                    <span className="truncate font-medium">
+                      {attachment.name}
+                    </span>
                     <span className="shrink-0 text-muted-foreground">
                       {Math.max(1, Math.round(attachment.size / 1024))} KB
                     </span>
@@ -583,7 +719,15 @@ function MessageRow({
                       : "border-border/70 bg-surface text-muted-foreground hover:border-primary/40",
                   )}
                 >
-                  <span>{reaction.emoji}</span>
+                  {reaction.url ? (
+                    <img
+                      src={reaction.url}
+                      alt={reaction.emoji}
+                      className="size-4 object-contain"
+                    />
+                  ) : (
+                    <span>{reaction.emoji}</span>
+                  )}
                   <span>{reaction.count}</span>
                 </button>
               ))}
@@ -594,7 +738,7 @@ function MessageRow({
 
       {/* Hover toolbar */}
       <div className="message-toolbar absolute -top-3 right-2 flex items-center gap-0.5 rounded-lg border border-border/70 bg-panel px-1 py-0.5 shadow-lg">
-        <Popover>
+        <Popover onOpenChange={(open) => open && loadReactionEmojis()}>
           <PopoverTrigger asChild>
             <button
               type="button"
@@ -604,19 +748,11 @@ function MessageRow({
               <SmilePlus className="size-4" />
             </button>
           </PopoverTrigger>
-          <PopoverContent align="end" className="w-64">
-            <div className="grid grid-cols-10 gap-1">
-              {QUICK_EMOJI.map((emoji) => (
-                <button
-                  key={emoji}
-                  type="button"
-                  onClick={() => void send(emoji)}
-                  className="rounded p-1 text-lg hover:bg-surface"
-                >
-                  {emoji}
-                </button>
-              ))}
-            </div>
+          <PopoverContent align="end" className="w-auto p-3">
+            <EmojiPicker
+              customEmojis={reactionCustomEmojis}
+              onSelect={(emoji) => void send(emoji)}
+            />
           </PopoverContent>
         </Popover>
 
@@ -697,4 +833,3 @@ function MessageRow({
     </div>
   );
 }
-

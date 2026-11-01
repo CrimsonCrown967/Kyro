@@ -1,7 +1,12 @@
 import { v } from "convex/values";
 import type { Doc } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
-import { PERMISSIONS } from "../lib/permissions";
+import {
+  ALL_PERMISSIONS,
+  CHANNEL_PERMISSIONS,
+  channelPermissions,
+  PERMISSIONS,
+} from "../lib/permissions";
 import {
   can,
   logAudit,
@@ -12,6 +17,53 @@ import {
 import { deleteChannelData } from "./cleanup";
 
 const CHANNEL_NAME = /^[a-z0-9][a-z0-9-_]{0,99}$/i;
+
+type ChannelOverwrite = {
+  roleId: Doc<"serverRoles">["_id"];
+  allow: string[];
+  deny: string[];
+};
+
+const VALID_CHANNEL_PERMISSIONS = new Set<string>(CHANNEL_PERMISSIONS);
+
+/** Validate role overrides so a channel can only reference its own roles. */
+async function sanitizeOverwrites(
+  ctx: Parameters<typeof requireServerAccess>[0],
+  serverId: Doc<"servers">["_id"],
+  overwrites: readonly {
+    roleId: Doc<"serverRoles">["_id"];
+    allow: string[];
+    deny: string[];
+  }[],
+): Promise<ChannelOverwrite[]> {
+  if (overwrites.length > 100) {
+    throw new Error("A channel can have up to 100 role overrides.");
+  }
+  const seen = new Set<string>();
+  const sanitized: ChannelOverwrite[] = [];
+  for (const overwrite of overwrites) {
+    if (seen.has(overwrite.roleId)) {
+      throw new Error("A role can only have one channel override.");
+    }
+    seen.add(overwrite.roleId);
+    const role = await ctx.db.get(overwrite.roleId);
+    if (!role || role.serverId !== serverId) {
+      throw new Error("That role isn't in this community.");
+    }
+    const allow = Array.from(new Set<string>(overwrite.allow)).filter(
+      (permission) => VALID_CHANNEL_PERMISSIONS.has(permission),
+    );
+    const deny = Array.from(new Set<string>(overwrite.deny)).filter(
+      (permission) =>
+        VALID_CHANNEL_PERMISSIONS.has(permission) &&
+        !allow.includes(permission),
+    );
+    if (allow.length > 0 || deny.length > 0) {
+      sanitized.push({ roleId: overwrite.roleId, allow, deny });
+    }
+  }
+  return sanitized;
+}
 
 async function requireCategoryInServer(
   ctx: Parameters<typeof requireServerAccess>[0],
@@ -31,7 +83,7 @@ export const list = query({
   handler: async (ctx, { serverId }) => {
     const { id } = await requireUser(ctx);
     const access = await requireServerAccess(ctx, serverId, id);
-    const [categories, channels, reads] = await Promise.all([
+    const [categories, channels, reads, roles] = await Promise.all([
       ctx.db
         .query("categories")
         .withIndex("by_server_position", (q) => q.eq("serverId", serverId))
@@ -44,8 +96,29 @@ export const list = query({
         .query("reads")
         .withIndex("by_user", (q) => q.eq("userId", id))
         .collect(),
+      ctx.db
+        .query("serverRoles")
+        .withIndex("by_server", (q) => q.eq("serverId", serverId))
+        .collect(),
     ]);
     const readMap = new Map(reads.map((read) => [read.key, read.lastReadAt]));
+    const everyoneRole = roles.find((role) => role.isDefault) ?? null;
+    const effective = new Map(
+      channels.map((channel) => [
+        channel._id,
+        access.server.ownerId === id
+          ? [...ALL_PERMISSIONS]
+          : channelPermissions(
+              access.permissions,
+              access.member.roleIds,
+              everyoneRole?._id ?? null,
+              channel.permissionOverwrites,
+            ),
+      ]),
+    );
+    const visibleChannels = channels.filter((channel) =>
+      (effective.get(channel._id) ?? []).includes(PERMISSIONS.VIEW_CHANNEL),
+    );
 
     return {
       permissions: access.permissions,
@@ -58,7 +131,7 @@ export const list = query({
           name: category.name,
           position: category.position,
         })),
-      channels: channels
+      channels: visibleChannels
         .slice()
         .sort((a, b) => a.position - b.position)
         .map((channel) => ({
@@ -68,9 +141,18 @@ export const list = query({
           categoryId: (channel.categoryId as string | undefined) ?? null,
           position: channel.position,
           readOnly: channel.readOnly === true,
-          kind: channel.kind === "voice" ? ("voice" as const) : ("text" as const),
+          kind:
+            channel.kind === "voice" ? ("voice" as const) : ("text" as const),
           isRules: access.server.rulesChannelId === channel._id,
           slowMode: channel.slowMode ?? 0,
+          permissions: effective.get(channel._id) ?? access.permissions,
+          permissionOverwrites: (channel.permissionOverwrites ?? []).map(
+            (overwrite) => ({
+              roleId: overwrite.roleId as string,
+              allow: overwrite.allow,
+              deny: overwrite.deny,
+            }),
+          ),
           lastMessageAt: channel.lastMessageAt ?? 0,
           lastMessageSenderId:
             (channel.lastMessageSenderId as string | undefined) ?? null,
@@ -87,10 +169,22 @@ export const create = mutation({
     name: v.string(),
     topic: v.optional(v.string()),
     categoryId: v.optional(v.union(v.id("categories"), v.null())),
+    permissionOverwrites: v.optional(
+      v.array(
+        v.object({
+          roleId: v.id("serverRoles"),
+          allow: v.array(v.string()),
+          deny: v.array(v.string()),
+        }),
+      ),
+    ),
     /** `voice` creates a live audio room instead of a text channel. */
     kind: v.optional(v.union(v.literal("text"), v.literal("voice"))),
   },
-  handler: async (ctx, { serverId, name, topic, categoryId, kind }) => {
+  handler: async (
+    ctx,
+    { serverId, name, topic, categoryId, kind, permissionOverwrites },
+  ) => {
     const { id } = await requireProfile(ctx);
     const access = await requireServerAccess(ctx, serverId, id);
     if (!can(access.permissions, PERMISSIONS.MANAGE_CHANNELS)) {
@@ -109,15 +203,23 @@ export const create = mutation({
       .query("channels")
       .withIndex("by_server", (q) => q.eq("serverId", serverId))
       .collect();
-    if (existing.some((channel) => channel.name.toLowerCase() === clean.toLowerCase() && (!categoryId || channel.categoryId === categoryId))) {
+    if (
+      existing.some(
+        (channel) =>
+          channel.name.toLowerCase() === clean.toLowerCase() &&
+          (!categoryId || channel.categoryId === categoryId),
+      )
+    ) {
       throw new Error("There's already a channel with that name.");
     }
-    const siblings = existing.filter(
-      (channel) =>
-        (categoryId === undefined || categoryId === null
-          ? !channel.categoryId
-          : channel.categoryId === categoryId),
+    const siblings = existing.filter((channel) =>
+      categoryId === undefined || categoryId === null
+        ? !channel.categoryId
+        : channel.categoryId === categoryId,
     );
+    const overwrites = permissionOverwrites
+      ? await sanitizeOverwrites(ctx, serverId, permissionOverwrites)
+      : [];
     const channelId = await ctx.db.insert("channels", {
       serverId,
       categoryId: categoryId ?? undefined,
@@ -125,6 +227,7 @@ export const create = mutation({
       topic: topic?.trim().slice(0, 300) || undefined,
       kind: kind === "voice" ? "voice" : undefined,
       position: siblings.length,
+      permissionOverwrites: overwrites.length > 0 ? overwrites : undefined,
       createdAt: Date.now(),
       createdById: id,
     });
@@ -148,6 +251,15 @@ export const update = mutation({
     slowMode: v.optional(v.number()),
     readOnly: v.optional(v.boolean()),
     categoryId: v.optional(v.union(v.id("categories"), v.null())),
+    permissionOverwrites: v.optional(
+      v.array(
+        v.object({
+          roleId: v.id("serverRoles"),
+          allow: v.array(v.string()),
+          deny: v.array(v.string()),
+        }),
+      ),
+    ),
   },
   handler: async (ctx, args) => {
     const { id } = await requireProfile(ctx);
@@ -177,13 +289,17 @@ export const update = mutation({
     if (args.readOnly !== undefined) patch.readOnly = args.readOnly;
     if (args.categoryId !== undefined) {
       if (args.categoryId) {
-        await requireCategoryInServer(
-          ctx,
-          args.categoryId,
-          channel.serverId,
-        );
+        await requireCategoryInServer(ctx, args.categoryId, channel.serverId);
       }
       patch.categoryId = args.categoryId ?? undefined;
+    }
+    if (args.permissionOverwrites !== undefined) {
+      const sanitized = await sanitizeOverwrites(
+        ctx,
+        channel.serverId,
+        args.permissionOverwrites,
+      );
+      patch.permissionOverwrites = sanitized.length > 0 ? sanitized : undefined;
     }
     await ctx.db.patch(args.channelId, patch);
     await logAudit(ctx, {
@@ -283,7 +399,8 @@ export const deleteCategory = mutation({
       .query("channels")
       .withIndex("by_category", (q) => q.eq("categoryId", categoryId))
       .collect();
-    for (const child of children) await ctx.db.patch(child._id, { categoryId: undefined });
+    for (const child of children)
+      await ctx.db.patch(child._id, { categoryId: undefined });
     await ctx.db.delete(categoryId);
     await logAudit(ctx, {
       serverId: category.serverId,

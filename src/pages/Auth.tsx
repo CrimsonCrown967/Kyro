@@ -25,6 +25,11 @@ import {
 } from "@/components/icons";
 import { Link } from "react-router";
 import { useAction, useMutation } from "convex/react";
+import {
+  forgetAccount,
+  rememberAccount,
+  rememberedAccounts,
+} from "@/lib/accounts";
 
 const USERNAME_PATTERN = /^[a-z0-9_]{3,32}$/;
 
@@ -58,7 +63,10 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
   const requestCodeAction = useAction(api.passwordReset.requestCode);
   const resetPasswordAction = useAction(api.passwordReset.resetPassword);
   const [step, setStep] = React.useState<Step>("signIn");
-  const [email, setEmail] = React.useState("");
+  const [email, setEmail] = React.useState(
+    () => searchParams.get("email")?.trim().toLowerCase() ?? "",
+  );
+  const [accounts, setAccounts] = React.useState(rememberedAccounts);
   const [password, setPassword] = React.useState("");
   const [confirmPassword, setConfirmPassword] = React.useState("");
   const [displayName, setDisplayName] = React.useState("");
@@ -100,6 +108,7 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
         email: signInEmail,
         password: signInPassword,
       });
+      rememberAccount({ email: signInEmail });
       toast.success("Welcome back!");
       navigate(redirect);
     } catch (err) {
@@ -125,7 +134,9 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
     const displayNameValue = displayName.trim() || handle;
     try {
       if (!USERNAME_PATTERN.test(handle)) {
-        setError("Pick a username using only letters, numbers and underscores.");
+        setError(
+          "Pick a username using only letters, numbers and underscores.",
+        );
         return;
       }
       if (password.length < 8) {
@@ -146,7 +157,9 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
         });
       } catch (createError) {
         const message =
-          createError instanceof Error ? createError.message : String(createError);
+          createError instanceof Error
+            ? createError.message
+            : String(createError);
         const actionNotDeployed =
           message.includes("Could not find public function") &&
           message.toLowerCase().includes("createaccount");
@@ -160,6 +173,11 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
           flow: "signUp",
           email: normalizedEmail,
           password,
+        });
+        rememberAccount({
+          email: normalizedEmail,
+          name: displayNameValue,
+          username: handle,
         });
         try {
           await claimProfile({ username: handle, name: displayNameValue });
@@ -178,11 +196,18 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
         email: normalizedEmail,
         password,
       });
+      rememberAccount({
+        email: normalizedEmail,
+        name: displayNameValue,
+        username: handle,
+      });
       toast.success("Account created — welcome to Kyro!");
       navigate(redirect);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Registration failed. Please try again.",
+        err instanceof Error
+          ? err.message
+          : "Registration failed. Please try again.",
       );
     } finally {
       setIsLoading(false);
@@ -227,17 +252,13 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
           : "If that email has a Kyro account, a code is on its way.",
       );
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Couldn't send the code.",
-      );
+      setError(err instanceof Error ? err.message : "Couldn't send the code.");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleRequestCode = async (
-    event: React.FormEvent<HTMLFormElement>,
-  ) => {
+  const handleRequestCode = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     await sendResetCode();
   };
@@ -349,12 +370,69 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
                 </div>
                 <CardTitle className="text-xl">Welcome to Kyro</CardTitle>
                 <CardDescription>
-                  Sign in with your password, or create a free account — no email
-                  code required.
+                  Sign in with your password, or create a free account — no
+                  email code required.
                 </CardDescription>
               </CardHeader>
               <form onSubmit={handleSignInSubmit}>
                 <CardContent className="space-y-4">
+                  {(searchParams.get("switch") === "1" ||
+                    accounts.length > 1) &&
+                    accounts.length > 0 && (
+                      <div className="space-y-2">
+                        <Label>Saved accounts</Label>
+                        <div className="space-y-1.5 rounded-lg border border-border/70 bg-surface p-2">
+                          {accounts.map((account) => (
+                            <div
+                              key={account.email}
+                              className="flex items-center gap-2"
+                            >
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEmail(account.email);
+                                  requestAnimationFrame(() =>
+                                    document
+                                      .getElementById("signin-password")
+                                      ?.focus(),
+                                  );
+                                }}
+                                className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-panel"
+                              >
+                                <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-bold uppercase text-primary">
+                                  {(account.name ?? account.email).slice(0, 1)}
+                                </span>
+                                <span className="min-w-0 flex-1">
+                                  {account.name && (
+                                    <span className="block truncate text-sm font-medium">
+                                      {account.name}
+                                    </span>
+                                  )}
+                                  <span className="block truncate text-xs text-muted-foreground">
+                                    {account.email}
+                                  </span>
+                                </span>
+                              </button>
+                              <button
+                                type="button"
+                                aria-label={`Forget ${account.email}`}
+                                onClick={() => {
+                                  forgetAccount(account.email);
+                                  setAccounts(rememberedAccounts());
+                                }}
+                                className="rounded p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                        <p className="text-[11px] text-muted-foreground">
+                          Kyro remembers account names and email addresses
+                          only—never passwords.
+                        </p>
+                      </div>
+                    )}
                   <div>
                     <Label htmlFor="signin-email">Email</Label>
                     <div className="relative">
@@ -500,7 +578,9 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
                         type="button"
                         onClick={() => setShowPassword((v) => !v)}
                         className="absolute inset-y-0 right-0 z-10 flex w-10 items-center justify-center rounded-r-md text-muted-foreground transition-colors hover:text-foreground"
-                        aria-label={showPassword ? "Hide password" : "Show password"}
+                        aria-label={
+                          showPassword ? "Hide password" : "Show password"
+                        }
                         aria-pressed={showPassword}
                       >
                         {showPassword ? (
@@ -543,7 +623,9 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
                   </div>
 
                   <div>
-                    <Label htmlFor="display-name">Display name (optional)</Label>
+                    <Label htmlFor="display-name">
+                      Display name (optional)
+                    </Label>
                     <Input
                       id="display-name"
                       placeholder="How others see you"
@@ -583,7 +665,7 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
                     </Button>
                   </div>
                 </div>
-            </form>
+              </form>
             </>
           ) : step === "forgot" ? (
             <form onSubmit={handleRequestCode} className="space-y-4">

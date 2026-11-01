@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import type { CustomEmoji } from "@/lib/emoji";
 
 /**
  * A deliberately small markdown subset for chat: code, emphasis, links and
@@ -7,9 +8,21 @@ import type { ReactNode } from "react";
  */
 
 const INLINE_PATTERN =
-  /(`[^`\n]+`)|(\*\*[^*\n]+\*\*)|(__[^_\n]+__)|(\*[^*\n]+\*)|(~~[^~\n]+~~)|(https?:\/\/[^\s<>()]+)|(@[a-zA-Z0-9_]{2,32})/g;
+  /(<:([a-zA-Z0-9_]{2,32}):([a-z0-9]+)>)|(`[^`\n]+`)|(\*\*[^*\n]+\*\*)|(__[^_\n]+__)|(\*[^*\n]+\*)|(~~[^~\n]+~~)|(https?:\/\/[^\s<>()]+)|(@[a-zA-Z0-9_]{2,32})/g;
 
-function renderInline(text: string, keyPrefix: string): ReactNode[] {
+export interface MessageRenderOptions {
+  customEmojis?: readonly CustomEmoji[];
+  onMention?: (username: string) => void;
+  onMedia?: (url: string) => void;
+}
+
+const DIRECT_MEDIA_URL = /\.(?:gif|png|jpe?g|webp|avif)(?:[?#].*)?$/i;
+
+function renderInline(
+  text: string,
+  keyPrefix: string,
+  options: MessageRenderOptions,
+): ReactNode[] {
   const nodes: ReactNode[] = [];
   let lastIndex = 0;
   let index = 0;
@@ -22,7 +35,24 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
     }
     const token = match[0];
     const key = `${keyPrefix}-${index++}`;
-    if (token.startsWith("`")) {
+    if (token.startsWith("<:")) {
+      const emojiId = match[3];
+      const emoji = options.customEmojis?.find((entry) => entry.id === emojiId);
+      nodes.push(
+        emoji?.url ? (
+          <img
+            key={key}
+            src={emoji.url}
+            alt={`:${emoji.name}:`}
+            title={`:${emoji.name}:${emoji.serverName ? ` · ${emoji.serverName}` : ""}`}
+            className="mx-0.5 inline-block size-6 object-contain align-middle"
+            loading="lazy"
+          />
+        ) : (
+          <span key={key}>:{match[2]}:</span>
+        ),
+      );
+    } else if (token.startsWith("`")) {
       nodes.push(
         <code
           key={key}
@@ -38,9 +68,7 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
         </strong>,
       );
     } else if (token.startsWith("__")) {
-      nodes.push(
-        <u key={key}>{token.slice(2, -2)}</u>,
-      );
+      nodes.push(<u key={key}>{token.slice(2, -2)}</u>);
     } else if (token.startsWith("~~")) {
       nodes.push(
         <s key={key} className="opacity-70">
@@ -54,26 +82,47 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
         </em>,
       );
     } else if (token.startsWith("http")) {
+      const media = DIRECT_MEDIA_URL.test(token);
       nodes.push(
-        <a
-          key={key}
-          href={token}
-          target="_blank"
-          rel="noopener noreferrer nofollow"
-          className="text-cyan underline decoration-cyan/40 underline-offset-2 hover:decoration-cyan"
-        >
-          {token}
-        </a>,
+        media && options.onMedia ? (
+          <button
+            key={key}
+            type="button"
+            onClick={() => options.onMedia?.(token)}
+            className="text-cyan underline decoration-cyan/40 underline-offset-2 hover:decoration-cyan"
+          >
+            {token}
+          </button>
+        ) : (
+          <a
+            key={key}
+            href={token}
+            target="_blank"
+            rel="noopener noreferrer nofollow"
+            className="text-cyan underline decoration-cyan/40 underline-offset-2 hover:decoration-cyan"
+          >
+            {token}
+          </a>
+        ),
       );
     } else if (token.startsWith("@")) {
+      const username = token.slice(1).toLowerCase();
+      const massMention = username === "everyone" || username === "here";
       nodes.push(
-        <span
+        <button
           key={key}
-          className="cursor-pointer rounded bg-primary/15 px-1 font-medium text-primary hover:bg-primary/25"
-          data-mention={token.slice(1).toLowerCase()}
+          type="button"
+          disabled={massMention || !options.onMention}
+          className={
+            massMention
+              ? "cursor-default rounded bg-warning/15 px-1 font-semibold text-warning"
+              : "cursor-pointer rounded bg-primary/15 px-1 font-medium text-primary hover:bg-primary/25 disabled:cursor-default"
+          }
+          data-mention={username}
+          onClick={() => options.onMention?.(username)}
         >
           {token}
-        </span>,
+        </button>,
       );
     }
     lastIndex = match.index + token.length;
@@ -82,7 +131,10 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
   return nodes;
 }
 
-export function renderMessage(content: string): ReactNode[] {
+export function renderMessage(
+  content: string,
+  options: MessageRenderOptions = {},
+): ReactNode[] {
   const segments = content.split(/```/);
   return segments.map((segment, index) => {
     if (index % 2 === 1) {
@@ -101,7 +153,7 @@ export function renderMessage(content: string): ReactNode[] {
       <span key={`text-${index}`}>
         {lines.map((line, lineIndex) => (
           <span key={lineIndex}>
-            {renderInline(line, `text-${index}-${lineIndex}`)}
+            {renderInline(line, `text-${index}-${lineIndex}`, options)}
             {lineIndex < lines.length - 1 ? <br /> : null}
           </span>
         ))}

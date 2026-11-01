@@ -1,7 +1,20 @@
 import { useMutation, useQuery } from "convex/react";
-import { Bell, Loader2, Menu, PanelRight, Search } from "@/components/icons";
+import {
+  Bell,
+  Home,
+  Loader2,
+  Menu,
+  PanelRight,
+  Search,
+  User,
+} from "@/components/icons";
 import { useEffect, useRef, type ReactNode } from "react";
-import { useMatch, useSearchParams } from "react-router";
+import {
+  useLocation,
+  useMatch,
+  useNavigate,
+  useSearchParams,
+} from "react-router";
 import { api } from "@/convex/_generated/api";
 import { ClaimUsername } from "@/components/app/ClaimUsername";
 import { Inbox } from "@/components/app/Inbox";
@@ -10,13 +23,13 @@ import { SearchOverlay } from "@/components/app/SearchOverlay";
 import { ServerRail } from "@/components/app/ServerRail";
 import { SettingsDialog } from "@/components/app/Settings";
 import { Sidebar } from "@/components/app/Sidebar";
-import { UserBar } from "@/components/app/UserBar";
 import { IncomingCallBanner } from "@/components/app/Voice";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { useAuth } from "@/hooks/use-auth";
 import { useUiStore } from "@/lib/store";
 import { playNotificationPing } from "@/lib/sound";
+import { cn } from "@/lib/utils";
 
 /**
  * Best-effort device class for the platform indicator. Tablet first, since
@@ -25,7 +38,10 @@ import { playNotificationPing } from "@/lib/sound";
 function detectDevice(): "desktop" | "mobile" | "tablet" {
   if (typeof navigator === "undefined") return "desktop";
   const ua = navigator.userAgent;
-  if (/iPad|Tablet|PlayBook|Silk/i.test(ua) || (/Android/i.test(ua) && !/Mobile/i.test(ua))) {
+  if (
+    /iPad|Tablet|PlayBook|Silk/i.test(ua) ||
+    (/Android/i.test(ua) && !/Mobile/i.test(ua))
+  ) {
     return "tablet";
   }
   if (/Mobi|Android|iPhone|iPod|Windows Phone|webOS|BlackBerry/i.test(ua)) {
@@ -45,9 +61,17 @@ export function AppShell({ children }: { children: ReactNode }) {
   const heartbeat = useMutation(api.users.heartbeat);
   const unread = useQuery(api.notifications.unreadCount);
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  const { mobileNavOpen, setMobileNav, searchOpen, setSearchOpen, inboxOpen, setInboxOpen } =
-    useUiStore();
+  const {
+    mobileNavOpen,
+    setMobileNav,
+    searchOpen,
+    setSearchOpen,
+    inboxOpen,
+    setInboxOpen,
+  } = useUiStore();
 
   const channelMatch = useMatch("/dashboard/s/:serverId/c/:channelId");
   const serverMatch = useMatch("/dashboard/s/:serverId");
@@ -141,7 +165,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className="hidden md:flex">{sidebar}</div>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border/60 bg-panel px-3">
+        <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border/60 bg-panel/95 px-2 backdrop-blur sm:px-3">
           <button
             type="button"
             aria-label="Open navigation"
@@ -154,7 +178,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <button
             type="button"
             onClick={() => setSearchOpen(true)}
-            className="flex h-8 flex-1 items-center gap-2 rounded-md border border-border/70 bg-surface px-3 text-left text-sm text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground sm:max-w-md"
+            className="flex h-8 flex-1 items-center gap-2 rounded-full border border-border/70 bg-surface px-3 text-left text-sm text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground sm:max-w-md sm:rounded-md"
           >
             <Search className="size-4" />
             <span className="truncate">Search Kyro</span>
@@ -185,7 +209,12 @@ export function AppShell({ children }: { children: ReactNode }) {
             >
               <PanelRight className="size-5" />
             </button>
-            <Button size="sm" variant="ghost" className="hidden md:inline-flex" onClick={openSettings}>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="hidden md:inline-flex"
+              onClick={openSettings}
+            >
               Settings
             </Button>
           </div>
@@ -193,16 +222,66 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <main className="min-h-0 flex-1">{children}</main>
 
-        {/* Phone: the account panel stays pinned to the bottom-left, since
-            the desktop rail and sidebar are hidden below `md`. */}
-        <div className="md:hidden">
-          <UserBar onOpenSettings={openSettings} />
-        </div>
+        {/* Phone-first dock: large touch targets, safe-area padding and one
+            thumb-reachable route to every core surface. Account/status tools
+            remain in the navigation sheet's UserBar. */}
+        <nav className="grid shrink-0 grid-cols-5 border-t border-border/70 bg-panel/95 px-1 pb-[max(.35rem,env(safe-area-inset-bottom))] pt-1 backdrop-blur md:hidden">
+          {[
+            {
+              label: "Home",
+              icon: Home,
+              active: location.pathname === "/dashboard",
+              action: () => navigate("/dashboard"),
+            },
+            {
+              label: "Servers",
+              icon: Menu,
+              active: location.pathname.includes("/dashboard/s/"),
+              action: () => setMobileNav(true),
+            },
+            {
+              label: "Inbox",
+              icon: Bell,
+              active: inboxOpen,
+              action: () => setInboxOpen(true),
+            },
+            {
+              label: "Search",
+              icon: Search,
+              active: searchOpen,
+              action: () => setSearchOpen(true),
+            },
+            {
+              label: "You",
+              icon: User,
+              active: settingsOpen,
+              action: openSettings,
+            },
+          ].map((entry) => (
+            <button
+              key={entry.label}
+              type="button"
+              onClick={entry.action}
+              className={cn(
+                "flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] font-medium transition-colors",
+                entry.active
+                  ? "bg-primary/15 text-primary"
+                  : "text-muted-foreground active:bg-surface active:text-foreground",
+              )}
+            >
+              <entry.icon className="size-5" />
+              {entry.label}
+            </button>
+          ))}
+        </nav>
       </div>
 
       {/* Mobile navigation drawer keeps the rail + sidebar reachable. */}
       <Sheet open={mobileNavOpen} onOpenChange={setMobileNav}>
-        <SheetContent side="left" className="w-[86vw] max-w-xs gap-0 p-0">
+        <SheetContent
+          side="left"
+          className="w-[92vw] max-w-sm gap-0 border-r-border/70 p-0"
+        >
           <SheetTitle className="sr-only">Navigation</SheetTitle>
           <div className="flex h-full">
             <div className="w-14 shrink-0 overflow-y-auto">{rail}</div>

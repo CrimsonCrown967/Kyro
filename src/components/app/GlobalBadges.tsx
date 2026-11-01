@@ -17,7 +17,11 @@ export function BadgeTip({
   children: ReactNode;
 }) {
   return (
-    <span className="group/tip relative inline-flex shrink-0 items-center align-middle">
+    <span
+      tabIndex={0}
+      aria-label={`${label}${blurb ? `: ${blurb}` : ""}`}
+      className="group/tip relative inline-flex shrink-0 items-center align-middle outline-none"
+    >
       {children}
       <span
         role="tooltip"
@@ -188,9 +192,7 @@ export const BADGE_PRIORITY: GlobalBadgeKey[] = [
 export function topGlobalBadge(
   badges: readonly string[],
 ): GlobalBadgeKey | null {
-  return (
-    BADGE_PRIORITY.find((badge) => badges.includes(badge)) ?? null
-  );
+  return BADGE_PRIORITY.find((badge) => badges.includes(badge)) ?? null;
 }
 
 /**
@@ -203,7 +205,7 @@ export function topGlobalBadge(
 export function InlineBadge({
   badges,
   primaryBadge,
-  size = "size-3.5",
+  size = "size-4",
 }: {
   badges: readonly string[];
   /** This user's chosen inline badge: a held badge id, "none", or unset. */
@@ -217,9 +219,6 @@ export function InlineBadge({
       ? (primaryBadge as GlobalBadgeKey)
       : topGlobalBadge(badges);
   if (!chosen) return null;
-  if (chosen === "founder") {
-    return <CrownBadge variant="founder" label="Kyro founder" size={size} />;
-  }
   const meta = GLOBAL_BADGE_META[chosen];
   return (
     <BadgeTip label={meta.label} blurb={meta.blurb}>
@@ -309,7 +308,13 @@ export function GlobalBadgeIcon({
   className?: string;
 }) {
   if (badge === "founder") {
-    return <CrownBadge variant="founder" label="Kyro founder" size={className ?? "size-4"} />;
+    return (
+      <CrownBadge
+        variant="founder"
+        label="Kyro founder"
+        size={className ?? "size-[18px]"}
+      />
+    );
   }
 
   const art = BADGE_ART[badge];
@@ -322,7 +327,7 @@ export function GlobalBadgeIcon({
       viewBox="0 0 24 24"
       aria-hidden="true"
       focusable="false"
-      className={cn("size-4 shrink-0", className)}
+      className={cn("size-[18px] shrink-0", className)}
       style={{ filter: "drop-shadow(0 1px 1.5px rgba(0,0,0,0.28))" }}
     >
       <defs>
@@ -442,11 +447,7 @@ export function GlobalBadgeIcon({
         <>
           {/* hourglass: a trial period on the team */}
           <path d="M9.2 7.8h5.6L12 12Z" fill={white} />
-          <path
-            d="M9.2 16.2h5.6L12 12Z"
-            fill={white}
-            fillOpacity="0.85"
-          />
+          <path d="M9.2 16.2h5.6L12 12Z" fill={white} fillOpacity="0.85" />
           <path
             d="M8.7 6.8h6.6M8.7 17.2h6.6"
             stroke={white}
@@ -529,10 +530,7 @@ export function GlobalBadgeIcon({
       {badge === "vip" && (
         <>
           {/* faceted gem */}
-          <path
-            d="M8.1 8.4h7.8l2.5 3.4L12 17.6l-6.4-5.8Z"
-            fill={white}
-          />
+          <path d="M8.1 8.4h7.8l2.5 3.4L12 17.6l-6.4-5.8Z" fill={white} />
           <path
             d="M8.1 8.4 12 17.6l3.9-9.2"
             fill="none"
@@ -541,7 +539,13 @@ export function GlobalBadgeIcon({
             strokeWidth="0.9"
             strokeLinejoin="round"
           />
-          <path d="M5.6 11.8h12.8" fill="none" stroke={art.edge} strokeOpacity="0.55" strokeWidth="0.9" />
+          <path
+            d="M5.6 11.8h12.8"
+            fill="none"
+            stroke={art.edge}
+            strokeOpacity="0.55"
+            strokeWidth="0.9"
+          />
           <path d="M12.6 9.2h2.2l-1.3 2.9Z" fill={white} fillOpacity="0.9" />
         </>
       )}
@@ -594,7 +598,15 @@ export function GlobalBadgeIcon({
         <>
           {/* coin with a shine */}
           <circle cx="12" cy="12" r="5.2" fill={white} />
-          <circle cx="12" cy="12" r="3.4" fill="none" stroke={art.edge} strokeOpacity="0.35" strokeWidth="0.8" />
+          <circle
+            cx="12"
+            cy="12"
+            r="3.4"
+            fill="none"
+            stroke={art.edge}
+            strokeOpacity="0.35"
+            strokeWidth="0.8"
+          />
           <path
             d="M12 9.3v5.4M13.6 10.3c-.4-.7-2.9-1.1-3.3.4-.4 1.4 3.4 1 3.4 2.6 0 1.5-2.9 1.2-3.5.4"
             fill="none"
@@ -655,7 +667,7 @@ export function GlobalBadgeChip({
     <BadgeTip label={meta.label} blurb={meta.blurb}>
       <span
         className={cn(
-          "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold tracking-wide",
+          "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold tracking-wide",
           "shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] transition-shadow hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_2px_6px_rgba(0,0,0,0.12)]",
           meta.chip,
           className,
@@ -687,7 +699,7 @@ export function GlobalBadges({
     );
   }
   return (
-    <div className={cn("flex flex-wrap gap-1.5", className)}>
+    <div className={cn("flex flex-wrap gap-2", className)}>
       {badges.map((badge) => (
         <GlobalBadgeChip key={badge} badge={badge} />
       ))}

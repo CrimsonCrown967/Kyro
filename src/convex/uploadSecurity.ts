@@ -9,7 +9,8 @@ export type UploadClaim =
   | "user_avatar"
   | "user_banner"
   | "server_icon"
-  | "server_banner";
+  | "server_banner"
+  | "server_emoji";
 
 const SAFE_CONTENT_TYPES = new Set([
   "application/json",

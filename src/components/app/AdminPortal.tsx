@@ -184,7 +184,9 @@ export function AdminPortal() {
           <div className="flex flex-wrap items-center gap-1.5">
             {data.me.isFounder && <RolePill label="Founder" tone="brand" />}
             {data.me.isAdmin && <RolePill label="Admin" tone="rose" />}
-            {data.me.isModerator && <RolePill label="Moderator" tone="emerald" />}
+            {data.me.isModerator && (
+              <RolePill label="Moderator" tone="emerald" />
+            )}
           </div>
         </div>
         <nav className="relative flex gap-1 overflow-x-auto px-3 pb-2">
@@ -220,10 +222,7 @@ export function AdminPortal() {
       <div className="min-h-0 flex-1 overflow-y-auto p-5">
         {tab === "overview" && <OverviewTab data={data} openBugs={openBugs} />}
         {tab === "badges" && (
-          <BadgesTab
-            isAdmin={data.me.isAdmin}
-            isFounder={data.me.isFounder}
-          />
+          <BadgesTab isAdmin={data.me.isAdmin} isFounder={data.me.isFounder} />
         )}
         {tab === "reports" && <ReportsTab isAdmin={data.me.isAdmin} />}
         {tab === "bugs" && (
@@ -381,11 +380,7 @@ function OverviewTab({
           icon={ShieldAlert}
           tone="amber"
         />
-        <StatCard
-          label="Admins"
-          value={data.counts.admins}
-          icon={Shield}
-        />
+        <StatCard label="Admins" value={data.counts.admins} icon={Shield} />
         <StatCard
           label="Moderators"
           value={data.counts.moderators}
@@ -444,11 +439,11 @@ function OverviewTab({
             {(me?.badges ?? []).map((badge) => (
               <span
                 key={badge}
-                className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-panel px-2 py-0.5 text-xs"
+                className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-panel px-2.5 py-1 text-xs"
               >
                 <GlobalBadgeIcon
                   badge={badge as GlobalBadgeKey}
-                  className="size-3.5"
+                  className="size-4"
                 />
                 {GLOBAL_BADGE_META[badge as GlobalBadgeKey]?.label ?? badge}
               </span>
@@ -524,7 +519,9 @@ function OverviewTab({
                     );
                 }}
               >
-                {holdsFounder ? "Remove from my profile" : "Restore Founder badge"}
+                {holdsFounder
+                  ? "Remove from my profile"
+                  : "Restore Founder badge"}
               </Button>
             </div>
           )}
@@ -607,14 +604,18 @@ function BadgesTab({
                 <div className="min-w-0 flex-1">
                   <p className="flex items-center gap-1.5 truncate text-sm font-semibold">
                     {member.name}
-                    {member.isFounder && <RolePill label="Founder" tone="brand" />}
+                    {member.isFounder && (
+                      <RolePill label="Founder" tone="brand" />
+                    )}
                     {member.ban && <RolePill label="Banned" tone="rose" />}
                   </p>
                   <p className="truncate text-xs text-muted-foreground">
                     @{member.username ?? "no username"} ·{" "}
                     {member.activeWarnings} active warning
                     {member.activeWarnings === 1 ? "" : "s"}
-                    {member.lastSeen ? ` · seen ${timeAgo(member.lastSeen)}` : ""}
+                    {member.lastSeen
+                      ? ` · seen ${timeAgo(member.lastSeen)}`
+                      : ""}
                   </p>
                 </div>
               </div>
@@ -645,14 +646,14 @@ function BadgesTab({
                             : "Grant badge"
                       }
                       className={cn(
-                        "inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs transition-colors",
+                        "inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs transition-colors",
                         held
                           ? "border-brand/40 bg-brand/10 text-foreground"
                           : "border-border/70 text-muted-foreground hover:border-brand/40 hover:text-foreground",
                         locked && "cursor-not-allowed opacity-60",
                       )}
                     >
-                      <GlobalBadgeIcon badge={badge.id} className="size-3.5" />
+                      <GlobalBadgeIcon badge={badge.id} className="size-4" />
                       {GLOBAL_BADGE_META[badge.id].label}
                       {busyId === member.id ? (
                         <Loader2 className="size-3 animate-spin" />
@@ -757,7 +758,9 @@ function ReportsTab({ isAdmin }: { isAdmin: boolean }) {
               {report.reporterName} reported{" "}
               {report.reportedName ??
                 report.messageAuthorName ??
-                (report.serverName ? `community ${report.serverName}` : "content")}
+                (report.serverName
+                  ? `community ${report.serverName}`
+                  : "content")}
               {report.serverName ? ` in ${report.serverName}` : ""}
             </p>
             {report.details && (
@@ -839,7 +842,8 @@ function ReportsTab({ isAdmin }: { isAdmin: boolean }) {
                   label="Delete community"
                   tone="danger"
                   onClick={() => {
-                    if (!window.confirm("Delete this community permanently?")) return;
+                    if (!window.confirm("Delete this community permanently?"))
+                      return;
                     void act(
                       removeServer({
                         serverId: report.serverId as Id<"servers">,
@@ -867,7 +871,10 @@ const BUG_STATUS = {
     label: "Acknowledged",
     chip: "border-brand/40 bg-brand/10 text-brand",
   },
-  fixed: { label: "Fixed", chip: "border-success/40 bg-success/10 text-success" },
+  fixed: {
+    label: "Fixed",
+    chip: "border-success/40 bg-success/10 text-success",
+  },
   not_a_bug: {
     label: "Not a bug",
     chip: "border-border/70 bg-panel text-muted-foreground",
@@ -897,98 +904,100 @@ function BugsTab({
       {bugs.map((bug) => {
         const reporter = bug.reporter;
         return (
-        <div
-          key={bug.id}
-          className="rounded-xl border border-border/70 bg-surface p-3"
-        >
-          <div className="flex flex-wrap items-center gap-2">
-            <span
-              className={cn(
-                "rounded border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide",
-                BUG_STATUS[bug.status].chip,
-              )}
-            >
-              {BUG_STATUS[bug.status].label}
-            </span>
-            <span className="shrink-0 rounded border border-border/70 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-              {BUG_CATEGORY_LABELS[bug.category] ?? "Other"}
-            </span>
-            <p className="min-w-0 flex-1 truncate text-sm font-semibold">
-              {bug.title}
-            </p>
-            <span className="shrink-0 text-xs text-muted-foreground">
-              {bug.reporter ? `${bug.reporter.name} · ` : ""}
-              {timeAgo(bug.createdAt)}
-            </span>
-          </div>
-          {bug.details && (
-            <p className="mt-1 text-xs text-muted-foreground">{bug.details}</p>
-          )}
-          {bug.staffNote && (
-            <p className="mt-1 rounded-md border border-border/60 bg-panel px-2 py-1 text-xs">
-              Staff note: {bug.staffNote}
-            </p>
-          )}
-          {canTriage && (
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {(Object.keys(BUG_STATUS) as BugStatus[]).map((next) => (
-                <button
-                  key={next}
-                  type="button"
-                  onClick={() => {
-                    void update({
-                      reportId: bug.id as Id<"bugReports">,
-                      status: next,
-                      staffNote: bug.staffNote ?? undefined,
-                    })
-                      .then(() => toast.success("Bug report updated."))
-                      .catch((error: unknown) =>
-                        toast.error(
-                          error instanceof Error
-                            ? error.message
-                            : "Could not update that bug.",
-                        ),
-                      );
-                  }}
-                  className={cn(
-                    "rounded-md border px-2 py-1 text-xs transition-colors",
-                    bug.status === next
-                      ? "border-brand/50 bg-brand/10 text-foreground"
-                      : "border-border/70 text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {BUG_STATUS[next].label}
-                </button>
-              ))}
-              {reporter && isAdmin && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    void setBadges({
-                      userId: reporter.id as Id<"users">,
-                      bugHunter: true,
-                    })
-                      .then(() =>
-                        toast.success(
-                          `Bug Hunter badge granted to ${reporter.name}.`,
-                        ),
-                      )
-                      .catch((error: unknown) =>
-                        toast.error(
-                          error instanceof Error
-                            ? error.message
-                            : "Could not grant that badge.",
-                        ),
-                      );
-                  }}
-                  className="inline-flex items-center gap-1 rounded-md border border-warning/40 bg-warning/10 px-2 py-1 text-xs text-warning transition-colors hover:bg-warning/20"
-                >
-                  <Wrench className="size-3" /> Grant Bug Hunter
-                </button>
-              )}
+          <div
+            key={bug.id}
+            className="rounded-xl border border-border/70 bg-surface p-3"
+          >
+            <div className="flex flex-wrap items-center gap-2">
+              <span
+                className={cn(
+                  "rounded border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide",
+                  BUG_STATUS[bug.status].chip,
+                )}
+              >
+                {BUG_STATUS[bug.status].label}
+              </span>
+              <span className="shrink-0 rounded border border-border/70 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                {BUG_CATEGORY_LABELS[bug.category] ?? "Other"}
+              </span>
+              <p className="min-w-0 flex-1 truncate text-sm font-semibold">
+                {bug.title}
+              </p>
+              <span className="shrink-0 text-xs text-muted-foreground">
+                {bug.reporter ? `${bug.reporter.name} · ` : ""}
+                {timeAgo(bug.createdAt)}
+              </span>
             </div>
-          )}
-        </div>
+            {bug.details && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                {bug.details}
+              </p>
+            )}
+            {bug.staffNote && (
+              <p className="mt-1 rounded-md border border-border/60 bg-panel px-2 py-1 text-xs">
+                Staff note: {bug.staffNote}
+              </p>
+            )}
+            {canTriage && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {(Object.keys(BUG_STATUS) as BugStatus[]).map((next) => (
+                  <button
+                    key={next}
+                    type="button"
+                    onClick={() => {
+                      void update({
+                        reportId: bug.id as Id<"bugReports">,
+                        status: next,
+                        staffNote: bug.staffNote ?? undefined,
+                      })
+                        .then(() => toast.success("Bug report updated."))
+                        .catch((error: unknown) =>
+                          toast.error(
+                            error instanceof Error
+                              ? error.message
+                              : "Could not update that bug.",
+                          ),
+                        );
+                    }}
+                    className={cn(
+                      "rounded-md border px-2 py-1 text-xs transition-colors",
+                      bug.status === next
+                        ? "border-brand/50 bg-brand/10 text-foreground"
+                        : "border-border/70 text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {BUG_STATUS[next].label}
+                  </button>
+                ))}
+                {reporter && isAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void setBadges({
+                        userId: reporter.id as Id<"users">,
+                        bugHunter: true,
+                      })
+                        .then(() =>
+                          toast.success(
+                            `Bug Hunter badge granted to ${reporter.name}.`,
+                          ),
+                        )
+                        .catch((error: unknown) =>
+                          toast.error(
+                            error instanceof Error
+                              ? error.message
+                              : "Could not grant that badge.",
+                          ),
+                        );
+                    }}
+                    className="inline-flex items-center gap-1 rounded-md border border-warning/40 bg-warning/10 px-2 py-1 text-xs text-warning transition-colors hover:bg-warning/20"
+                  >
+                    <Wrench className="size-3" /> Grant Bug Hunter
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         );
       })}
     </div>
@@ -1064,7 +1073,9 @@ function BansTab() {
         {!target && term.length >= 2 && (
           <div className="mt-1 max-h-48 overflow-y-auto rounded-md border border-border/70 bg-panel">
             {results === undefined ? (
-              <p className="px-3 py-2 text-xs text-muted-foreground">Searching…</p>
+              <p className="px-3 py-2 text-xs text-muted-foreground">
+                Searching…
+              </p>
             ) : results.length === 0 ? (
               <p className="px-3 py-2 text-xs text-muted-foreground">
                 No accounts matched.
@@ -1261,7 +1272,8 @@ function WarningsTab() {
 function ActivityTab() {
   const actions = useQuery(api.admin.actionLog);
   if (actions === undefined) return <Loading />;
-  if (actions.length === 0) return <Empty text="No staff actions logged yet." />;
+  if (actions.length === 0)
+    return <Empty text="No staff actions logged yet." />;
   return (
     <div className="overflow-hidden rounded-xl border border-border/70 bg-surface">
       <ul className="divide-y divide-border/60">

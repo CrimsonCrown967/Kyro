@@ -1,5 +1,5 @@
-import { useMutation, useQuery } from "convex/react";
-import { useState } from "react";
+import { useConvex, useMutation, useQuery } from "convex/react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import {
   AlertTriangle,
@@ -46,6 +46,7 @@ import { InviteDialog } from "@/components/app/dialogs";
 import { motion } from "framer-motion";
 import {
   ALL_PERMISSIONS,
+  CHANNEL_PERMISSIONS,
   DEFAULT_ROLE_COLORS,
   PERMISSIONS,
   PERMISSION_META,
@@ -60,6 +61,7 @@ type TabId =
   | "theme"
   | "channels"
   | "roles"
+  | "emojis"
   | "members"
   | "invites"
   | "bans"
@@ -138,7 +140,10 @@ export function ServerSettings({ serverId }: { serverId: string }) {
     );
   }
 
-  const canManage = hasPermission(server.permissions, PERMISSIONS.MANAGE_SERVER);
+  const canManage = hasPermission(
+    server.permissions,
+    PERMISSIONS.MANAGE_SERVER,
+  );
   const canRoles = hasPermission(server.permissions, PERMISSIONS.MANAGE_ROLES);
   const canBans = hasPermission(server.permissions, PERMISSIONS.BAN_MEMBERS);
   const canChannels = hasPermission(
@@ -153,6 +158,8 @@ export function ServerSettings({ serverId }: { serverId: string }) {
     server.permissions,
     PERMISSIONS.VIEW_AUDIT_LOG,
   );
+  const canEmojis =
+    hasPermission(server.permissions, PERMISSIONS.MANAGE_EMOJIS) || canManage;
 
   const TABS: {
     id: TabId;
@@ -164,6 +171,7 @@ export function ServerSettings({ serverId }: { serverId: string }) {
     { id: "theme", label: "Theme", show: canManage, icon: Palette },
     { id: "channels", label: "Channels", show: canChannels, icon: Hash },
     { id: "roles", label: "Roles", show: canRoles, icon: Shield },
+    { id: "emojis", label: "Emojis", show: canEmojis, icon: MessagesSquare },
     { id: "members", label: "Members", show: canRoles || canBans, icon: Users },
     { id: "invites", label: "Invites", show: canInvites, icon: Link2 },
     { id: "bans", label: "Bans", show: canBans, icon: Ban },
@@ -182,7 +190,9 @@ export function ServerSettings({ serverId }: { serverId: string }) {
     },
   ];
   const visibleTabs = TABS.filter((entry) => entry.show);
-  const activeTab = visibleTabs.some((entry) => entry.id === tab) ? tab : visibleTabs[0]?.id ?? "overview";
+  const activeTab = visibleTabs.some((entry) => entry.id === tab)
+    ? tab
+    : (visibleTabs[0]?.id ?? "overview");
 
   const save = async () => {
     if (saving) return;
@@ -228,11 +238,11 @@ export function ServerSettings({ serverId }: { serverId: string }) {
         [kind === "icon" ? "iconStorageId" : "bannerStorageId"]:
           attachment.storageId,
       });
-      toast.success(kind === "icon" ? "Server icon updated." : "Banner updated.");
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Upload failed.",
+      toast.success(
+        kind === "icon" ? "Server icon updated." : "Banner updated.",
       );
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Upload failed.");
     } finally {
       setUploading(null);
     }
@@ -257,7 +267,10 @@ export function ServerSettings({ serverId }: { serverId: string }) {
     if (vanityBusy) return;
     setVanityBusy(true);
     try {
-      await setVanity({ serverId: serverId as Id<"servers">, code: vanityDraft });
+      await setVanity({
+        serverId: serverId as Id<"servers">,
+        code: vanityDraft,
+      });
       toast.success(
         vanityDraft.trim()
           ? `Custom invite link saved: /invite/${vanityDraft.trim().toLowerCase()}`
@@ -326,7 +339,9 @@ export function ServerSettings({ serverId }: { serverId: string }) {
       );
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Could not lock the community.",
+        error instanceof Error
+          ? error.message
+          : "Could not lock the community.",
       );
     }
   };
@@ -337,7 +352,9 @@ export function ServerSettings({ serverId }: { serverId: string }) {
       toast.success("Community unlocked.");
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Could not unlock the community.",
+        error instanceof Error
+          ? error.message
+          : "Could not unlock the community.",
       );
     }
   };
@@ -379,7 +396,6 @@ export function ServerSettings({ serverId }: { serverId: string }) {
     }
   };
 
-
   return (
     <div className="h-full overflow-y-auto bg-background">
       {/* Community hero: identity, live numbers and the way back. */}
@@ -411,7 +427,11 @@ export function ServerSettings({ serverId }: { serverId: string }) {
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-brand to-cyan text-lg font-bold text-white shadow-md">
               {server.iconUrl ? (
-                <img src={server.iconUrl} alt="" className="size-full object-cover" />
+                <img
+                  src={server.iconUrl}
+                  alt=""
+                  className="size-full object-cover"
+                />
               ) : (
                 server.name.slice(0, 2).toUpperCase()
               )}
@@ -434,7 +454,11 @@ export function ServerSettings({ serverId }: { serverId: string }) {
                       : "border-border/70 text-muted-foreground",
                   )}
                 >
-                  {server.locked ? "Locked" : server.isPublic ? "Public" : "Private"}
+                  {server.locked
+                    ? "Locked"
+                    : server.isPublic
+                      ? "Public"
+                      : "Private"}
                 </span>
               </div>
               <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
@@ -481,7 +505,11 @@ export function ServerSettings({ serverId }: { serverId: string }) {
                   {active && (
                     <motion.span
                       layoutId="server-settings-active-tab"
-                      transition={{ type: "spring", stiffness: 520, damping: 42 }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 520,
+                        damping: 42,
+                      }}
                       className="absolute inset-0 rounded-xl bg-surface shadow-sm ring-1 ring-border/70"
                     />
                   )}
@@ -533,627 +561,678 @@ export function ServerSettings({ serverId }: { serverId: string }) {
             </div>
           )}
 
-        {activeTab === "overview" && (
-          <section className="rounded-xl border border-border/70 bg-panel p-5">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h2 className="text-sm font-semibold">Quick actions</h2>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  The places you visit most, one click away.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => navigate(`/dashboard/s/${serverId}`)}
-                >
-                  <Eye className="mr-1.5 size-4" /> Open community
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setTab("invites")}
-                >
-                  <Link2 className="mr-1.5 size-4" /> Invite people
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setTab("theme")}
-                >
-                  <Palette className="mr-1.5 size-4" /> Appearance
-                </Button>
-              </div>
-            </div>
-          </section>
-        )}
-
-        {activeTab === "overview" && (
-          <section className="rounded-xl border border-border/70 bg-panel p-5">
-            <h2 className="text-sm font-semibold">Images</h2>
-            <div className="mt-4 flex flex-wrap items-center gap-4">
-              <div className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-brand to-cyan text-sm font-bold text-white">
-                {server.iconUrl ? (
-                  <img src={server.iconUrl} alt="" className="size-full object-cover" />
-                ) : (
-                  server.name.slice(0, 2).toUpperCase()
-                )}
-              </div>
-              <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-border/70 bg-surface px-3 py-2 text-sm hover:bg-surface/70">
-                {uploading === "icon" ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Plus className="size-4" />
-                )}
-                {server.iconUrl ? "Change icon" : "Upload icon"}
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(event) =>
-                    void uploadImage("icon", event.target.files?.[0])
-                  }
-                />
-              </label>
-              {server.iconUrl && (
-                <Button
-                  variant="outline"
-                  onClick={() =>
-                    void update({
-                      serverId: serverId as Id<"servers">,
-                      iconStorageId: null,
-                    })
-                  }
-                >
-                  Remove
-                </Button>
-              )}
-            </div>
-            <div className="mt-4">
-              <div className="h-24 w-full overflow-hidden rounded-lg border border-border/70 bg-gradient-to-br from-brand to-cyan">
-                {server.bannerUrl && (
-                  <img
-                    src={server.bannerUrl}
-                    alt=""
-                    className="size-full object-cover"
-                  />
-                )}
-              </div>
-              <label className="mt-2 inline-flex cursor-pointer items-center gap-2 rounded-md border border-border/70 bg-surface px-3 py-2 text-sm hover:bg-surface/70">
-                {uploading === "banner" ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Plus className="size-4" />
-                )}
-                {server.bannerUrl ? "Change banner" : "Upload banner"}
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(event) =>
-                    void uploadImage("banner", event.target.files?.[0])
-                  }
-                />
-              </label>
-              {server.bannerUrl && (
-                <Button
-                  variant="outline"
-                  className="ml-2"
-                  onClick={() =>
-                    void update({
-                      serverId: serverId as Id<"servers">,
-                      bannerStorageId: null,
-                    })
-                  }
-                >
-                  Remove
-                </Button>
-              )}
-            </div>
-
-            <h2 className="mt-7 text-sm font-semibold">Overview</h2>
-            <div className="mt-4 space-y-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="server-name">Name</Label>
-                <Input
-                  id="server-name"
-                  value={form.name}
-                  onChange={(event) =>
-                    setForm({ ...form, name: event.target.value })
-                  }
-                  maxLength={64}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="server-description">Description</Label>
-                <Textarea
-                  id="server-description"
-                  value={form.description}
-                  onChange={(event) =>
-                    setForm({ ...form, description: event.target.value })
-                  }
-                  placeholder="What is this server about?"
-                  rows={3}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="server-welcome">Welcome message</Label>
-                <Textarea
-                  id="server-welcome"
-                  value={form.welcomeMessage}
-                  onChange={(event) =>
-                    setForm({ ...form, welcomeMessage: event.target.value })
-                  }
-                  placeholder="Shown to new members after they join."
-                  rows={2}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="server-rules">Rules</Label>
-                <Textarea
-                  id="server-rules"
-                  value={form.rules}
-                  onChange={(event) =>
-                    setForm({ ...form, rules: event.target.value })
-                  }
-                  placeholder="One rule per line."
-                  rows={4}
-                />
-              </div>
-              <div className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2.5">
+          {activeTab === "overview" && (
+            <section className="rounded-xl border border-border/70 bg-panel p-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="text-sm font-medium">Discoverable</p>
-                  <p className="text-xs text-muted-foreground">
-                    Anyone can find and join this server.
+                  <h2 className="text-sm font-semibold">Quick actions</h2>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    The places you visit most, one click away.
                   </p>
                 </div>
-                <Switch
-                  checked={form.isPublic}
-                  onCheckedChange={(checked) =>
-                    setForm({ ...form, isPublic: checked })
-                  }
-                  aria-label="Discoverable"
-                />
-              </div>
-
-              {/* Preview stats: exactly what Discovery cards show. */}
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-md border border-border/60 bg-surface px-3 py-2.5 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1.5">
-                  <span className="size-1.5 rounded-full bg-success" />
-                  {server.onlineCount} online
-                </span>
-                <span>{server.memberCount} members</span>
-                <span>
-                  Est. {new Date(server.createdAt).toLocaleDateString(undefined, { month: "short", year: "numeric" })}
-                </span>
-              </div>
-            </div>
-
-            <h2 className="mt-7 text-sm font-semibold">Discovery tags</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              How your server appears in invite links and Discovery. People
-              search these — up to 5.
-            </p>
-            <div className="mt-3">
-              <div className="flex flex-wrap gap-1.5">
-                {form.tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-surface px-2.5 py-1 text-xs"
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => navigate(`/dashboard/s/${serverId}`)}
                   >
-                    {tag}
+                    <Eye className="mr-1.5 size-4" /> Open community
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setTab("invites")}
+                  >
+                    <Link2 className="mr-1.5 size-4" /> Invite people
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setTab("theme")}
+                  >
+                    <Palette className="mr-1.5 size-4" /> Appearance
+                  </Button>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {activeTab === "overview" && (
+            <section className="rounded-xl border border-border/70 bg-panel p-5">
+              <h2 className="text-sm font-semibold">Images</h2>
+              <div className="mt-4 flex flex-wrap items-center gap-4">
+                <div className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-brand to-cyan text-sm font-bold text-white">
+                  {server.iconUrl ? (
+                    <img
+                      src={server.iconUrl}
+                      alt=""
+                      className="size-full object-cover"
+                    />
+                  ) : (
+                    server.name.slice(0, 2).toUpperCase()
+                  )}
+                </div>
+                <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-border/70 bg-surface px-3 py-2 text-sm hover:bg-surface/70">
+                  {uploading === "icon" ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Plus className="size-4" />
+                  )}
+                  {server.iconUrl ? "Change icon" : "Upload icon"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(event) =>
+                      void uploadImage("icon", event.target.files?.[0])
+                    }
+                  />
+                </label>
+                {server.iconUrl && (
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      void update({
+                        serverId: serverId as Id<"servers">,
+                        iconStorageId: null,
+                      })
+                    }
+                  >
+                    Remove
+                  </Button>
+                )}
+              </div>
+              <div className="mt-4">
+                <div className="h-24 w-full overflow-hidden rounded-lg border border-border/70 bg-gradient-to-br from-brand to-cyan">
+                  {server.bannerUrl && (
+                    <img
+                      src={server.bannerUrl}
+                      alt=""
+                      className="size-full object-cover"
+                    />
+                  )}
+                </div>
+                <label className="mt-2 inline-flex cursor-pointer items-center gap-2 rounded-md border border-border/70 bg-surface px-3 py-2 text-sm hover:bg-surface/70">
+                  {uploading === "banner" ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Plus className="size-4" />
+                  )}
+                  {server.bannerUrl ? "Change banner" : "Upload banner"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(event) =>
+                      void uploadImage("banner", event.target.files?.[0])
+                    }
+                  />
+                </label>
+                {server.bannerUrl && (
+                  <Button
+                    variant="outline"
+                    className="ml-2"
+                    onClick={() =>
+                      void update({
+                        serverId: serverId as Id<"servers">,
+                        bannerStorageId: null,
+                      })
+                    }
+                  >
+                    Remove
+                  </Button>
+                )}
+              </div>
+
+              <h2 className="mt-7 text-sm font-semibold">Overview</h2>
+              <div className="mt-4 space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="server-name">Name</Label>
+                  <Input
+                    id="server-name"
+                    value={form.name}
+                    onChange={(event) =>
+                      setForm({ ...form, name: event.target.value })
+                    }
+                    maxLength={64}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="server-description">Description</Label>
+                  <Textarea
+                    id="server-description"
+                    value={form.description}
+                    onChange={(event) =>
+                      setForm({ ...form, description: event.target.value })
+                    }
+                    placeholder="What is this server about?"
+                    rows={3}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="server-welcome">Welcome message</Label>
+                  <Textarea
+                    id="server-welcome"
+                    value={form.welcomeMessage}
+                    onChange={(event) =>
+                      setForm({ ...form, welcomeMessage: event.target.value })
+                    }
+                    placeholder="Shown to new members after they join."
+                    rows={2}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="server-rules">Rules</Label>
+                  <Textarea
+                    id="server-rules"
+                    value={form.rules}
+                    onChange={(event) =>
+                      setForm({ ...form, rules: event.target.value })
+                    }
+                    placeholder="One rule per line."
+                    rows={4}
+                  />
+                </div>
+                <div className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2.5">
+                  <div>
+                    <p className="text-sm font-medium">Discoverable</p>
+                    <p className="text-xs text-muted-foreground">
+                      Anyone can find and join this server.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={form.isPublic}
+                    onCheckedChange={(checked) =>
+                      setForm({ ...form, isPublic: checked })
+                    }
+                    aria-label="Discoverable"
+                  />
+                </div>
+
+                {/* Preview stats: exactly what Discovery cards show. */}
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-md border border-border/60 bg-surface px-3 py-2.5 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1.5">
+                    <span className="size-1.5 rounded-full bg-success" />
+                    {server.onlineCount} online
+                  </span>
+                  <span>{server.memberCount} members</span>
+                  <span>
+                    Est.{" "}
+                    {new Date(server.createdAt).toLocaleDateString(undefined, {
+                      month: "short",
+                      year: "numeric",
+                    })}
+                  </span>
+                </div>
+              </div>
+
+              <h2 className="mt-7 text-sm font-semibold">Discovery tags</h2>
+              <p className="mt-1 text-xs text-muted-foreground">
+                How your server appears in invite links and Discovery. People
+                search these — up to 5.
+              </p>
+              <div className="mt-3">
+                <div className="flex flex-wrap gap-1.5">
+                  {form.tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-surface px-2.5 py-1 text-xs"
+                    >
+                      {tag}
+                      <button
+                        type="button"
+                        aria-label={`Remove tag ${tag}`}
+                        onClick={() =>
+                          setForm({
+                            ...form,
+                            tags: form.tags.filter((t) => t !== tag),
+                          })
+                        }
+                        className="text-muted-foreground hover:text-destructive"
+                      >
+                        <X className="size-3" />
+                      </button>
+                    </span>
+                  ))}
+                  {form.tags.length === 0 && (
+                    <span className="text-xs text-muted-foreground">
+                      No tags yet — add a few below.
+                    </span>
+                  )}
+                </div>
+                <div className="mt-2 flex gap-2">
+                  <Input
+                    value={tagDraft}
+                    onChange={(event) => setTagDraft(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        addTag();
+                      }
+                    }}
+                    placeholder="e.g. gaming, coding, chill"
+                    maxLength={24}
+                    className="flex-1"
+                    aria-label="New tag"
+                  />
+                  <Button variant="outline" onClick={addTag}>
+                    <Plus className="mr-1 size-4" /> Add tag
+                  </Button>
+                </div>
+              </div>
+
+              <h2 className="mt-7 text-sm font-semibold">Custom invite link</h2>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Pick a memorable link for your server. Letters, numbers, dashes
+                and underscores.
+              </p>
+              <div className="mt-3 rounded-md border border-border/60 bg-surface p-3">
+                <div className="flex flex-wrap items-center gap-2 text-sm">
+                  <span className="text-muted-foreground">
+                    {siteOrigin()}/invite/
+                  </span>
+                  <Input
+                    value={vanityDraft}
+                    onChange={(event) =>
+                      setVanityDraft(event.target.value.toLowerCase())
+                    }
+                    placeholder="my-server"
+                    maxLength={24}
+                    className="h-8 w-44 flex-1"
+                    aria-label="Custom invite code"
+                  />
+                  <Button
+                    size="sm"
+                    onClick={() => void saveVanity()}
+                    disabled={
+                      vanityBusy ||
+                      (vanityDraft ?? "") === (server.vanityCode ?? "")
+                    }
+                  >
+                    {vanityBusy && (
+                      <Loader2 className="mr-1.5 size-4 animate-spin" />
+                    )}
+                    Save link
+                  </Button>
+                </div>
+                <div className="mt-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                  <span className="truncate">
+                    {server.vanityCode
+                      ? `Current: ${inviteUrl(server.vanityCode)}`
+                      : "No custom link yet — your default invite code still works."}
+                  </span>
+                  {server.vanityCode && (
                     <button
                       type="button"
-                      aria-label={`Remove tag ${tag}`}
-                      onClick={() =>
-                        setForm({ ...form, tags: form.tags.filter((t) => t !== tag) })
-                      }
-                      className="text-muted-foreground hover:text-destructive"
+                      className="flex shrink-0 items-center gap-1 hover:text-foreground"
+                      onClick={() => {
+                        const vanity = server.vanityCode;
+                        if (!vanity) return;
+                        void navigator.clipboard
+                          .writeText(inviteUrl(vanity))
+                          .then(() => toast.success("Link copied."))
+                          .catch(() =>
+                            toast.error(
+                              "Clipboard access was blocked by the browser.",
+                            ),
+                          );
+                      }}
                     >
-                      <X className="size-3" />
+                      <Copy className="size-3.5" /> Copy
                     </button>
-                  </span>
-                ))}
-                {form.tags.length === 0 && (
-                  <span className="text-xs text-muted-foreground">
-                    No tags yet — add a few below.
-                  </span>
-                )}
-              </div>
-              <div className="mt-2 flex gap-2">
-                <Input
-                  value={tagDraft}
-                  onChange={(event) => setTagDraft(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault();
-                      addTag();
-                    }
-                  }}
-                  placeholder="e.g. gaming, coding, chill"
-                  maxLength={24}
-                  className="flex-1"
-                  aria-label="New tag"
-                />
-                <Button variant="outline" onClick={addTag}>
-                  <Plus className="mr-1 size-4" /> Add tag
-                </Button>
-              </div>
-            </div>
-
-            <h2 className="mt-7 text-sm font-semibold">Custom invite link</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Pick a memorable link for your server. Letters, numbers, dashes
-              and underscores.
-            </p>
-            <div className="mt-3 rounded-md border border-border/60 bg-surface p-3">
-              <div className="flex flex-wrap items-center gap-2 text-sm">
-                <span className="text-muted-foreground">
-                  {siteOrigin()}/invite/
-                </span>
-                <Input
-                  value={vanityDraft}
-                  onChange={(event) =>
-                    setVanityDraft(event.target.value.toLowerCase())
-                  }
-                  placeholder="my-server"
-                  maxLength={24}
-                  className="h-8 w-44 flex-1"
-                  aria-label="Custom invite code"
-                />
-                <Button
-                  size="sm"
-                  onClick={() => void saveVanity()}
-                  disabled={
-                    vanityBusy ||
-                    (vanityDraft ?? "") === (server.vanityCode ?? "")
-                  }
-                >
-                  {vanityBusy && <Loader2 className="mr-1.5 size-4 animate-spin" />}
-                  Save link
-                </Button>
-              </div>
-              <div className="mt-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                <span className="truncate">
-                  {server.vanityCode
-                    ? `Current: ${inviteUrl(server.vanityCode)}`
-                    : "No custom link yet — your default invite code still works."}
-                </span>
-                {server.vanityCode && (
-                  <button
-                    type="button"
-                    className="flex shrink-0 items-center gap-1 hover:text-foreground"
-                    onClick={() => {
-                      const vanity = server.vanityCode;
-                      if (!vanity) return;
-                      void navigator.clipboard
-                        .writeText(inviteUrl(vanity))
-                        .then(() => toast.success("Link copied."))
-                        .catch(() => toast.error("Clipboard access was blocked by the browser."));
-                    }}
-                  >
-                    <Copy className="size-3.5" /> Copy
-                  </button>
-                )}
-              </div>
-            </div>
-            <h2 className="mt-7 text-sm font-semibold">Server tag</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              2 to 4 letters or numbers. Members can wear it next to their name
-              everywhere on Kyro (Settings → Profile).
-            </p>
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <span className="rounded-md border border-border bg-surface px-2.5 py-1.5 text-xs font-bold uppercase tracking-wider">
-                {server.tag ?? "—"}
-              </span>
-              <Input
-                value={serverTagDraft}
-                onChange={(event) =>
-                  setServerTagDraft(event.target.value.toUpperCase())
-                }
-                placeholder="HTML"
-                maxLength={4}
-                className="h-9 w-32"
-                aria-label="Server tag"
-              />
-              <Button
-                size="sm"
-                disabled={
-                  serverTagDraft.trim().length < 2 ||
-                  serverTagDraft === (server.tag ?? "")
-                }
-                onClick={() => void saveTag()}
-              >
-                Save
-              </Button>
-              {server.tag && (
-                <Button size="sm" variant="ghost" onClick={() => void saveTag("")}>
-                  Remove
-                </Button>
-              )}
-            </div>
-
-            <h2 className="mt-7 text-sm font-semibold">Links</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Shown on your community profile and Discovery card — up to 5.
-            </p>
-            <div className="mt-3 space-y-2">
-              {linksDraft.map((link, index) => (
-                <div key={index} className="flex gap-2">
-                  <Input
-                    value={link.label}
-                    placeholder="Label (e.g. Website)"
-                    maxLength={32}
-                    className="w-40 flex-none"
-                    onChange={(event) => {
-                      const next = [...linksDraft];
-                      next[index] = { ...next[index], label: event.target.value };
-                      setLinksDraft(next);
-                    }}
-                  />
-                  <Input
-                    value={link.url}
-                    placeholder="https://…"
-                    maxLength={200}
-                    className="flex-1"
-                    onChange={(event) => {
-                      const next = [...linksDraft];
-                      next[index] = { ...next[index], url: event.target.value };
-                      setLinksDraft(next);
-                    }}
-                  />
-                  <button
-                    type="button"
-                    aria-label={`Remove link ${index + 1}`}
-                    className="rounded-md border border-border/70 px-2 text-muted-foreground hover:text-destructive"
-                    onClick={() =>
-                      setLinksDraft(linksDraft.filter((_, i) => i !== index))
-                    }
-                  >
-                    <X className="size-4" />
-                  </button>
+                  )}
                 </div>
-              ))}
-              <div className="flex items-center justify-between gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={linksDraft.length >= 5}
-                  onClick={() =>
-                    setLinksDraft([...linksDraft, { label: "", url: "" }])
+              </div>
+              <h2 className="mt-7 text-sm font-semibold">Server tag</h2>
+              <p className="mt-1 text-xs text-muted-foreground">
+                2 to 4 letters or numbers. Members can wear it next to their
+                name everywhere on Kyro (Settings → Profile).
+              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <span className="rounded-md border border-border bg-surface px-2.5 py-1.5 text-xs font-bold uppercase tracking-wider">
+                  {server.tag ?? "—"}
+                </span>
+                <Input
+                  value={serverTagDraft}
+                  onChange={(event) =>
+                    setServerTagDraft(event.target.value.toUpperCase())
                   }
+                  placeholder="HTML"
+                  maxLength={4}
+                  className="h-9 w-32"
+                  aria-label="Server tag"
+                />
+                <Button
+                  size="sm"
+                  disabled={
+                    serverTagDraft.trim().length < 2 ||
+                    serverTagDraft === (server.tag ?? "")
+                  }
+                  onClick={() => void saveTag()}
                 >
-                  <Plus className="mr-1.5 size-4" /> Add link
+                  Save
+                </Button>
+                {server.tag && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => void saveTag("")}
+                  >
+                    Remove
+                  </Button>
+                )}
+              </div>
+
+              <h2 className="mt-7 text-sm font-semibold">Links</h2>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Shown on your community profile and Discovery card — up to 5.
+              </p>
+              <div className="mt-3 space-y-2">
+                {linksDraft.map((link, index) => (
+                  <div key={index} className="flex gap-2">
+                    <Input
+                      value={link.label}
+                      placeholder="Label (e.g. Website)"
+                      maxLength={32}
+                      className="w-40 flex-none"
+                      onChange={(event) => {
+                        const next = [...linksDraft];
+                        next[index] = {
+                          ...next[index],
+                          label: event.target.value,
+                        };
+                        setLinksDraft(next);
+                      }}
+                    />
+                    <Input
+                      value={link.url}
+                      placeholder="https://…"
+                      maxLength={200}
+                      className="flex-1"
+                      onChange={(event) => {
+                        const next = [...linksDraft];
+                        next[index] = {
+                          ...next[index],
+                          url: event.target.value,
+                        };
+                        setLinksDraft(next);
+                      }}
+                    />
+                    <button
+                      type="button"
+                      aria-label={`Remove link ${index + 1}`}
+                      className="rounded-md border border-border/70 px-2 text-muted-foreground hover:text-destructive"
+                      onClick={() =>
+                        setLinksDraft(linksDraft.filter((_, i) => i !== index))
+                      }
+                    >
+                      <X className="size-4" />
+                    </button>
+                  </div>
+                ))}
+                <div className="flex items-center justify-between gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={linksDraft.length >= 5}
+                    onClick={() =>
+                      setLinksDraft([...linksDraft, { label: "", url: "" }])
+                    }
+                  >
+                    <Plus className="mr-1.5 size-4" /> Add link
+                  </Button>
+                  <Button
+                    size="sm"
+                    disabled={linksBusy}
+                    onClick={() => void saveLinks()}
+                  >
+                    {linksBusy && (
+                      <Loader2 className="mr-1.5 size-4 animate-spin" />
+                    )}
+                    Save links
+                  </Button>
+                </div>
+              </div>
+
+              <h2 className="mt-7 text-sm font-semibold">Raid protection</h2>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Locked: nobody new can join and only people who can manage
+                messages can post. Pick a timed lock, or lock it until you open
+                it again.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void lockFor(15 * 60 * 1000)}
+                >
+                  Lock for 15 min
                 </Button>
                 <Button
                   size="sm"
-                  disabled={linksBusy}
-                  onClick={() => void saveLinks()}
+                  variant="outline"
+                  onClick={() => void lockFor(60 * 60 * 1000)}
                 >
-                  {linksBusy && <Loader2 className="mr-1.5 size-4 animate-spin" />}
-                  Save links
+                  Lock for 1 hour
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void lockFor(24 * 60 * 60 * 1000)}
+                >
+                  Lock for a day
+                </Button>
+                <Button size="sm" onClick={() => void lockFor()}>
+                  Lock until unlocked
+                </Button>
+                {server.locked && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void unlockNow()}
+                  >
+                    Unlock now
+                  </Button>
+                )}
+              </div>
+              {server.locked && (
+                <p className="mt-2 text-xs text-warning">
+                  Currently locked
+                  {server.lockedUntil && now > 0 && server.lockedUntil > now
+                    ? ` — unlocks ${new Date(server.lockedUntil).toLocaleString()}.`
+                    : " until you unlock it."}
+                </p>
+              )}
+
+              <h2 className="mt-7 text-sm font-semibold">Verification level</h2>
+              <p className="mt-1 text-xs text-muted-foreground">
+                What people need before they can talk here. The owner, staff and
+                people with roles skip it.
+              </p>
+              <select
+                value={server.verificationLevel}
+                aria-label="Verification level"
+                className="mt-3 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                onChange={(event) =>
+                  void updateServer(
+                    {
+                      verificationLevel: event.target.value as
+                        | "none"
+                        | "low"
+                        | "medium"
+                        | "high",
+                    },
+                    "Verification level updated.",
+                  )
+                }
+              >
+                <option value="none">None</option>
+                <option value="low">Low — 5 minute old accounts</option>
+                <option value="medium">Medium — 1 hour old accounts</option>
+                <option value="high">High — 1 day old accounts</option>
+              </select>
+              <p className="mt-2 text-xs text-muted-foreground">
+                {server.verificationLevel === "low"
+                  ? "Accounts need to be at least 5 minutes old."
+                  : server.verificationLevel === "medium"
+                    ? "Accounts need to be at least 1 hour old."
+                    : server.verificationLevel === "high"
+                      ? "Accounts need to be at least 1 day old."
+                      : "Anyone in the community can talk right away."}
+              </p>
+
+              <h2 className="mt-7 text-sm font-semibold">New accounts</h2>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Stops raids from freshly made accounts. Only accounts older than
+                the gate can join; existing members are never re-checked.
+              </p>
+              <select
+                value={
+                  server.minAccountAgeMs === 604800000
+                    ? "7d"
+                    : server.minAccountAgeMs === 86400000
+                      ? "1d"
+                      : "off"
+                }
+                aria-label="New accounts"
+                className="mt-3 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                onChange={(event) => {
+                  const value =
+                    event.target.value === "7d"
+                      ? 604800000
+                      : event.target.value === "1d"
+                        ? 86400000
+                        : 0;
+                  void updateServer(
+                    { minAccountAgeMs: value },
+                    "New-account gate updated.",
+                  );
+                }}
+              >
+                <option value="off">Off</option>
+                <option value="1d">1 day</option>
+                <option value="7d">7 days</option>
+              </select>
+
+              <h2 className="mt-7 text-sm font-semibold">Rules channel</h2>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Gets a book icon, only people who can manage the server can post
+                in it, and new members know where to start.
+              </p>
+              <select
+                value={server.rulesChannelId ?? ""}
+                aria-label="Rules channel"
+                className="mt-3 w-full max-w-sm rounded-md border border-input bg-background px-3 py-2 text-sm"
+                onChange={(event) =>
+                  void updateServer(
+                    {
+                      rulesChannelId: (event.target.value ||
+                        null) as Id<"channels"> | null,
+                    },
+                    "Rules channel updated.",
+                  )
+                }
+              >
+                <option value="">No rules channel</option>
+                {(channels?.channels ?? []).map((channel) => (
+                  <option key={channel.id} value={channel.id}>
+                    #{channel.name}
+                  </option>
+                ))}
+              </select>
+
+              <div className="mt-4 flex justify-end">
+                <Button onClick={() => void save()} disabled={saving}>
+                  {saving && <Loader2 className="mr-2 size-4 animate-spin" />}
+                  Save changes
                 </Button>
               </div>
-            </div>
+            </section>
+          )}
 
-            <h2 className="mt-7 text-sm font-semibold">Raid protection</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Locked: nobody new can join and only people who can manage
-              messages can post. Pick a timed lock, or lock it until you open
-              it again.
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Button size="sm" variant="outline" onClick={() => void lockFor(15 * 60 * 1000)}>
-                Lock for 15 min
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => void lockFor(60 * 60 * 1000)}>
-                Lock for 1 hour
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => void lockFor(24 * 60 * 60 * 1000)}>
-                Lock for a day
-              </Button>
-              <Button size="sm" onClick={() => void lockFor()}>
-                Lock until unlocked
-              </Button>
-              {server.locked && (
-                <Button size="sm" variant="outline" onClick={() => void unlockNow()}>
-                  Unlock now
-                </Button>
-              )}
-            </div>
-            {server.locked && (
-              <p className="mt-2 text-xs text-warning">
-                Currently locked
-                {server.lockedUntil && now > 0 && server.lockedUntil > now
-                  ? ` — unlocks ${new Date(server.lockedUntil).toLocaleString()}.`
-                  : " until you unlock it."}
+          {activeTab === "roles" && (
+            <RolesTab
+              serverId={serverId}
+              isOwner={server.isOwner}
+              canManageRoles={canRoles}
+            />
+          )}
+
+          {activeTab === "invites" && (
+            <section className="rounded-xl border border-border/70 bg-panel p-5">
+              <h2 className="text-sm font-semibold">Invite links</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Create invite links with expiry and use limits, then share them
+                with the people you want in this server.
               </p>
-            )}
+              <div className="mt-3">
+                <InvitesInline serverId={serverId} />
+              </div>
+            </section>
+          )}
 
-            <h2 className="mt-7 text-sm font-semibold">Verification level</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              What people need before they can talk here. The owner, staff and
-              people with roles skip it.
-            </p>
-            <select
-              value={server.verificationLevel}
-              aria-label="Verification level"
-              className="mt-3 rounded-md border border-input bg-background px-3 py-2 text-sm"
-              onChange={(event) =>
-                void updateServer(
-                  {
-                    verificationLevel: event.target.value as
-                      | "none"
-                      | "low"
-                      | "medium"
-                      | "high",
-                  },
-                  "Verification level updated.",
-                )
-              }
-            >
-              <option value="none">None</option>
-              <option value="low">Low — 5 minute old accounts</option>
-              <option value="medium">Medium — 1 hour old accounts</option>
-              <option value="high">High — 1 day old accounts</option>
-            </select>
-            <p className="mt-2 text-xs text-muted-foreground">
-              {server.verificationLevel === "low"
-                ? "Accounts need to be at least 5 minutes old."
-                : server.verificationLevel === "medium"
-                  ? "Accounts need to be at least 1 hour old."
-                  : server.verificationLevel === "high"
-                    ? "Accounts need to be at least 1 day old."
-                    : "Anyone in the community can talk right away."}
-            </p>
+          {activeTab === "channels" && (
+            <ChannelsTab serverId={serverId} canManage={canChannels} />
+          )}
+          {activeTab === "emojis" && (
+            <EmojisTab serverId={serverId} canManage={canEmojis} />
+          )}
 
-            <h2 className="mt-7 text-sm font-semibold">New accounts</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Stops raids from freshly made accounts. Only accounts older than
-              the gate can join; existing members are never re-checked.
-            </p>
-            <select
-              value={
-                server.minAccountAgeMs === 604800000
-                  ? "7d"
-                  : server.minAccountAgeMs === 86400000
-                    ? "1d"
-                    : "off"
-              }
-              aria-label="New accounts"
-              className="mt-3 rounded-md border border-input bg-background px-3 py-2 text-sm"
-              onChange={(event) => {
-                const value =
-                  event.target.value === "7d"
-                    ? 604800000
-                    : event.target.value === "1d"
-                      ? 86400000
-                      : 0;
-                void updateServer(
-                  { minAccountAgeMs: value },
-                  "New-account gate updated.",
-                );
-              }}
-            >
-              <option value="off">Off</option>
-              <option value="1d">1 day</option>
-              <option value="7d">7 days</option>
-            </select>
+          {activeTab === "theme" && canManage && (
+            <ThemeTab
+              serverId={serverId}
+              initialAccent={server.themeAccent}
+              initialTint={server.themeTint}
+            />
+          )}
 
-            <h2 className="mt-7 text-sm font-semibold">Rules channel</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Gets a book icon, only people who can manage the server can post
-              in it, and new members know where to start.
-            </p>
-            <select
-              value={server.rulesChannelId ?? ""}
-              aria-label="Rules channel"
-              className="mt-3 w-full max-w-sm rounded-md border border-input bg-background px-3 py-2 text-sm"
-              onChange={(event) =>
-                void updateServer(
-                  {
-                    rulesChannelId: (event.target.value || null) as
-                      | Id<"channels">
-                      | null,
-                  },
-                  "Rules channel updated.",
-                )
-              }
-            >
-              <option value="">No rules channel</option>
-              {(channels?.channels ?? []).map((channel) => (
-                <option key={channel.id} value={channel.id}>
-                  #{channel.name}
-                </option>
-              ))}
-            </select>
+          {activeTab === "members" && (
+            <MembersTab
+              serverId={serverId}
+              canRoles={canRoles}
+              canBans={canBans}
+            />
+          )}
 
-            <div className="mt-4 flex justify-end">
-              <Button onClick={() => void save()} disabled={saving}>
-                {saving && <Loader2 className="mr-2 size-4 animate-spin" />}
-                Save changes
-              </Button>
-            </div>
-          </section>
-        )}
+          {activeTab === "reports" && <ReportsTab />}
 
-        {activeTab === "roles" && (
-          <RolesTab
-            serverId={serverId}
-            isOwner={server.isOwner}
-            canManageRoles={canRoles}
-          />
-        )}
+          {activeTab === "bans" && <BansTab serverId={serverId} />}
 
-        {activeTab === "invites" && (
-          <section className="rounded-xl border border-border/70 bg-panel p-5">
-            <h2 className="text-sm font-semibold">Invite links</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Create invite links with expiry and use limits, then share them
-              with the people you want in this server.
-            </p>
-            <div className="mt-3">
-              <InvitesInline serverId={serverId} />
-            </div>
-          </section>
-        )}
+          {activeTab === "audit" && <AuditTab serverId={serverId} />}
 
-        {activeTab === "channels" && (
-          <ChannelsTab serverId={serverId} canManage={canChannels} />
-        )}
-
-        {activeTab === "theme" && canManage && (
-          <ThemeTab
-            serverId={serverId}
-            initialAccent={server.themeAccent}
-            initialTint={server.themeTint}
-          />
-        )}
-
-        {activeTab === "members" && (
-          <MembersTab serverId={serverId} canRoles={canRoles} canBans={canBans} />
-        )}
-
-        {activeTab === "reports" && <ReportsTab />}
-
-        {activeTab === "bans" && <BansTab serverId={serverId} />}
-
-        {activeTab === "audit" && <AuditTab serverId={serverId} />}
-
-        {activeTab === "danger" && server.isOwner && (
-          <section className="rounded-xl border border-destructive/40 bg-panel p-5">
-            <h2 className="text-sm font-semibold text-destructive">
-              Delete server
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              This permanently removes {server.name}, every channel, and all
-              messages inside it. It cannot be undone.
-            </p>
-            <div className="mt-3 space-y-2">
-              <Input
-                value={confirmName}
-                onChange={(event) => setConfirmName(event.target.value)}
-                placeholder={`Type “${server.name}” to confirm`}
-                aria-label="Confirm server name"
-              />
-              <Button
-                variant="destructive"
-                disabled={saving || confirmName.trim() !== server.name}
-                onClick={() => void destroy()}
-              >
-                <Trash2 className="mr-2 size-4" />
+          {activeTab === "danger" && server.isOwner && (
+            <section className="rounded-xl border border-destructive/40 bg-panel p-5">
+              <h2 className="text-sm font-semibold text-destructive">
                 Delete server
-              </Button>
-            </div>
-          </section>
-        )}
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                This permanently removes {server.name}, every channel, and all
+                messages inside it. It cannot be undone.
+              </p>
+              <div className="mt-3 space-y-2">
+                <Input
+                  value={confirmName}
+                  onChange={(event) => setConfirmName(event.target.value)}
+                  placeholder={`Type “${server.name}” to confirm`}
+                  aria-label="Confirm server name"
+                />
+                <Button
+                  variant="destructive"
+                  disabled={saving || confirmName.trim() !== server.name}
+                  onClick={() => void destroy()}
+                >
+                  <Trash2 className="mr-2 size-4" />
+                  Delete server
+                </Button>
+              </div>
+            </section>
+          )}
 
-        {visibleTabs.length === 0 && (
-          <p className="rounded-xl border border-border/60 bg-panel p-4 text-sm text-muted-foreground">
-            You don't have permission to manage this server.
-          </p>
-        )}
+          {visibleTabs.length === 0 && (
+            <p className="rounded-xl border border-border/60 bg-panel p-4 text-sm text-muted-foreground">
+              You don't have permission to manage this server.
+            </p>
+          )}
         </motion.div>
       </div>
     </div>
@@ -1200,8 +1279,7 @@ function PermissionToggles({
                 }
                 const base = value.filter(
                   (entry) =>
-                    entry !== permission &&
-                    entry !== PERMISSIONS.ADMINISTRATOR,
+                    entry !== permission && entry !== PERMISSIONS.ADMINISTRATOR,
                 );
                 onChange(checked ? [...base, permission] : base);
               }}
@@ -1250,9 +1328,7 @@ function RolesTab({
       await action;
       if (success) toast.success(success);
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "That didn't work.",
-      );
+      toast.error(error instanceof Error ? error.message : "That didn't work.");
     } finally {
       setBusy(false);
     }
@@ -1272,7 +1348,7 @@ function RolesTab({
     .filter((role) => !role.isDefault)
     .sort((a, b) => b.position - a.position);
   const editingRole = editingId
-    ? ordered.find((role) => role.id === editingId) ?? null
+    ? (ordered.find((role) => role.id === editingId) ?? null)
     : null;
 
   const openEdit = (role: { id: string }) => {
@@ -1677,11 +1753,7 @@ function InvitesInline({ serverId }: { serverId: string }) {
       <Button variant="outline" onClick={() => setOpen(true)}>
         Manage invite links
       </Button>
-      <InviteDialog
-        serverId={serverId}
-        open={open}
-        onOpenChange={setOpen}
-      />
+      <InviteDialog serverId={serverId} open={open} onOpenChange={setOpen} />
     </>
   );
 }
@@ -1706,7 +1778,9 @@ function BansTab({ serverId }: { serverId: string }) {
         {bans === undefined ? (
           <p className="text-sm text-muted-foreground">Loading bans…</p>
         ) : bans.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No bans in this server.</p>
+          <p className="text-sm text-muted-foreground">
+            No bans in this server.
+          </p>
         ) : (
           bans.map((ban) => (
             <div
@@ -1797,6 +1871,214 @@ function AuditTab({ serverId }: { serverId: string }) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Custom emojis                                                       */
+/* ------------------------------------------------------------------ */
+
+type ServerEmojiData = {
+  canManage: boolean;
+  emojis: {
+    id: string;
+    name: string;
+    url: string | null;
+    animated: boolean;
+    serverId: string;
+    serverName: string;
+  }[];
+};
+
+function EmojisTab({
+  serverId,
+  canManage,
+}: {
+  serverId: string;
+  canManage: boolean;
+}) {
+  const convex = useConvex();
+  const upload = useUploadFile({ requireRegistration: true });
+  const createEmoji = useMutation(api.emojis.create);
+  const removeEmoji = useMutation(api.emojis.remove);
+  const [data, setData] = useState<ServerEmojiData | null>(null);
+  const [backendMissing, setBackendMissing] = useState(false);
+  const [name, setName] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const load = async () => {
+    try {
+      const next = await convex.query(api.emojis.forServer, {
+        serverId: serverId as Id<"servers">,
+      });
+      setData(next);
+      setBackendMissing(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.includes("Could not find public function")) {
+        setBackendMissing(true);
+        setData({ canManage: false, emojis: [] });
+      } else {
+        toast.error(message);
+      }
+    }
+  };
+
+  useEffect(() => {
+    // `load` awaits the Convex query before touching state; the lint rule
+    // cannot see through the helper call.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void load();
+    // `load` intentionally tracks the active server and stable Convex client.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [convex, serverId]);
+
+  const create = async () => {
+    if (!file || busy) return;
+    if (file.size > 1024 * 1024) {
+      toast.error("Custom emoji files must be 1 MB or smaller.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const stored = await upload(file);
+      await createEmoji({
+        serverId: serverId as Id<"servers">,
+        name: name.trim(),
+        storageId: stored.storageId,
+      });
+      setName("");
+      setFile(null);
+      await load();
+      toast.success("Custom emoji uploaded.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not upload emoji.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!canManage) {
+    return (
+      <section className="rounded-xl border border-border/70 bg-panel p-5 text-sm text-muted-foreground">
+        You don't have permission to manage custom emojis.
+      </section>
+    );
+  }
+
+  return (
+    <section className="space-y-4 rounded-xl border border-border/70 bg-panel p-5">
+      <div>
+        <h2 className="text-base font-semibold">Custom emojis</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Upload PNG, WebP, APNG, or animated GIF emoji up to 1 MB. Members can
+          use them in any Kyro conversation.
+        </p>
+      </div>
+
+      {backendMissing ? (
+        <div className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm text-warning">
+          The custom-emoji backend is ready in the repository but still needs
+          deployment to this server's live Convex project.
+        </div>
+      ) : (
+        <div className="grid gap-3 rounded-lg border border-border/60 bg-surface p-4 sm:grid-cols-[1fr_auto]">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="emoji-name">Emoji name</Label>
+              <Input
+                id="emoji-name"
+                value={name}
+                onChange={(event) => setName(event.target.value.toLowerCase())}
+                placeholder="party_blob"
+                maxLength={32}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="emoji-file">Image or GIF</Label>
+              <Input
+                id="emoji-file"
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif,image/apng"
+                onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+              />
+            </div>
+          </div>
+          <Button
+            className="self-end"
+            disabled={busy || !file || !/^[a-z0-9_]{2,32}$/.test(name.trim())}
+            onClick={() => void create()}
+          >
+            {busy ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Plus className="size-4" />
+            )}
+            Upload
+          </Button>
+        </div>
+      )}
+
+      {data === null ? (
+        <div className="flex h-28 items-center justify-center">
+          <Loader2 className="size-5 animate-spin text-muted-foreground" />
+        </div>
+      ) : data.emojis.length === 0 ? (
+        <p className="rounded-lg border border-dashed border-border/70 px-4 py-10 text-center text-sm text-muted-foreground">
+          No custom emojis yet.
+        </p>
+      ) : (
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {data.emojis.map((emoji) => (
+            <div
+              key={emoji.id}
+              className="flex items-center gap-3 rounded-lg border border-border/60 bg-surface p-3"
+            >
+              {emoji.url ? (
+                <img
+                  src={emoji.url}
+                  alt={`:${emoji.name}:`}
+                  className="size-10 object-contain"
+                />
+              ) : (
+                <span className="size-10 rounded bg-panel" />
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium">:{emoji.name}:</p>
+                <p className="text-xs text-muted-foreground">
+                  {emoji.animated ? "Animated" : "Static"}
+                </p>
+              </div>
+              <button
+                type="button"
+                aria-label={`Delete ${emoji.name}`}
+                disabled={busy}
+                onClick={() => {
+                  setBusy(true);
+                  void removeEmoji({ emojiId: emoji.id as Id<"serverEmojis"> })
+                    .then(load)
+                    .then(() => toast.success("Emoji deleted."))
+                    .catch((error: unknown) =>
+                      toast.error(
+                        error instanceof Error
+                          ? error.message
+                          : "Could not delete emoji.",
+                      ),
+                    )
+                    .finally(() => setBusy(false));
+                }}
+                className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+              >
+                <Trash2 className="size-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* Channels — order and categories, exactly like the sidebar.          */
 /* ------------------------------------------------------------------ */
 
@@ -1810,13 +2092,21 @@ function ChannelsTab({
   const channels = useQuery(api.channels.list, {
     serverId: serverId as Id<"servers">,
   });
+  const roles = useQuery(api.roles.list, {
+    serverId: serverId as Id<"servers">,
+  });
   const reorder = useMutation(api.channels.reorder);
+  const updateChannel = useMutation(api.channels.update);
   const createCategory = useMutation(api.channels.createCategory);
   const [newCategory, setNewCategory] = useState("");
   const [creating, setCreating] = useState(false);
   const [busy, setBusy] = useState(false);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [overwrites, setOverwrites] = useState<
+    { roleId: string; allow: string[]; deny: string[] }[]
+  >([]);
 
   const run = async (action: Promise<unknown>, success?: string) => {
     if (busy) return;
@@ -1857,10 +2147,7 @@ function ChannelsTab({
       .filter((channel) => channel.categoryId === category.id)
       .sort((a, b) => a.position - b.position),
   }));
-  const flat = [
-    ...uncategorised,
-    ...groups.flatMap((group) => group.channels),
-  ];
+  const flat = [...uncategorised, ...groups.flatMap((group) => group.channels)];
 
   const saveOrder = async (next: typeof flat) =>
     run(
@@ -1870,8 +2157,7 @@ function ChannelsTab({
         channels: next.map((channel, position) => ({
           id: channel.id as Id<"channels">,
           position,
-          categoryId:
-            (channel.categoryId as Id<"categories"> | null) ?? null,
+          categoryId: (channel.categoryId as Id<"categories"> | null) ?? null,
         })),
       }),
       "Channel order saved.",
@@ -1904,6 +2190,32 @@ function ChannelsTab({
   for (const channel of uncategorised) {
     rows.push({ kind: "channel", channel, index: flat.indexOf(channel) });
   }
+  const editingChannel = editingId
+    ? (channels.channels.find((channel) => channel.id === editingId) ?? null)
+    : null;
+
+  const setOverride = (
+    roleId: string,
+    permission: string,
+    state: "inherit" | "allow" | "deny",
+  ) => {
+    setOverwrites((current) => {
+      const existing = current.find((entry) => entry.roleId === roleId) ?? {
+        roleId,
+        allow: [],
+        deny: [],
+      };
+      const next = {
+        ...existing,
+        allow: existing.allow.filter((entry) => entry !== permission),
+        deny: existing.deny.filter((entry) => entry !== permission),
+      };
+      if (state === "allow") next.allow.push(permission);
+      if (state === "deny") next.deny.push(permission);
+      const rest = current.filter((entry) => entry.roleId !== roleId);
+      return next.allow.length || next.deny.length ? [...rest, next] : rest;
+    });
+  };
   for (const group of groups) {
     rows.push({
       kind: "category",
@@ -2042,6 +2354,23 @@ function ChannelsTab({
               >
                 <ChevronDown className="size-4" />
               </button>
+              <button
+                type="button"
+                aria-label={`Edit ${row.channel.name} permissions`}
+                className="rounded p-1 text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground"
+                onClick={() => {
+                  setEditingId(row.channel.id);
+                  setOverwrites(
+                    (row.channel.permissionOverwrites ?? []).map((entry) => ({
+                      roleId: entry.roleId,
+                      allow: [...entry.allow],
+                      deny: [...entry.deny],
+                    })),
+                  );
+                }}
+              >
+                <Pencil className="size-4" />
+              </button>
             </div>
           ),
         )}
@@ -2051,6 +2380,129 @@ function ChannelsTab({
           </p>
         )}
       </div>
+
+      {editingChannel && (
+        <div className="mt-4 rounded-xl border border-primary/40 bg-surface p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h3 className="font-semibold">
+                #{editingChannel.name} permissions
+              </h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Allow, deny, or inherit each permission for a role. Deny wins
+                when a member has multiple conflicting roles.
+              </p>
+            </div>
+            <button
+              type="button"
+              aria-label="Close channel permissions"
+              onClick={() => setEditingId(null)}
+              className="rounded p-1 text-muted-foreground hover:bg-panel"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+
+          <div className="mt-4 space-y-3">
+            {(roles ?? [])
+              .slice()
+              .sort(
+                (a, b) =>
+                  Number(b.isDefault) - Number(a.isDefault) ||
+                  b.position - a.position,
+              )
+              .map((role) => {
+                const overwrite = overwrites.find(
+                  (entry) => entry.roleId === role.id,
+                );
+                return (
+                  <div
+                    key={role.id}
+                    className="rounded-lg border border-border/60 bg-panel p-3"
+                  >
+                    <div className="mb-2 flex items-center gap-2">
+                      <span
+                        className="size-2.5 rounded-full"
+                        style={{ background: role.color ?? "#94a3b8" }}
+                      />
+                      <p className="text-sm font-semibold">{role.name}</p>
+                    </div>
+                    <div className="grid gap-2 lg:grid-cols-2">
+                      {CHANNEL_PERMISSIONS.map((permission) => {
+                        const state = overwrite?.allow.includes(permission)
+                          ? "allow"
+                          : overwrite?.deny.includes(permission)
+                            ? "deny"
+                            : "inherit";
+                        return (
+                          <label
+                            key={permission}
+                            className="flex items-center justify-between gap-2 rounded-md border border-border/50 px-2.5 py-2"
+                          >
+                            <span className="min-w-0">
+                              <span className="block truncate text-xs font-medium">
+                                {PERMISSION_META[permission].label}
+                              </span>
+                            </span>
+                            <select
+                              value={state}
+                              onChange={(event) =>
+                                setOverride(
+                                  role.id,
+                                  permission,
+                                  event.target.value as
+                                    | "inherit"
+                                    | "allow"
+                                    | "deny",
+                                )
+                              }
+                              className={cn(
+                                "h-7 rounded border border-input bg-background px-1.5 text-xs",
+                                state === "allow" && "text-success",
+                                state === "deny" && "text-destructive",
+                              )}
+                            >
+                              <option value="inherit">Inherit</option>
+                              <option value="allow">Allow</option>
+                              <option value="deny">Deny</option>
+                            </select>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+          <div className="mt-4 flex justify-end gap-2">
+            <Button
+              variant="ghost"
+              disabled={busy}
+              onClick={() => setEditingId(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              disabled={busy}
+              onClick={() =>
+                void run(
+                  updateChannel({
+                    channelId: editingChannel.id as Id<"channels">,
+                    permissionOverwrites: overwrites.map((entry) => ({
+                      roleId: entry.roleId as Id<"serverRoles">,
+                      allow: entry.allow,
+                      deny: entry.deny,
+                    })),
+                  }).then(() => setEditingId(null)),
+                  "Channel permissions saved.",
+                )
+              }
+            >
+              Save permissions
+            </Button>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
@@ -2198,17 +2650,16 @@ function ThemeTab({
     <section className="rounded-xl border border-border/70 bg-panel p-5">
       <h2 className="text-base font-semibold">Theme</h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        Give your server its own colours. Everyone sees them while they're
-        here, unless they turned server colours off in their Appearance
-        settings.
+        Give your server its own colours. Everyone sees them while they're here,
+        unless they turned server colours off in their Appearance settings.
       </p>
 
       <h3 className="mt-6 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         Accent colour
       </h3>
       <p className="mt-1 text-xs text-muted-foreground">
-        Buttons, links and highlights. Very light or very dark picks get
-        nudged so text stays readable.
+        Buttons, links and highlights. Very light or very dark picks get nudged
+        so text stays readable.
       </p>
       <ThemeSwatches value={accent} onPick={setAccent} label="accent" />
 
@@ -2312,15 +2763,15 @@ function MembersTab({
 
   const needle = term.trim().toLowerCase();
   const all =
-    members === undefined
-      ? []
-      : [...members.online, ...members.offline];
+    members === undefined ? [] : [...members.online, ...members.offline];
   const filtered = all.filter(
     (member) =>
       !needle ||
-      [member.user.name, member.nickname ?? "", member.user.username ?? ""].some(
-        (value) => value.toLowerCase().includes(needle),
-      ),
+      [
+        member.user.name,
+        member.nickname ?? "",
+        member.user.username ?? "",
+      ].some((value) => value.toLowerCase().includes(needle)),
   );
 
   const setRoles = (member: (typeof filtered)[number], roleIds: string[]) =>
@@ -2337,9 +2788,7 @@ function MembersTab({
     <section className="rounded-xl border border-border/70 bg-panel p-5">
       <h2 className="text-base font-semibold">
         Members
-        {members
-          ? ` · ${members.online.length + members.offline.length}`
-          : ""}
+        {members ? ` · ${members.online.length + members.offline.length}` : ""}
       </h2>
       <Input
         value={term}
@@ -2365,12 +2814,19 @@ function MembersTab({
                 !heldRoles.some((held) => held.id === role.id),
             );
             return (
-              <div key={member.user.id} className="flex items-center gap-3 py-2.5">
+              <div
+                key={member.user.id}
+                className="flex items-center gap-3 py-2.5"
+              >
                 <div className="relative shrink-0">
                   <UserAvatar user={member.user} size="md" />
                   {member.isOwner && (
                     <span className="absolute -right-1.5 -top-1.5">
-                      <CrownBadge variant="owner" label="Owner" size="size-3.5" />
+                      <CrownBadge
+                        variant="owner"
+                        label="Owner"
+                        size="size-3.5"
+                      />
                     </span>
                   )}
                 </div>
@@ -2410,7 +2866,9 @@ function MembersTab({
                               >
                                 <span
                                   className="size-2.5 shrink-0 rounded-full"
-                                  style={{ background: role.color ?? "#9CA3AF" }}
+                                  style={{
+                                    background: role.color ?? "#9CA3AF",
+                                  }}
                                 />
                                 <span className="truncate">{role.name}</span>
                               </DropdownMenuItem>
@@ -2603,7 +3061,12 @@ function ReportRow({
             Also warn (3 days)
           </label>
         )}
-        <Button size="sm" variant="outline" disabled={busy} onClick={() => void save()}>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={busy}
+          onClick={() => void save()}
+        >
           {busy && <Loader2 className="mr-1 size-3 animate-spin" />}
           Save
         </Button>
@@ -2621,8 +3084,8 @@ function ReportsTab() {
     <section className="rounded-xl border border-border/70 bg-panel p-5">
       <h2 className="text-base font-semibold">Reports</h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        People and messages reported in this community. Resolve them with a
-        note so the reporter knows what happened.
+        People and messages reported in this community. Resolve them with a note
+        so the reporter knows what happened.
       </p>
       <div className="mt-4 space-y-2">
         {queue === undefined ? (
@@ -2633,7 +3096,11 @@ function ReportsTab() {
           </p>
         ) : (
           queue.map((report) => (
-            <ReportRow key={report.id} report={report} isAdmin={isAdmin === true} />
+            <ReportRow
+              key={report.id}
+              report={report}
+              isAdmin={isAdmin === true}
+            />
           ))
         )}
       </div>

@@ -100,10 +100,7 @@ export const move = mutation({
     const lo = Math.min(from, to);
     const hi = Math.max(from, to);
     for (let i = lo; i <= hi; i++) {
-      if (
-        sorted[i].position >= myTop &&
-        access.server.ownerId !== id
-      ) {
+      if (sorted[i].position >= myTop && access.server.ownerId !== id) {
         throw new Error("You can't move a role above your own.");
       }
     }
@@ -148,7 +145,9 @@ export const create = mutation({
       .query("serverRoles")
       .withIndex("by_server", (q) => q.eq("serverId", serverId))
       .collect();
-    if (existing.some((role) => role.name.toLowerCase() === clean.toLowerCase())) {
+    if (
+      existing.some((role) => role.name.toLowerCase() === clean.toLowerCase())
+    ) {
       throw new Error("A role with that name already exists.");
     }
     const myTop = await topPosition(ctx, access, existing);
@@ -283,6 +282,20 @@ export const remove = mutation({
         });
       }
     }
+    const channels = await ctx.db
+      .query("channels")
+      .withIndex("by_server", (q) => q.eq("serverId", role.serverId))
+      .collect();
+    for (const channel of channels) {
+      const next = (channel.permissionOverwrites ?? []).filter(
+        (overwrite) => overwrite.roleId !== roleId,
+      );
+      if (next.length !== (channel.permissionOverwrites ?? []).length) {
+        await ctx.db.patch(channel._id, {
+          permissionOverwrites: next.length > 0 ? next : undefined,
+        });
+      }
+    }
     await ctx.db.delete(roleId);
     await logAudit(ctx, {
       serverId: role.serverId,
@@ -307,8 +320,11 @@ async function topPosition(
   access: ServerAccess,
   roles: Doc<"serverRoles">[],
 ): Promise<number> {
-  if (access.server.ownerId === access.member.userId) return Number.MAX_SAFE_INTEGER;
-  const assigned = roles.filter((role) => access.member.roleIds.includes(role._id));
+  if (access.server.ownerId === access.member.userId)
+    return Number.MAX_SAFE_INTEGER;
+  const assigned = roles.filter((role) =>
+    access.member.roleIds.includes(role._id),
+  );
   return assigned.length > 0
     ? Math.max(...assigned.map((role) => role.position))
     : 0;

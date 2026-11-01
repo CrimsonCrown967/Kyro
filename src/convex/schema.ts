@@ -73,11 +73,7 @@ const schema = defineSchema(
       founderBadgeRemoved: v.optional(v.boolean()),
       /** Device class last seen on, powering the platform indicator. */
       device: v.optional(
-        v.union(
-          v.literal("desktop"),
-          v.literal("mobile"),
-          v.literal("tablet"),
-        ),
+        v.union(v.literal("desktop"), v.literal("mobile"), v.literal("tablet")),
       ),
 
       // --- Kyro profile + presence ---
@@ -97,7 +93,11 @@ const schema = defineSchema(
       accent: v.optional(v.string()),
       /** Privacy controls, enforced server-side. */
       dmPolicy: v.optional(
-        v.union(v.literal("everyone"), v.literal("friends"), v.literal("nobody")),
+        v.union(
+          v.literal("everyone"),
+          v.literal("friends"),
+          v.literal("nobody"),
+        ),
       ),
       allowFriendRequests: v.optional(v.boolean()),
       showPresence: v.optional(v.boolean()),
@@ -273,6 +273,16 @@ const schema = defineSchema(
       readOnly: v.optional(v.boolean()),
       /** `text` (default) or `voice` — voice channels host live audio rooms. */
       kind: v.optional(v.union(v.literal("text"), v.literal("voice"))),
+      /** Per-role permission overrides scoped to this channel. */
+      permissionOverwrites: v.optional(
+        v.array(
+          v.object({
+            roleId: v.id("serverRoles"),
+            allow: v.array(v.string()),
+            deny: v.array(v.string()),
+          }),
+        ),
+      ),
       lastMessageAt: v.optional(v.number()),
       lastMessageSenderId: v.optional(v.id("users")),
       createdAt: v.number(),
@@ -281,6 +291,18 @@ const schema = defineSchema(
       .index("by_server", ["serverId"])
       .index("by_category", ["categoryId"])
       .index("by_server_position", ["serverId", "position"]),
+
+    /** Static or animated custom emoji uploaded by a community. */
+    serverEmojis: defineTable({
+      serverId: v.id("servers"),
+      name: v.string(),
+      storageId: v.id("_storage"),
+      animated: v.boolean(),
+      createdById: v.id("users"),
+      createdAt: v.number(),
+    })
+      .index("by_server", ["serverId"])
+      .index("by_server_name", ["serverId", "name"]),
 
     /** One row per message in a channel *or* a direct-message conversation. */
     messages: defineTable({
@@ -334,6 +356,7 @@ const schema = defineSchema(
           v.literal("user_banner"),
           v.literal("server_icon"),
           v.literal("server_banner"),
+          v.literal("server_emoji"),
         ),
       ),
       /** String form of the message, user, or server id that owns the claim. */

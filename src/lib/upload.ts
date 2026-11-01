@@ -30,7 +30,7 @@ const uploadRegistrationEnabled =
  * Files go straight to object storage through a short-lived signed URL, so
  * the browser never streams file contents through the database.
  */
-export function useUploadFile() {
+export function useUploadFile(options: { requireRegistration?: boolean } = {}) {
   const generateUploadUrl = useMutation(api.files.generateUploadUrl);
   const registerUpload = useMutation(api.files.registerUpload);
 
@@ -61,7 +61,9 @@ export function useUploadFile() {
       // The signed upload has already completed. Legacy Kyro mutations accept
       // this storage id directly, so never call a function that production is
       // known not to expose.
-      if (!uploadRegistrationEnabled) return attachment;
+      if (!uploadRegistrationEnabled && !options.requireRegistration) {
+        return attachment;
+      }
 
       try {
         return await registerUpload({
@@ -69,8 +71,7 @@ export function useUploadFile() {
           name: file.name,
         });
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : String(error);
+        const message = error instanceof Error ? error.message : String(error);
         const backendPredatesRegistration =
           message.includes("Could not find public function") &&
           message.toLowerCase().includes("registerupload");
@@ -82,6 +83,6 @@ export function useUploadFile() {
         return attachment;
       }
     },
-    [generateUploadUrl, registerUpload],
+    [generateUploadUrl, options.requireRegistration, registerUpload],
   );
 }

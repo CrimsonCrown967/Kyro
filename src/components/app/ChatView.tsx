@@ -32,6 +32,14 @@ type SurfaceProps = {
   serverOwnerId?: string;
   /** Rendered to the right of the conversation header. */
   headerAction?: ReactNode;
+  /** People offered after typing @, and used to open mentioned profiles. */
+  mentionUsers?: {
+    id: string;
+    name: string;
+    username: string | null;
+    avatarUrl?: string | null;
+  }[];
+  allowMassMentions?: boolean;
 };
 
 /** Shared conversation surface: header, history, typing strip and composer. */
@@ -47,6 +55,8 @@ function ChatSurface({
   roleColors,
   serverOwnerId,
   headerAction,
+  mentionUsers = [],
+  allowMassMentions = false,
 }: SurfaceProps) {
   const me = useQuery(api.users.me);
   const markRead = useMutation(api.messages.markContainerRead);
@@ -59,9 +69,10 @@ function ChatSurface({
       : "skip",
   );
   const endCall = useMutation(api.voice.endCall);
-  const callActive = dmCall !== null && dmCall !== undefined && (
-    dmCall.isCaller || dmCall.answeredAt !== null
-  );
+  const callActive =
+    dmCall !== null &&
+    dmCall !== undefined &&
+    (dmCall.isCaller || dmCall.answeredAt !== null);
   const typing = useQuery(api.messages.typingList, {
     containerType,
     containerId,
@@ -152,6 +163,7 @@ function ChatSurface({
         }
         roleColors={roleColors}
         serverOwnerId={serverOwnerId}
+        mentionUsers={mentionUsers}
       />
 
       <div className="h-5 shrink-0 px-4 text-xs text-muted-foreground">
@@ -170,6 +182,8 @@ function ChatSurface({
         reply={reply}
         onCancelReply={() => setReply(null)}
         disabledReason={disabledReason ?? null}
+        mentionUsers={mentionUsers}
+        allowMassMentions={allowMassMentions}
       />
 
       <ReportDialog
@@ -232,24 +246,26 @@ export function ChannelChat({
   // Voice channels have their own stage view — sending a text-channel URL
   // there (an old link, a shared invite) lands on /c/, so bounce to /v/.
   if (channel.kind === "voice") {
-    return (
-      <Navigate
-        to={`/dashboard/s/${serverId}/v/${channelId}`}
-        replace
-      />
-    );
+    return <Navigate to={`/dashboard/s/${serverId}/v/${channelId}`} replace />;
   }
 
   const canManageMessages = hasPermission(
-    channels.permissions,
+    channel.permissions ?? channels.permissions,
     PERMISSIONS.MANAGE_MESSAGES,
   );
+  const allowMassMentions =
+    channels.isOwner ||
+    hasPermission(
+      channel.permissions ?? channels.permissions,
+      PERMISSIONS.MENTION_EVERYONE,
+    );
   const roleColors: Record<string, string> = {};
   let serverOwnerId: string | undefined;
-  for (const member of [
+  const serverMembers = [
     ...(members?.online ?? []),
     ...(members?.offline ?? []),
-  ]) {
+  ];
+  for (const member of serverMembers) {
     if (member.topRoleColor) roleColors[member.user.id] = member.topRoleColor;
     if (member.isOwner) serverOwnerId = member.user.id;
   }
@@ -271,6 +287,8 @@ export function ChannelChat({
               : null
           }
           roleColors={roleColors}
+          mentionUsers={serverMembers.map((member) => member.user)}
+          allowMassMentions={allowMassMentions}
         />
       </div>
       {memberListOpen && <MemberList serverId={serverId} />}
@@ -321,6 +339,7 @@ export function DirectChat({ conversationId }: { conversationId: string }) {
       }
       icon={<MessagesSquare className="size-4" />}
       participants={others}
+      mentionUsers={conversation.participants}
       canManageMessages
     />
   );

@@ -18,7 +18,9 @@ import type * as bugReports from "../bugReports.js";
 import type * as channels from "../channels.js";
 import type * as cleanup from "../cleanup.js";
 import type * as conversations from "../conversations.js";
+import type * as emojis from "../emojis.js";
 import type * as files from "../files.js";
+import type * as gifs from "../gifs.js";
 import type * as http from "../http.js";
 import type * as lib from "../lib.js";
 import type * as messages from "../messages.js";
@@ -28,6 +30,7 @@ import type * as reports from "../reports.js";
 import type * as roles from "../roles.js";
 import type * as schema from "../schema.js";
 import type * as servers from "../servers.js";
+import type * as sha256 from "../sha256.js";
 import type * as social from "../social.js";
 import type * as tempResetPassword from "../tempResetPassword.js";
 import type * as uploadSecurity from "../uploadSecurity.js";
@@ -47,7 +50,9 @@ const fullApi: ApiFromModules<{
   "channels": typeof channels,
   "cleanup": typeof cleanup,
   "conversations": typeof conversations,
+  "emojis": typeof emojis,
   "files": typeof files,
+  "gifs": typeof gifs,
   "http": typeof http,
   "lib": typeof lib,
   "messages": typeof messages,
@@ -57,6 +62,7 @@ const fullApi: ApiFromModules<{
   "roles": typeof roles,
   "schema": typeof schema,
   "servers": typeof servers,
+  "sha256": typeof sha256,
   "social": typeof social,
   "tempResetPassword": typeof tempResetPassword,
   "uploadSecurity": typeof uploadSecurity,
