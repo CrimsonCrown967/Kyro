@@ -30,6 +30,11 @@ import { StyledDisplayName } from "@/components/app/StyledDisplayName";
 import { ImageCropDialog } from "@/components/app/ImageCropDialog";
 import { CrownBadge } from "@/components/app/CrownBadge";
 import {
+  AutoModEvents,
+  AutoModSettings,
+  JoinApplicationSettings,
+} from "@/components/app/ServerSafetySettings";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -1161,6 +1166,19 @@ export function ServerSettings({ serverId }: { serverId: string }) {
                 ))}
               </select>
 
+              <JoinApplicationSettings
+                serverId={serverId}
+                isPublic={server.isPublic}
+                applyToJoin={server.applyToJoin}
+                applicationQuestions={server.applicationQuestions}
+              />
+
+              <AutoModSettings
+                serverId={serverId}
+                channels={channels?.channels ?? []}
+                roles={server.roles}
+              />
+
               <div className="mt-4 flex justify-end">
                 <Button onClick={() => void save()} disabled={saving}>
                   {saving && <Loader2 className="mr-2 size-4 animate-spin" />}
@@ -1214,7 +1232,7 @@ export function ServerSettings({ serverId }: { serverId: string }) {
             />
           )}
 
-          {activeTab === "reports" && <ReportsTab />}
+          {activeTab === "reports" && <ReportsTab serverId={serverId} />}
 
           {activeTab === "bans" && <BansTab serverId={serverId} />}
 
@@ -2762,8 +2780,126 @@ function ThemeTab({
 }
 
 /* ------------------------------------------------------------------ */
-/* Members — search, role chips, kick and ban.                          */
+/* Members — applications, search, role chips, kick and ban.           */
 /* ------------------------------------------------------------------ */
+
+function ApplicationReview({ serverId }: { serverId: string }) {
+  const applications = useQuery(api.applications.list, {
+    serverId: serverId as Id<"servers">,
+  });
+  const decide = useMutation(api.applications.decide);
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const pending = (applications ?? []).filter(
+    (application) => application.status === "pending",
+  );
+
+  if (pending.length === 0) return null;
+
+  const review = async (applicationId: string, approve: boolean) => {
+    if (busyId) return;
+    setBusyId(applicationId);
+    try {
+      await decide({
+        applicationId: applicationId as Id<"joinApplications">,
+        approve,
+        note: notes[applicationId]?.trim() || undefined,
+      });
+      toast.success(
+        approve ? "Application approved." : "Application declined.",
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Could not review application.",
+      );
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  return (
+    <div className="mt-4 rounded-xl border border-primary/25 bg-primary/5 p-4">
+      <h3 className="text-sm font-semibold">
+        Pending applications · {pending.length}
+      </h3>
+      <div className="mt-3 space-y-3">
+        {pending.map((application) => (
+          <div
+            key={application.id}
+            className="rounded-lg border border-border/70 bg-panel p-3"
+          >
+            <div className="flex items-center gap-2">
+              {application.applicant ? (
+                <UserAvatar user={application.applicant} size="sm" />
+              ) : (
+                <span className="size-8 rounded-full bg-muted" />
+              )}
+              <div className="min-w-0 flex-1">
+                {application.applicant ? (
+                  <StyledDisplayName
+                    user={application.applicant}
+                    className="text-sm"
+                  />
+                ) : (
+                  <p className="text-sm font-semibold">Unknown applicant</p>
+                )}
+                <p className="text-[11px] text-muted-foreground">
+                  Applied {new Date(application.createdAt).toLocaleString()}
+                </p>
+              </div>
+            </div>
+            <div className="mt-2 space-y-2">
+              {application.answers.map((answer) => (
+                <div key={answer.question}>
+                  <p className="text-[11px] font-semibold text-muted-foreground">
+                    {answer.question}
+                  </p>
+                  <p className="mt-0.5 text-sm">{answer.answer}</p>
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+              <Input
+                value={notes[application.id] ?? ""}
+                onChange={(event) =>
+                  setNotes((current) => ({
+                    ...current,
+                    [application.id]: event.target.value,
+                  }))
+                }
+                placeholder="Optional note to the applicant"
+                maxLength={500}
+                className="h-8 flex-1 text-xs"
+              />
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  disabled={busyId !== null}
+                  onClick={() => void review(application.id, true)}
+                >
+                  {busyId === application.id && (
+                    <Loader2 className="mr-1 size-3 animate-spin" />
+                  )}
+                  Approve
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={busyId !== null}
+                  onClick={() => void review(application.id, false)}
+                >
+                  Decline
+                </Button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function MembersTab({
   serverId,
@@ -2825,6 +2961,7 @@ function MembersTab({
 
   return (
     <section className="rounded-xl border border-border/70 bg-panel p-5">
+      {canBans && <ApplicationReview serverId={serverId} />}
       <h2 className="text-base font-semibold">
         Members
         {members ? ` · ${members.online.length + members.offline.length}` : ""}
@@ -3116,7 +3253,7 @@ function ReportRow({
   );
 }
 
-function ReportsTab() {
+function ReportsTab({ serverId }: { serverId: string }) {
   const queue = useQuery(api.reports.queue, {});
   const me = useQuery(api.users.me);
   const isAdmin = me?.role === "admin";
@@ -3145,6 +3282,7 @@ function ReportsTab() {
           ))
         )}
       </div>
+      <AutoModEvents serverId={serverId} />
     </section>
   );
 }

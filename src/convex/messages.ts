@@ -30,6 +30,7 @@ import {
 } from "./lib";
 import { deleteMessageData } from "./cleanup";
 import { claimUpload, requireOwnedUpload } from "./uploadSecurity";
+import { evaluateAutomod, recordAutomodEvent } from "./automod";
 
 export type ContainerType = "channel" | "conversation";
 
@@ -543,6 +544,24 @@ export const send = mutation({
             );
           }
         }
+      }
+      const automod = await evaluateAutomod(ctx, {
+        server: access.server,
+        channel,
+        member: access.member,
+        permissions,
+        userId,
+        content,
+      });
+      if (automod) {
+        await recordAutomodEvent(ctx, {
+          serverId: access.server._id,
+          channelId: channel._id,
+          userId,
+          rule: automod.rule,
+          content,
+        });
+        throw new Error(automod.reason);
       }
     } else {
       dmConversation = access.conversation;

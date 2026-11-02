@@ -424,7 +424,7 @@ function DiscoverDialog({
                 <Button
                   size="sm"
                   onClick={() =>
-                    server.isJoined
+                    server.isJoined || server.applyToJoin
                       ? onJoin(server.id)
                       : void joinNow(server.id)
                   }
@@ -433,7 +433,11 @@ function DiscoverDialog({
                   {busyId === server.id ? (
                     <Loader2 className="mr-1.5 size-4 animate-spin" />
                   ) : null}
-                  {server.isJoined ? "Open" : "Join"}
+                  {server.isJoined
+                    ? "Open"
+                    : server.applyToJoin
+                      ? "Apply"
+                      : "Join"}
                 </Button>
               </div>
             ))

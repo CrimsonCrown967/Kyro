@@ -5,7 +5,8 @@ import { toast } from "sonner";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Ban, Loader2, Users } from "@/components/icons";
+import { Textarea } from "@/components/ui/textarea";
+import { ArrowLeft, Ban, Loader2, Send, Users } from "@/components/icons";
 
 /**
  * Wraps everything rendered under `/dashboard/s/:id`.
@@ -29,7 +30,9 @@ export function MembershipGate({
     serverId: serverId as Id<"servers">,
   });
   const join = useMutation(api.servers.join);
+  const apply = useMutation(api.applications.submit);
   const [busy, setBusy] = useState(false);
+  const [answers, setAnswers] = useState<string[]>([]);
 
   if (state === undefined) {
     return (
@@ -71,6 +74,29 @@ export function MembershipGate({
     }
   };
 
+  const submitApplication = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await apply({
+        serverId: serverId as Id<"servers">,
+        answers: state.applicationQuestions.map(
+          (_, index) => answers[index] ?? "",
+        ),
+      });
+      toast.success("Application submitted.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Could not submit application.",
+      );
+      setBusy(false);
+    }
+  };
+
+  const applicationPending = state.application?.status === "pending";
+
   return (
     <Screen>
       <div className="flex size-16 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-brand to-cyan text-lg font-bold text-white shadow-md">
@@ -93,6 +119,73 @@ export function MembershipGate({
         <p className="mt-4 flex items-center gap-1.5 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
           <Ban className="size-4" /> You're banned from this community.
         </p>
+      ) : applicationPending ? (
+        <div className="mt-4 w-full max-w-md rounded-xl border border-primary/25 bg-primary/5 p-4">
+          <p className="text-sm font-semibold">Application pending</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Staff will review your answers and send you a notification when
+            there's a decision.
+          </p>
+        </div>
+      ) : state.applyToJoin ? (
+        <div className="mt-4 w-full max-w-md space-y-3 text-left">
+          {state.application?.status === "rejected" && (
+            <div className="rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs">
+              <p className="font-semibold text-warning">
+                Your last application wasn't approved.
+              </p>
+              {state.application.note && (
+                <p className="mt-0.5 text-muted-foreground">
+                  {state.application.note}
+                </p>
+              )}
+              <p className="mt-1 text-muted-foreground">
+                You can update your answers and apply again.
+              </p>
+            </div>
+          )}
+          {state.applicationQuestions.map((question, index) => (
+            <div key={question} className="space-y-1.5">
+              <label
+                htmlFor={`application-answer-${index}`}
+                className="text-xs font-semibold"
+              >
+                {question}
+              </label>
+              <Textarea
+                id={`application-answer-${index}`}
+                value={answers[index] ?? ""}
+                onChange={(event) =>
+                  setAnswers((current) => {
+                    const next = [...current];
+                    next[index] = event.target.value;
+                    return next;
+                  })
+                }
+                rows={3}
+                maxLength={1000}
+                placeholder="Your answer…"
+              />
+            </div>
+          ))}
+          <Button
+            className="w-full"
+            disabled={
+              busy ||
+              state.applicationQuestions.some(
+                (_, index) => (answers[index] ?? "").trim().length < 2,
+              )
+            }
+            onClick={() => void submitApplication()}
+          >
+            {busy ? (
+              <Loader2 className="mr-1.5 size-4 animate-spin" />
+            ) : (
+              <Send className="mr-1.5 size-4" />
+            )}
+            Submit application
+          </Button>
+        </div>
       ) : state.isPublic ? (
         <Button className="mt-4" disabled={busy} onClick={() => void joinNow()}>
           {busy && <Loader2 className="mr-1.5 size-4 animate-spin" />}

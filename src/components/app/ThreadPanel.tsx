@@ -61,7 +61,8 @@ export function ThreadPanel({
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-bold">Thread</p>
             <p className="truncate text-xs text-muted-foreground">
-              {thread?.replyCount ?? 0} replies
+              {thread?.replyCount ?? 0}{" "}
+              {thread?.replyCount === 1 ? "reply" : "replies"}
             </p>
           </div>
           {thread?.canManage && (

@@ -11,9 +11,11 @@
 import type { ApiFromModules, FilterApi, FunctionReference } from "convex/server";
 import { anyApi } from "convex/server";
 import type * as admin from "../admin.js";
+import type * as applications from "../applications.js";
 import type * as auth from "../auth.js";
 import type * as auth_config from "../auth.config.js";
 import type * as auth_emailOtp from "../auth/emailOtp.js";
+import type * as automod from "../automod.js";
 import type * as bugReports from "../bugReports.js";
 import type * as channels from "../channels.js";
 import type * as cleanup from "../cleanup.js";
@@ -46,9 +48,11 @@ import type * as warnings from "../warnings.js";
 
 const fullApi: ApiFromModules<{
   "admin": typeof admin,
+  "applications": typeof applications,
   "auth": typeof auth,
   "auth.config": typeof auth_config,
   "auth/emailOtp": typeof auth_emailOtp,
+  "automod": typeof automod,
   "bugReports": typeof bugReports,
   "channels": typeof channels,
   "cleanup": typeof cleanup,

@@ -226,6 +226,10 @@ const schema = defineSchema(
       /** Community theme colours, shown to viewers with server colours on. */
       themeAccent: v.optional(v.string()),
       themeTint: v.optional(v.string()),
+      /** Open joins become applications that staff review first. */
+      applyToJoin: v.optional(v.boolean()),
+      /** Prompts shown on the application form, one answer per question. */
+      applicationQuestions: v.optional(v.array(v.string())),
       /** Immutable marker for the official platform community. */
       isPlatformHome: v.optional(v.boolean()),
       createdAt: v.number(),
@@ -599,6 +603,53 @@ const schema = defineSchema(
     })
       .index("by_key", ["key"])
       .index("by_expires", ["expiresAt"]),
+
+    /** Someone asking to join a community that reviews applications. */
+    joinApplications: defineTable({
+      serverId: v.id("servers"),
+      userId: v.id("users"),
+      answers: v.array(v.object({ question: v.string(), answer: v.string() })),
+      status: v.union(
+        v.literal("pending"),
+        v.literal("approved"),
+        v.literal("rejected"),
+      ),
+      note: v.optional(v.string()),
+      reviewedById: v.optional(v.id("users")),
+      reviewedAt: v.optional(v.number()),
+      createdAt: v.number(),
+      updatedAt: v.number(),
+    })
+      .index("by_server_status", ["serverId", "status", "createdAt"])
+      .index("by_user_server", ["userId", "serverId"]),
+
+    /** Per-community AutoMod rules, enforced before a message is stored. */
+    serverAutomod: defineTable({
+      serverId: v.id("servers"),
+      enabled: v.boolean(),
+      blockedWords: v.array(v.string()),
+      blockInvites: v.boolean(),
+      blockLinks: v.boolean(),
+      maxMentions: v.number(),
+      blockCaps: v.boolean(),
+      blockSpam: v.boolean(),
+      exemptRoleIds: v.array(v.id("serverRoles")),
+      exemptChannelIds: v.array(v.id("channels")),
+      updatedAt: v.number(),
+      updatedById: v.id("users"),
+    }).index("by_server", ["serverId"]),
+
+    /** Audit trail of messages AutoMod stopped, shown to moderators. */
+    automodEvents: defineTable({
+      serverId: v.id("servers"),
+      channelId: v.id("channels"),
+      userId: v.id("users"),
+      rule: v.string(),
+      excerpt: v.string(),
+      createdAt: v.number(),
+    })
+      .index("by_server", ["serverId", "createdAt"])
+      .index("by_user", ["userId"]),
 
     /** Staff warnings against an account; they expire after 3 days. */
     warnings: defineTable({

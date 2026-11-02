@@ -65,16 +65,20 @@ async function unreadSummaryFor(
     .withIndex("by_server", (q) => q.eq("serverId", server._id))
     .collect();
   const unread = channels.some(
-    (channel) =>
-      (channel.lastMessageAt ?? 0) > (readMap.get(channel._id) ?? 0),
+    (channel) => (channel.lastMessageAt ?? 0) > (readMap.get(channel._id) ?? 0),
   );
   const notes = await ctx.db
     .query("notifications")
-    .withIndex("by_user_unread", (q) => q.eq("userId", userId).eq("read", false))
+    .withIndex("by_user_unread", (q) =>
+      q.eq("userId", userId).eq("read", false),
+    )
     .take(50);
   let mentions = 0;
   for (const note of notes) {
-    if (!note.containerKey || (note.type !== "mention" && note.type !== "reply"))
+    if (
+      !note.containerKey ||
+      (note.type !== "mention" && note.type !== "reply")
+    )
       continue;
     const channel = await ctx.db.get(note.containerKey as Id<"channels">);
     if (channel && channel.serverId === server._id) mentions += 1;
@@ -226,6 +230,7 @@ export const discover = query({
             // Joined servers stay listed so cards can offer "Open" instead
             // of "Join", like the Discover grid does.
             isJoined,
+            applyToJoin: server.applyToJoin === true,
           };
         }),
     );
@@ -299,27 +304,35 @@ export const joinState = query({
         ownerId: null as string | null,
       };
     }
-    const [member, banned, memberRows, iconUrl] = await Promise.all([
-      ctx.db
-        .query("serverMembers")
-        .withIndex("by_server_user", (q) =>
-          q.eq("serverId", serverId).eq("userId", id),
-        )
-        .unique(),
-      ctx.db
-        .query("bans")
-        .withIndex("by_server_user", (q) =>
-          q.eq("serverId", serverId).eq("userId", id),
-        )
-        .unique(),
-      ctx.db
-        .query("serverMembers")
-        .withIndex("by_server", (q) => q.eq("serverId", serverId))
-        .collect(),
-      server.iconStorageId
-        ? ctx.storage.getUrl(server.iconStorageId)
-        : Promise.resolve(null),
-    ]);
+    const [member, banned, memberRows, iconUrl, application] =
+      await Promise.all([
+        ctx.db
+          .query("serverMembers")
+          .withIndex("by_server_user", (q) =>
+            q.eq("serverId", serverId).eq("userId", id),
+          )
+          .unique(),
+        ctx.db
+          .query("bans")
+          .withIndex("by_server_user", (q) =>
+            q.eq("serverId", serverId).eq("userId", id),
+          )
+          .unique(),
+        ctx.db
+          .query("serverMembers")
+          .withIndex("by_server", (q) => q.eq("serverId", serverId))
+          .collect(),
+        server.iconStorageId
+          ? ctx.storage.getUrl(server.iconStorageId)
+          : Promise.resolve(null),
+        ctx.db
+          .query("joinApplications")
+          .withIndex("by_user_server", (q) =>
+            q.eq("userId", id).eq("serverId", serverId),
+          )
+          .order("desc")
+          .first(),
+      ]);
     return {
       exists: true as const,
       isMember: member !== null,
@@ -330,6 +343,29 @@ export const joinState = query({
       iconUrl,
       memberCount: memberRows.length,
       ownerId: server.ownerId as string,
+      applyToJoin: server.applyToJoin === true && server.isPublic,
+      applicationQuestions:
+        server.applyToJoin === true && server.isPublic
+          ? (() => {
+              const questions = (server.applicationQuestions ?? [])
+                .map((question) => question.trim())
+                .filter(Boolean)
+                .slice(0, 5);
+              return questions.length > 0
+                ? questions
+                : [
+                    "Why do you want to join this community?",
+                    "What will you contribute?",
+                  ];
+            })()
+          : [],
+      application: application
+        ? {
+            id: application._id as string,
+            status: application.status,
+            note: application.note ?? null,
+          }
+        : null,
     };
   },
 });
@@ -389,6 +425,8 @@ export const get = query({
       links: access.server.links ?? [],
       verificationLevel: access.server.verificationLevel ?? "none",
       minAccountAgeMs: access.server.minAccountAgeMs ?? 0,
+      applyToJoin: access.server.applyToJoin === true,
+      applicationQuestions: access.server.applicationQuestions ?? [],
       rulesChannelId:
         (access.server.rulesChannelId as string | undefined) ?? null,
       themeAccent: access.server.themeAccent ?? null,
@@ -457,17 +495,22 @@ export const members = query({
             position: role.position,
             isDefault: role.isDefault,
           })),
-          topRoleName: top?.name ?? (row.userId === ownerId ? "Owner" : "Member"),
+          topRoleName:
+            top?.name ?? (row.userId === ownerId ? "Owner" : "Member"),
           topRoleColor: top?.color ?? null,
         };
       })
-      .filter((member): member is NonNullable<typeof member> => member !== null);
+      .filter(
+        (member): member is NonNullable<typeof member> => member !== null,
+      );
 
     const online = members.filter((m) => m.user.presence !== "offline");
     const offline = members.filter((m) => m.user.presence === "offline");
     const rank = (m: (typeof members)[number]) =>
       m.isOwner ? 1000 : (m.roles[m.roles.length - 1]?.position ?? 0);
-    online.sort((a, b) => rank(b) - rank(a) || a.user.name.localeCompare(b.user.name));
+    online.sort(
+      (a, b) => rank(b) - rank(a) || a.user.name.localeCompare(b.user.name),
+    );
     offline.sort((a, b) => a.user.name.localeCompare(b.user.name));
     return { online, offline, myPermissions: access.permissions };
   },
@@ -512,7 +555,10 @@ export const invitePreview = query({
         )
         .unique();
       if (server && !server.isPublic) {
-        return { valid: false as const, reason: "That community is invite-only." };
+        return {
+          valid: false as const,
+          reason: "That community is invite-only.",
+        };
       }
     }
     if (!server) {
@@ -647,9 +693,7 @@ export async function joinKyroHq(
   userId: Id<"users">,
 ): Promise<void> {
   const founderId = configuredFounderId();
-  const founder = founderId
-    ? await ctx.db.get(founderId as Id<"users">)
-    : null;
+  const founder = founderId ? await ctx.db.get(founderId as Id<"users">) : null;
   if (!founder || founder.deletedAt !== undefined) {
     // Never let the first arbitrary registrant bootstrap ownership of the
     // platform community. Configure KYRO_FOUNDER_USER_ID first.
@@ -777,6 +821,8 @@ export const update = mutation({
       ),
     ),
     minAccountAgeMs: v.optional(v.union(v.number(), v.null())),
+    applyToJoin: v.optional(v.boolean()),
+    applicationQuestions: v.optional(v.array(v.string())),
     themeAccent: v.optional(v.union(v.string(), v.null())),
     themeTint: v.optional(v.union(v.string(), v.null())),
   },
@@ -794,8 +840,10 @@ export const update = mutation({
       }
       patch.name = name;
     }
-    if (args.description !== undefined) patch.description = args.description.trim().slice(0, 400);
-    if (args.rules !== undefined) patch.rules = args.rules.trim().slice(0, 2000);
+    if (args.description !== undefined)
+      patch.description = args.description.trim().slice(0, 400);
+    if (args.rules !== undefined)
+      patch.rules = args.rules.trim().slice(0, 2000);
     if (args.welcomeMessage !== undefined) {
       patch.welcomeMessage = args.welcomeMessage.trim().slice(0, 500);
     }
@@ -865,6 +913,16 @@ export const update = mutation({
       } else {
         patch.minAccountAgeMs = Math.floor(args.minAccountAgeMs);
       }
+    }
+    if (args.applyToJoin !== undefined) {
+      patch.applyToJoin = args.applyToJoin || undefined;
+    }
+    if (args.applicationQuestions !== undefined) {
+      const questions = args.applicationQuestions
+        .map((question) => question.trim().slice(0, 200))
+        .filter(Boolean)
+        .slice(0, 5);
+      patch.applicationQuestions = questions.length > 0 ? questions : undefined;
     }
     const HEX_COLOUR = /^#[0-9a-fA-F]{6}$/;
     if (args.themeAccent !== undefined) {
@@ -961,7 +1019,8 @@ export const remove = mutation({
     const { id } = await requireActiveUser(ctx);
     const server = await ctx.db.get(serverId);
     if (!server) throw new Error("That community doesn't exist.");
-    if (server.ownerId !== id) throw new Error("Only the owner can delete a community.");
+    if (server.ownerId !== id)
+      throw new Error("Only the owner can delete a community.");
     if (confirm !== server.name) {
       throw new Error(`Type the community name ("${server.name}") to confirm.`);
     }
@@ -979,7 +1038,9 @@ export const join = mutation({
     if (!server.isPublic) throw new Error("That community is invite-only.");
     const banned = await ctx.db
       .query("bans")
-      .withIndex("by_server_user", (q) => q.eq("serverId", serverId).eq("userId", id))
+      .withIndex("by_server_user", (q) =>
+        q.eq("serverId", serverId).eq("userId", id),
+      )
       .unique();
     if (banned) throw new Error("You're banned from this community.");
     const gateMs = server.minAccountAgeMs ?? 0;
@@ -993,9 +1054,14 @@ export const join = mutation({
     if ((await restrictionLevel(ctx, id)) >= 3) {
       throw new Error("Your account is suspended while staff review it.");
     }
+    if (server.applyToJoin === true) {
+      throw new Error("This community requires an application to join.");
+    }
     const existing = await ctx.db
       .query("serverMembers")
-      .withIndex("by_server_user", (q) => q.eq("serverId", serverId).eq("userId", id))
+      .withIndex("by_server_user", (q) =>
+        q.eq("serverId", serverId).eq("userId", id),
+      )
       .unique();
     if (existing) return serverId;
 
@@ -1036,7 +1102,9 @@ export const leave = mutation({
     }
     const membership = await ctx.db
       .query("serverMembers")
-      .withIndex("by_server_user", (q) => q.eq("serverId", serverId).eq("userId", id))
+      .withIndex("by_server_user", (q) =>
+        q.eq("serverId", serverId).eq("userId", id),
+      )
       .unique();
     if (membership) await ctx.db.delete(membership._id);
     await logAudit(ctx, {
@@ -1059,9 +1127,12 @@ export const transferOwnership = mutation({
     }
     const target = await ctx.db
       .query("serverMembers")
-      .withIndex("by_server_user", (q) => q.eq("serverId", serverId).eq("userId", userId))
+      .withIndex("by_server_user", (q) =>
+        q.eq("serverId", serverId).eq("userId", userId),
+      )
       .unique();
-    if (!target) throw new Error("That person isn't a member of this community.");
+    if (!target)
+      throw new Error("That person isn't a member of this community.");
     await ctx.db.patch(serverId, { ownerId: userId, updatedAt: Date.now() });
     await logAudit(ctx, {
       serverId,
@@ -1095,10 +1166,13 @@ export const kick = mutation({
     if (!can(access.permissions, PERMISSIONS.KICK_MEMBERS)) {
       throw new Error("You don't have permission to kick members.");
     }
-    if (access.server.ownerId === userId) throw new Error("You can't kick the owner.");
+    if (access.server.ownerId === userId)
+      throw new Error("You can't kick the owner.");
     const target = await ctx.db
       .query("serverMembers")
-      .withIndex("by_server_user", (q) => q.eq("serverId", serverId).eq("userId", userId))
+      .withIndex("by_server_user", (q) =>
+        q.eq("serverId", serverId).eq("userId", userId),
+      )
       .unique();
     if (!target) throw new Error("That person isn't a member.");
     const myTop = await topPosition(ctx, access.server, access.member);
@@ -1137,10 +1211,13 @@ export const ban = mutation({
     if (!can(access.permissions, PERMISSIONS.BAN_MEMBERS)) {
       throw new Error("You don't have permission to ban members.");
     }
-    if (access.server.ownerId === userId) throw new Error("You can't ban the owner.");
+    if (access.server.ownerId === userId)
+      throw new Error("You can't ban the owner.");
     const target = await ctx.db
       .query("serverMembers")
-      .withIndex("by_server_user", (q) => q.eq("serverId", serverId).eq("userId", userId))
+      .withIndex("by_server_user", (q) =>
+        q.eq("serverId", serverId).eq("userId", userId),
+      )
       .unique();
     if (!target) throw new Error("That person isn't a member.");
     const myTop = await topPosition(ctx, access.server, access.member);
@@ -1151,7 +1228,9 @@ export const ban = mutation({
     await ctx.db.delete(target._id);
     const existing = await ctx.db
       .query("bans")
-      .withIndex("by_server_user", (q) => q.eq("serverId", serverId).eq("userId", userId))
+      .withIndex("by_server_user", (q) =>
+        q.eq("serverId", serverId).eq("userId", userId),
+      )
       .unique();
     if (!existing) {
       await ctx.db.insert("bans", {
@@ -1190,7 +1269,9 @@ export const unban = mutation({
     }
     const existing = await ctx.db
       .query("bans")
-      .withIndex("by_server_user", (q) => q.eq("serverId", serverId).eq("userId", userId))
+      .withIndex("by_server_user", (q) =>
+        q.eq("serverId", serverId).eq("userId", userId),
+      )
       .unique();
     if (existing) await ctx.db.delete(existing._id);
     await logAudit(ctx, {
@@ -1241,7 +1322,9 @@ export const setNickname = mutation({
     }
     const membership = await ctx.db
       .query("serverMembers")
-      .withIndex("by_server_user", (q) => q.eq("serverId", serverId).eq("userId", userId))
+      .withIndex("by_server_user", (q) =>
+        q.eq("serverId", serverId).eq("userId", userId),
+      )
       .unique();
     if (!membership) throw new Error("That person isn't a member.");
     await ctx.db.patch(membership._id, {
@@ -1256,7 +1339,9 @@ export const setMuted = mutation({
     const { id } = await requireUser(ctx);
     const membership = await ctx.db
       .query("serverMembers")
-      .withIndex("by_server_user", (q) => q.eq("serverId", serverId).eq("userId", id))
+      .withIndex("by_server_user", (q) =>
+        q.eq("serverId", serverId).eq("userId", id),
+      )
       .unique();
     if (!membership) throw new Error("You're not a member of that community.");
     await ctx.db.patch(membership._id, { muted });
@@ -1277,7 +1362,9 @@ export const updateMemberRoles = mutation({
     }
     const target = await ctx.db
       .query("serverMembers")
-      .withIndex("by_server_user", (q) => q.eq("serverId", serverId).eq("userId", userId))
+      .withIndex("by_server_user", (q) =>
+        q.eq("serverId", serverId).eq("userId", userId),
+      )
       .unique();
     if (!target) throw new Error("That person isn't a member.");
     const myTop = await topPosition(ctx, access.server, access.member);
@@ -1290,9 +1377,14 @@ export const updateMemberRoles = mutation({
       .withIndex("by_server", (q) => q.eq("serverId", serverId))
       .collect();
     const valid = new Set(serverRoles.map((role) => role._id));
-    const cleaned = Array.from(new Set(roleIds)).filter((roleId) => valid.has(roleId));
+    const cleaned = Array.from(new Set(roleIds)).filter((roleId) =>
+      valid.has(roleId),
+    );
     const highestAssignable = cleaned
-      .map((roleId) => serverRoles.find((role) => role._id === roleId)?.position ?? 0)
+      .map(
+        (roleId) =>
+          serverRoles.find((role) => role._id === roleId)?.position ?? 0,
+      )
       .reduce((max, position) => Math.max(max, position), 0);
     if (highestAssignable >= myTop && access.server.ownerId !== id) {
       throw new Error("You can't grant a role as high as your own.");
@@ -1378,7 +1470,10 @@ export const revokeInvite = mutation({
     const invite = await ctx.db.get(inviteId);
     if (!invite) throw new Error("That invite doesn't exist.");
     const access = await requireServerAccess(ctx, invite.serverId, id);
-    if (invite.creatorId !== id && !can(access.permissions, PERMISSIONS.MANAGE_SERVER)) {
+    if (
+      invite.creatorId !== id &&
+      !can(access.permissions, PERMISSIONS.MANAGE_SERVER)
+    ) {
       throw new Error("You can't revoke that invite.");
     }
     await ctx.db.patch(inviteId, { revoked: true });
@@ -1450,6 +1545,9 @@ export const joinByCode = mutation({
       )
       .unique();
     if (!existing) {
+      if (server.applyToJoin === true && !invite) {
+        throw new Error("This community requires an application to join.");
+      }
       await ctx.db.insert("serverMembers", {
         serverId: server._id,
         userId: id,

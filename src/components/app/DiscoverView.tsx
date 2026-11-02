@@ -19,6 +19,7 @@ type Discovery = {
   onlineCount: number;
   createdAt: number;
   isJoined: boolean;
+  applyToJoin: boolean;
 };
 
 /**
@@ -68,7 +69,9 @@ export function DiscoverView() {
           <div className="flex flex-col items-center gap-2 py-16 text-center">
             <Compass className="size-8 text-muted-foreground" />
             <p className="text-sm font-medium">
-              {debounced ? `Nothing matches “${debounced}”.` : "No public servers yet."}
+              {debounced
+                ? `Nothing matches “${debounced}”.`
+                : "No public servers yet."}
             </p>
             <p className="max-w-sm text-sm text-muted-foreground">
               {debounced
@@ -79,7 +82,11 @@ export function DiscoverView() {
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {results.map((server) => (
-              <ServerCard key={server.id} server={server} onOpen={(id) => navigate(`/dashboard/s/${id}`)} />
+              <ServerCard
+                key={server.id}
+                server={server}
+                onOpen={(id) => navigate(`/dashboard/s/${id}`)}
+              />
             ))}
           </div>
         )}
@@ -100,6 +107,12 @@ function ServerCard({
 
   const joinNow = async () => {
     if (busy) return;
+    // Reviewed communities open their application form instead of joining
+    // immediately; the route renders the form behind MembershipGate.
+    if (server.applyToJoin) {
+      onOpen(server.id);
+      return;
+    }
     setBusy(true);
     try {
       await join({ serverId: server.id as Id<"servers"> });
@@ -120,11 +133,19 @@ function ServerCard({
     <article className="group flex flex-col overflow-hidden rounded-xl border border-border/70 bg-panel transition-colors hover:border-border">
       <div className="relative h-20 bg-gradient-to-br from-brand/70 to-cyan/70">
         {server.bannerUrl && (
-          <img src={server.bannerUrl} alt="" className="size-full object-cover" />
+          <img
+            src={server.bannerUrl}
+            alt=""
+            className="size-full object-cover"
+          />
         )}
         <div className="absolute -bottom-5 left-4 flex size-12 items-center justify-center overflow-hidden rounded-xl border-2 border-panel bg-gradient-to-br from-brand to-cyan text-xs font-bold text-white shadow-md">
           {server.iconUrl ? (
-            <img src={server.iconUrl} alt="" className="size-full object-cover" />
+            <img
+              src={server.iconUrl}
+              alt=""
+              className="size-full object-cover"
+            />
           ) : (
             server.name.slice(0, 2).toUpperCase()
           )}
@@ -174,9 +195,14 @@ function ServerCard({
             Open
           </Button>
         ) : (
-          <Button size="sm" className="mt-3 w-full" onClick={() => void joinNow()} disabled={busy}>
+          <Button
+            size="sm"
+            className="mt-3 w-full"
+            onClick={() => void joinNow()}
+            disabled={busy}
+          >
             {busy && <Loader2 className="mr-1.5 size-4 animate-spin" />}
-            Join server
+            {server.applyToJoin ? "Apply to join" : "Join server"}
           </Button>
         )}
       </div>

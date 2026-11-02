@@ -304,6 +304,11 @@ export function SearchOverlay({
                   <Button
                     size="sm"
                     onClick={() => {
+                      if (server.applyToJoin) {
+                        navigate(`/dashboard/s/${server.id}`);
+                        close();
+                        return;
+                      }
                       void joinServer({ serverId: server.id as Id<"servers"> })
                         .then(() => {
                           navigate(`/dashboard/s/${server.id}`);
@@ -318,7 +323,7 @@ export function SearchOverlay({
                         );
                     }}
                   >
-                    Join
+                    {server.applyToJoin ? "Apply" : "Join"}
                   </Button>
                 </div>
               ))}
