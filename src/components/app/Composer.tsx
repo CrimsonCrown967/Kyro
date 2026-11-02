@@ -156,7 +156,7 @@ export function Composer({
         ? crypto.randomUUID()
         : `${Date.now()}-${Math.random()}`;
     try {
-      await sendMessage({
+      const result = await sendMessage({
         containerType,
         containerId,
         content,
@@ -164,6 +164,10 @@ export function Composer({
         replyToId: reply?.id as Id<"messages"> | undefined,
         attachments: attachments.length > 0 ? attachments : undefined,
       });
+      if (result.blocked) {
+        toast.error(result.blocked);
+        return;
+      }
       setDraft(draftKey, "");
       setMentionQuery(null);
       setAttachments([]);

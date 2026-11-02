@@ -47,6 +47,10 @@ export function PollComposerDialog({
         content: `📊 ${question.trim()}`,
         clientId: crypto.randomUUID(),
       });
+      if (result.blocked || !result.messageId) {
+        toast.error(result.blocked ?? "AutoMod stopped this poll.");
+        return;
+      }
       await attach({
         messageId: result.messageId as Id<"messages">,
         question,

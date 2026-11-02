@@ -307,4 +307,12 @@ export async function recordAutomodEvent(
     excerpt: args.content.slice(0, 200),
     createdAt: Date.now(),
   });
+  await logAudit(ctx, {
+    serverId: args.serverId,
+    actorId: args.userId,
+    action: "automod.blocked",
+    targetType: "channel",
+    targetId: args.channelId,
+    details: `${args.rule}: ${args.content.slice(0, 120)}`,
+  });
 }

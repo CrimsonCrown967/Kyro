@@ -453,7 +453,7 @@ export const send = mutation({
         ) {
           throw new Error("That message identifier is already in use.");
         }
-        return { messageId: existing._id, deduped: true };
+        return { messageId: existing._id, deduped: true, blocked: null };
       }
     }
 
@@ -561,7 +561,15 @@ export const send = mutation({
           rule: automod.rule,
           content,
         });
-        throw new Error(automod.reason);
+        // Do not throw here: Convex rolls back every write in a mutation that
+        // throws, including the AutoMod activity row above. Returning the
+        // block result commits the event while still keeping the message out
+        // of the channel.
+        return {
+          messageId: null,
+          deduped: false,
+          blocked: automod.reason,
+        };
       }
     } else {
       dmConversation = access.conversation;
@@ -841,7 +849,7 @@ export const send = mutation({
       }
     }
 
-    return { messageId, deduped: false };
+    return { messageId, deduped: false, blocked: null };
   },
 });
 

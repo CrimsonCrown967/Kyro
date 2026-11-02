@@ -1,6 +1,6 @@
 import { useConvex, useMutation, useQuery } from "convex/react";
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -76,6 +76,28 @@ type TabId =
   | "audit"
   | "danger";
 
+const SETTINGS_TABS: readonly TabId[] = [
+  "overview",
+  "theme",
+  "channels",
+  "roles",
+  "emojis",
+  "members",
+  "invites",
+  "bans",
+  "reports",
+  "audit",
+  "danger",
+];
+
+function settingsTabFromPath(pathname: string): TabId {
+  const parts = pathname.split("/").filter(Boolean);
+  const segment = parts[parts.length - 1] ?? "";
+  return SETTINGS_TABS.includes(segment as TabId)
+    ? (segment as TabId)
+    : "overview";
+}
+
 /**
  * Server settings (`/dashboard/s/:id/settings/*`). Every tab hits the real
  * backend: overview edits, icon/banner uploads, roles with permissions,
@@ -91,12 +113,12 @@ export function ServerSettings({ serverId }: { serverId: string }) {
   const setVanity = useMutation(api.servers.setVanity);
   const setLocked = useMutation(api.servers.setLocked);
   const navigate = useNavigate();
+  const location = useLocation();
   const channels = useQuery(api.channels.list, {
     serverId: serverId as Id<"servers">,
   });
   const upload = useUploadFile();
 
-  const [tab, setTab] = useState<TabId>("overview");
   const [form, setForm] = useState({
     name: "",
     description: "",
@@ -201,9 +223,13 @@ export function ServerSettings({ serverId }: { serverId: string }) {
     },
   ];
   const visibleTabs = TABS.filter((entry) => entry.show);
-  const activeTab = visibleTabs.some((entry) => entry.id === tab)
-    ? tab
+  const requestedTab = settingsTabFromPath(location.pathname);
+  const activeTab = visibleTabs.some((entry) => entry.id === requestedTab)
+    ? requestedTab
     : (visibleTabs[0]?.id ?? "overview");
+  const openTab = (nextTab: TabId) => {
+    navigate(`/dashboard/s/${serverId}/settings/${nextTab}`);
+  };
 
   const save = async () => {
     if (saving) return;
@@ -517,7 +543,7 @@ export function ServerSettings({ serverId }: { serverId: string }) {
                 <button
                   key={entry.id}
                   type="button"
-                  onClick={() => setTab(entry.id)}
+                  onClick={() => openTab(entry.id)}
                   className={cn(
                     "relative flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm transition-colors",
                     active
@@ -570,7 +596,7 @@ export function ServerSettings({ serverId }: { serverId: string }) {
                 <button
                   key={entry.id}
                   type="button"
-                  onClick={() => setTab(entry.id)}
+                  onClick={() => openTab(entry.id)}
                   className={cn(
                     "shrink-0 rounded-full border px-3 py-1.5 text-xs transition-colors",
                     activeTab === entry.id
@@ -604,14 +630,14 @@ export function ServerSettings({ serverId }: { serverId: string }) {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => setTab("invites")}
+                    onClick={() => openTab("invites")}
                   >
                     <Link2 className="mr-1.5 size-4" /> Invite people
                   </Button>
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => setTab("theme")}
+                    onClick={() => openTab("theme")}
                   >
                     <Palette className="mr-1.5 size-4" /> Appearance
                   </Button>
