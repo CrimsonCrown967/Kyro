@@ -8,6 +8,7 @@ import {
   securitySignInState,
 } from "../securityRefs";
 import { normalizeRecoveryCode, verifyTotp } from "../totp";
+import { verificationRequirementRef } from "../verificationRefs";
 
 function recoveryHash(userId: string, code: string) {
   return sha256Hex(`${userId}:${normalizeRecoveryCode(code)}`);
@@ -49,6 +50,12 @@ export function PasswordWithTwoFactor() {
         userId = retrieved.user._id;
       } else {
         throw new Error("Unsupported password flow.");
+      }
+
+      if (await ctx.runQuery(verificationRequirementRef, { userId })) {
+        throw new Error(
+          "EMAIL_VERIFICATION_REQUIRED: Verify your email before signing in.",
+        );
       }
 
       const security = await ctx.runQuery(securitySignInState, { userId });

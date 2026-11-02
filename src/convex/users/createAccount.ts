@@ -7,6 +7,8 @@ import {
   normalizeUsername,
   USERNAME_PATTERN,
 } from "../lib";
+import { generateSixDigitCode } from "../verificationCodes";
+import { prepareEmailVerificationRef } from "../verificationRefs";
 
 /**
  * Registration for Kyro: email + password, no email verification code.
@@ -51,6 +53,13 @@ export const createAccount = action({
     name: v.optional(v.string()),
   },
   handler: async (ctx, { email, password, username, name }) => {
+    const verificationRequired =
+      process.env.KYRO_EMAIL_VERIFICATION_ENABLED === "true";
+    // Generate before creating anything so an unavailable CSPRNG cannot leave
+    // behind an account that has no possible verification code.
+    const verificationCode = verificationRequired
+      ? generateSixDigitCode()
+      : null;
     const handle = normalizeUsername(username);
     if (!USERNAME_PATTERN.test(handle)) {
       throw new Error(
@@ -103,6 +112,7 @@ export const createAccount = action({
         dmPolicy: "everyone",
         allowFriendRequests: true,
         showPresence: true,
+        requiresEmailVerification: verificationRequired || undefined,
       },
       shouldLinkViaEmail: false,
       shouldLinkViaPhone: false,
@@ -113,6 +123,26 @@ export const createAccount = action({
       userId: user._id,
     });
 
-    return user._id;
+    let verificationQueued = false;
+    if (verificationRequired && verificationCode) {
+      verificationQueued = true;
+      try {
+        await ctx.runMutation(prepareEmailVerificationRef, {
+          userId: user._id,
+          email: normalizedEmail,
+          code: verificationCode,
+        });
+      } catch {
+        // Account creation remains valid. The verification screen offers a safe
+        // resend once email delivery is configured or recovers.
+        verificationQueued = false;
+      }
+    }
+
+    return {
+      userId: user._id,
+      verificationRequired,
+      verificationQueued,
+    };
   },
 });

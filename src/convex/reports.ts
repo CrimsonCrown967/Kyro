@@ -12,6 +12,7 @@ import {
   requireServerAccess,
   requireUser,
 } from "./lib";
+import { enqueueUserEmail } from "./emailOutbox";
 
 export const create = mutation({
   args: {
@@ -208,10 +209,12 @@ export const resolve = mutation({
       }
       if (targetId !== id) {
         const now = Date.now();
-        await ctx.db.insert("warnings", {
+        const warningReason =
+          resolution?.trim().slice(0, 300) || "Broke a Kyro rule.";
+        const warningId = await ctx.db.insert("warnings", {
           userId: targetId,
           issuedById: id,
-          reason: resolution?.trim().slice(0, 300) || "Broke a Kyro rule.",
+          reason: warningReason,
           createdAt: now,
           expiresAt: now + 3 * 24 * 60 * 60 * 1000,
         });
@@ -221,6 +224,22 @@ export const resolve = mutation({
           title: "You received a warning from Kyro staff",
           body: resolution?.slice(0, 200),
           actorId: id,
+        });
+        const server = report.serverId
+          ? await ctx.db.get(report.serverId)
+          : null;
+        await enqueueUserEmail(ctx, {
+          eventKey: `warning:${warningId}:report`,
+          userId: targetId,
+          template: "warning",
+          payload: {
+            reason: report.reason,
+            explanation: warningReason,
+            actionAt: now,
+            rules:
+              server?.rules?.trim() ||
+              "Review Kyro's Terms and Community Guidelines.",
+          },
         });
       }
     }

@@ -1006,6 +1006,8 @@ export const deleteAccount = mutation({
       passkeys,
       targetCases,
       moderatorCases,
+      emailOutbox,
+      verificationCodes,
     ] = await Promise.all([
       ctx.db
         .query("serverMembers")
@@ -1055,6 +1057,14 @@ export const deleteAccount = mutation({
         .query("moderationCases")
         .withIndex("by_moderator", (q) => q.eq("moderatorId", id))
         .collect(),
+      ctx.db
+        .query("emailOutbox")
+        .withIndex("by_user", (q) => q.eq("userId", id))
+        .collect(),
+      ctx.db
+        .query("emailVerificationCodes")
+        .withIndex("by_user", (q) => q.eq("userId", id))
+        .collect(),
     ]);
 
     for (const membership of memberships) await ctx.db.delete(membership._id);
@@ -1069,6 +1079,32 @@ export const deleteAccount = mutation({
     for (const block of blocks) await ctx.db.delete(block._id);
     for (const row of securityRows) await ctx.db.delete(row._id);
     for (const passkey of passkeys) await ctx.db.delete(passkey._id);
+    for (const email of emailOutbox) await ctx.db.delete(email._id);
+    for (const code of verificationCodes) await ctx.db.delete(code._id);
+    if (user.email) {
+      const [verificationRequests, resetCodes, resetRequests] =
+        await Promise.all([
+          ctx.db
+            .query("emailVerificationRequests")
+            .withIndex("by_email", (q) => q.eq("email", user.email!))
+            .collect(),
+          ctx.db
+            .query("passwordResetCodes")
+            .withIndex("by_email", (q) => q.eq("email", user.email!))
+            .collect(),
+          ctx.db
+            .query("passwordResetRequests")
+            .withIndex("by_email", (q) => q.eq("email", user.email!))
+            .collect(),
+        ]);
+      for (const row of [
+        ...verificationRequests,
+        ...resetCodes,
+        ...resetRequests,
+      ]) {
+        await ctx.db.delete(row._id);
+      }
+    }
     const caseIds = new Set(
       [...targetCases, ...moderatorCases].map((row) => row._id),
     );

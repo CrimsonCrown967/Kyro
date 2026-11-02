@@ -116,6 +116,8 @@ const schema = defineSchema(
       usernameChangedAt: v.optional(v.number()),
       /** Email changes are limited to once every seven days. */
       emailChangedAt: v.optional(v.number()),
+      /** New accounts must verify their address before the first sign-in. */
+      requiresEmailVerification: v.optional(v.boolean()),
       /** External profile links (YouTube, site, portfolio …), max 6. */
       links: v.optional(
         v.array(v.object({ label: v.string(), url: v.string() })),
@@ -603,6 +605,40 @@ const schema = defineSchema(
       .index("by_container", ["containerKey"])
       .index("by_actor", ["actorId"]),
 
+    /** Durable transactional-email outbox. SMTP credentials never enter Convex. */
+    emailOutbox: defineTable({
+      eventKey: v.string(),
+      userId: v.optional(v.id("users")),
+      to: v.string(),
+      template: v.union(
+        v.literal("password_reset"),
+        v.literal("email_verification"),
+        v.literal("temporary_ban"),
+        v.literal("permanent_ban"),
+        v.literal("warning"),
+        v.literal("restoration"),
+      ),
+      payload: v.string(),
+      status: v.union(
+        v.literal("pending"),
+        v.literal("sending"),
+        v.literal("sent"),
+        v.literal("failed"),
+        v.literal("dead"),
+      ),
+      attempts: v.number(),
+      nextAttemptAt: v.number(),
+      lockedAt: v.optional(v.number()),
+      providerMessageId: v.optional(v.string()),
+      lastErrorCode: v.optional(v.string()),
+      createdAt: v.number(),
+      updatedAt: v.number(),
+      sentAt: v.optional(v.number()),
+    })
+      .index("by_event_key", ["eventKey"])
+      .index("by_status_next", ["status", "nextAttemptAt"])
+      .index("by_user", ["userId", "createdAt"]),
+
     reports: defineTable({
       reporterId: v.id("users"),
       reportedUserId: v.optional(v.id("users")),
@@ -737,6 +773,27 @@ const schema = defineSchema(
     /** One-hour request history; kept separately so replacing a code does not
      * accidentally reset the hourly email throttle. */
     passwordResetRequests: defineTable({
+      email: v.string(),
+      createdAt: v.number(),
+    })
+      .index("by_email", ["email", "createdAt"])
+      .index("by_created", ["createdAt"]),
+
+    /** One-time codes for verifying a newly registered email address. */
+    emailVerificationCodes: defineTable({
+      userId: v.id("users"),
+      email: v.string(),
+      codeHash: v.string(),
+      attempts: v.number(),
+      expiresAt: v.number(),
+      createdAt: v.number(),
+    })
+      .index("by_user", ["userId"])
+      .index("by_email", ["email"])
+      .index("by_expiry", ["expiresAt"]),
+
+    /** Separate request history keeps resend throttles after code replacement. */
+    emailVerificationRequests: defineTable({
       email: v.string(),
       createdAt: v.number(),
     })

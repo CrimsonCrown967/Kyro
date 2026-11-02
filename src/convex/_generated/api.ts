@@ -21,6 +21,12 @@ import type * as bugReports from "../bugReports.js";
 import type * as channels from "../channels.js";
 import type * as cleanup from "../cleanup.js";
 import type * as conversations from "../conversations.js";
+import type * as crons from "../crons.js";
+import type * as emailDelivery from "../emailDelivery.js";
+import type * as emailOutbox from "../emailOutbox.js";
+import type * as emailRefs from "../emailRefs.js";
+import type * as emailVerification from "../emailVerification.js";
+import type * as emailVerificationInternal from "../emailVerificationInternal.js";
 import type * as emojis from "../emojis.js";
 import type * as files from "../files.js";
 import type * as forums from "../forums.js";
@@ -32,6 +38,7 @@ import type * as messages from "../messages.js";
 import type * as moderation from "../moderation.js";
 import type * as notifications from "../notifications.js";
 import type * as passwordReset from "../passwordReset.js";
+import type * as passwordResetInternal from "../passwordResetInternal.js";
 import type * as platformStats from "../platformStats.js";
 import type * as polls from "../polls.js";
 import type * as reports from "../reports.js";
@@ -53,6 +60,8 @@ import type * as users_changeEmailInternal from "../users/changeEmailInternal.js
 import type * as users_changePassword from "../users/changePassword.js";
 import type * as users_createAccount from "../users/createAccount.js";
 import type * as users_lib from "../users/lib.js";
+import type * as verificationCodes from "../verificationCodes.js";
+import type * as verificationRefs from "../verificationRefs.js";
 import type * as voice from "../voice.js";
 import type * as warnings from "../warnings.js";
 
@@ -68,6 +77,12 @@ const fullApi: ApiFromModules<{
   "channels": typeof channels,
   "cleanup": typeof cleanup,
   "conversations": typeof conversations,
+  "crons": typeof crons,
+  "emailDelivery": typeof emailDelivery,
+  "emailOutbox": typeof emailOutbox,
+  "emailRefs": typeof emailRefs,
+  "emailVerification": typeof emailVerification,
+  "emailVerificationInternal": typeof emailVerificationInternal,
   "emojis": typeof emojis,
   "files": typeof files,
   "forums": typeof forums,
@@ -79,6 +94,7 @@ const fullApi: ApiFromModules<{
   "moderation": typeof moderation,
   "notifications": typeof notifications,
   "passwordReset": typeof passwordReset,
+  "passwordResetInternal": typeof passwordResetInternal,
   "platformStats": typeof platformStats,
   "polls": typeof polls,
   "reports": typeof reports,
@@ -100,6 +116,8 @@ const fullApi: ApiFromModules<{
   "users/changePassword": typeof users_changePassword,
   "users/createAccount": typeof users_createAccount,
   "users/lib": typeof users_lib,
+  "verificationCodes": typeof verificationCodes,
+  "verificationRefs": typeof verificationRefs,
   "voice": typeof voice,
   "warnings": typeof warnings,
 }> = anyApi as any;

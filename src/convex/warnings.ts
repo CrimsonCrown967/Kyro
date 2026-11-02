@@ -1,11 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import {
-  isFounderUser,
-  notify,
-  requireActiveUser,
-  requireUser,
-} from "./lib";
+import { isFounderUser, notify, requireActiveUser, requireUser } from "./lib";
+import { enqueueUserEmail } from "./emailOutbox";
 
 /** Warnings last 3 days, exactly like the account-standing copy says. */
 const WARNING_LIFETIME_MS = 3 * 24 * 60 * 60 * 1000;
@@ -40,7 +36,7 @@ export const warn = mutation({
       throw new Error("Say why — at least a few characters.");
     }
     const now = Date.now();
-    await ctx.db.insert("warnings", {
+    const warningId = await ctx.db.insert("warnings", {
       userId,
       issuedById: id,
       reason: clean,
@@ -54,8 +50,21 @@ export const warn = mutation({
       body: clean,
       actorId: id,
     });
+    await enqueueUserEmail(ctx, {
+      eventKey: `warning:${warningId}:created`,
+      userId,
+      template: "warning",
+      payload: {
+        reason: clean,
+        explanation: clean,
+        actionAt: now,
+        rules: "Review Kyro's Terms and Community Guidelines.",
+      },
+    });
   },
-});/** My active warnings and the standing they add up to, for the account page. */
+});
+
+/** My active warnings and the standing they add up to, for the account page. */
 export const mine = query({
   args: {},
   handler: async (ctx) => {

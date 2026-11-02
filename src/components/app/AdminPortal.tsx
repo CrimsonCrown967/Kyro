@@ -11,6 +11,7 @@ import {
   Clock,
   Hash,
   Loader2,
+  Mail,
   Search,
   Shield,
   ShieldAlert,
@@ -42,6 +43,7 @@ type AdminTab =
   | "bugs"
   | "bans"
   | "warnings"
+  | "email"
   | "activity";
 
 const TABS: { id: AdminTab; label: string; icon: typeof ShieldCheck }[] = [
@@ -51,6 +53,7 @@ const TABS: { id: AdminTab; label: string; icon: typeof ShieldCheck }[] = [
   { id: "bugs", label: "Bugs", icon: Wrench },
   { id: "bans", label: "Bans", icon: Ban },
   { id: "warnings", label: "Warnings", icon: ShieldAlert },
+  { id: "email", label: "Email", icon: Mail },
   { id: "activity", label: "Activity", icon: Clock },
 ];
 
@@ -234,8 +237,84 @@ export function AdminPortal() {
         )}
         {tab === "bans" && <BansTab />}
         {tab === "warnings" && <WarningsTab />}
+        {tab === "email" && <EmailDeliveryTab />}
         {tab === "activity" && <ActivityTab />}
       </div>
+    </div>
+  );
+}
+
+function EmailDeliveryTab() {
+  const failures = useQuery(api.emailOutbox.failures);
+  const retry = useMutation(api.emailOutbox.retry);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-lg font-semibold">Email delivery</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Failed SMTP deliveries are retained without exposing message content
+          or recipient addresses. Retrying reuses the same event id, preventing
+          duplicate moderation notifications.
+        </p>
+      </div>
+      {failures === undefined ? (
+        <Loading />
+      ) : failures.length === 0 ? (
+        <Empty text="No failed transactional emails." />
+      ) : (
+        <div className="space-y-2">
+          {failures.map((failure) => (
+            <div
+              key={failure.id}
+              className="flex flex-wrap items-center gap-3 rounded-xl border border-border/70 bg-panel p-3"
+            >
+              <span className="flex size-9 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
+                <Mail className="size-4" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold">
+                  {failure.template.replace(/_/g, " ")}
+                </p>
+                <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                  {failure.eventKey} · {failure.lastErrorCode} ·{" "}
+                  {failure.attempts} attempt{failure.attempts === 1 ? "" : "s"}{" "}
+                  · {timeAgo(failure.updatedAt)}
+                </p>
+              </div>
+              <span className="rounded-full border border-destructive/30 bg-destructive/10 px-2 py-0.5 text-[10px] font-bold uppercase text-destructive">
+                {failure.status}
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={busyId !== null}
+                onClick={() => {
+                  setBusyId(failure.id);
+                  void retry({
+                    outboxId: failure.id as Id<"emailOutbox">,
+                  })
+                    .then(() => toast.success("Email queued for retry."))
+                    .catch((error) =>
+                      toast.error(
+                        error instanceof Error
+                          ? error.message
+                          : "Could not retry that email.",
+                      ),
+                    )
+                    .finally(() => setBusyId(null));
+                }}
+              >
+                {busyId === failure.id && (
+                  <Loader2 className="mr-1.5 size-3.5 animate-spin" />
+                )}
+                Retry
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

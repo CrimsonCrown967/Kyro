@@ -11,6 +11,7 @@ import {
   requireUser,
   type Ctx,
 } from "./lib";
+import { enqueueUserEmail } from "./emailOutbox";
 import { deleteMessageData, deleteServerData } from "./cleanup";
 
 /**
@@ -121,25 +122,17 @@ export const overview = query({
       return { allowed: false as const };
     }
 
-    const [
-      users,
-      servers,
-      messages,
-      reports,
-      bugs,
-      bans,
-      warnings,
-      actions,
-    ] = await Promise.all([
-      ctx.db.query("users").take(2000),
-      ctx.db.query("servers").take(1000),
-      ctx.db.query("messages").take(5000),
-      ctx.db.query("reports").take(500),
-      ctx.db.query("bugReports").order("desc").take(BUG_LIST_LIMIT),
-      ctx.db.query("siteBans").take(500),
-      ctx.db.query("warnings").take(500),
-      ctx.db.query("adminActions").order("desc").take(12),
-    ]);
+    const [users, servers, messages, reports, bugs, bans, warnings, actions] =
+      await Promise.all([
+        ctx.db.query("users").take(2000),
+        ctx.db.query("servers").take(1000),
+        ctx.db.query("messages").take(5000),
+        ctx.db.query("reports").take(500),
+        ctx.db.query("bugReports").order("desc").take(BUG_LIST_LIMIT),
+        ctx.db.query("siteBans").take(500),
+        ctx.db.query("warnings").take(500),
+        ctx.db.query("adminActions").order("desc").take(12),
+      ]);
 
     const now = Date.now();
     const activeBans = bans.filter(
@@ -147,7 +140,9 @@ export const overview = query({
         ban.liftedAt === undefined &&
         (ban.expiresAt === undefined || ban.expiresAt > now),
     );
-    const activeWarnings = warnings.filter((warning) => warning.expiresAt > now);
+    const activeWarnings = warnings.filter(
+      (warning) => warning.expiresAt > now,
+    );
     const actors = await hydrateUsers(
       ctx,
       actions.map((action) => action.actorId),
@@ -368,9 +363,12 @@ export const banUser = mutation({
       throw new Error("That account is already banned.");
     }
     const now = Date.now();
-    const expiresAt =
-      days && days > 0 ? now + Math.min(days, 365) * 24 * 60 * 60 * 1000 : undefined;
-    await ctx.db.insert("siteBans", {
+    const durationDays =
+      days && days > 0 ? Math.min(Math.ceil(days), 365) : null;
+    const expiresAt = durationDays
+      ? now + durationDays * 24 * 60 * 60 * 1000
+      : undefined;
+    const banId = await ctx.db.insert("siteBans", {
       userId,
       bannedById: id,
       reason: clean,
@@ -387,9 +385,24 @@ export const banUser = mutation({
     await notify(ctx, {
       userId,
       type: "moderation",
-      title: expiresAt ? "Your Kyro account was suspended" : "Your Kyro account was banned",
+      title: expiresAt
+        ? "Your Kyro account was suspended"
+        : "Your Kyro account was banned",
       body: clean,
       actorId: id,
+    });
+    await enqueueUserEmail(ctx, {
+      eventKey: `siteban:${banId}:created`,
+      userId,
+      template: expiresAt ? "temporary_ban" : "permanent_ban",
+      payload: {
+        reason: clean,
+        duration: durationDays
+          ? `${durationDays} day${durationDays === 1 ? "" : "s"}`
+          : "Permanent",
+        expiresAt,
+        actionAt: now,
+      },
     });
   },
 });
@@ -401,11 +414,14 @@ export const unbanUser = mutation({
     const { id } = await requireStaff(ctx);
     const ban = await ctx.db.get(banId);
     if (!ban) throw new Error("That ban no longer exists.");
-    if (ban.liftedAt !== undefined) throw new Error("That ban is already lifted.");
+    if (ban.liftedAt !== undefined)
+      throw new Error("That ban is already lifted.");
+    const liftedAt = Date.now();
+    const cleanReason = reason?.trim().slice(0, 300) || undefined;
     await ctx.db.patch(banId, {
-      liftedAt: Date.now(),
+      liftedAt,
       liftedById: id,
-      liftReason: reason?.trim().slice(0, 300) || undefined,
+      liftReason: cleanReason,
     });
     await logAction(ctx, {
       actorId: id,
@@ -420,6 +436,15 @@ export const unbanUser = mutation({
       title: "Your Kyro ban was lifted",
       body: reason?.trim().slice(0, 200),
       actorId: id,
+    });
+    await enqueueUserEmail(ctx, {
+      eventKey: `siteban:${banId}:restored`,
+      userId: ban.userId,
+      template: "restoration",
+      payload: {
+        reason: cleanReason ?? "Kyro staff removed the account restriction.",
+        actionAt: liftedAt,
+      },
     });
   },
 });

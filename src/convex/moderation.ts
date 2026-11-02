@@ -11,6 +11,7 @@ import {
   requireUser,
   type Ctx,
 } from "./lib";
+import { enqueueUserEmail } from "./emailOutbox";
 
 const ALLOWED_TIMEOUT_MINUTES = new Set([5, 10, 60, 1440, 10080]);
 
@@ -155,6 +156,21 @@ export const create = mutation({
         actorId: id,
         link: `/dashboard/s/${args.serverId}`,
         containerKey: `moderation:${args.serverId}`,
+      });
+    }
+    if (args.action === "warning") {
+      await enqueueUserEmail(ctx, {
+        eventKey: `moderation-case:${caseId}:warning`,
+        userId: args.userId,
+        template: "warning",
+        payload: {
+          reason,
+          explanation: reason,
+          actionAt: now,
+          rules:
+            access.server.rules?.trim() ||
+            `Review the rules for ${access.server.name} and Kyro's Terms.`,
+        },
       });
     }
     return caseId;

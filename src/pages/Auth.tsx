@@ -43,7 +43,7 @@ function resolveRedirectAfterAuth(
   return fallback;
 }
 
-type Step = "signIn" | "register" | "forgot" | "reset";
+type Step = "signIn" | "register" | "verifyEmail" | "forgot" | "reset";
 
 function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
   const { isLoading: authLoading, isAuthenticated, signIn } = useAuth();
@@ -62,6 +62,10 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
   const claimProfile = useMutation(api.users.claimProfile);
   const requestCodeAction = useAction(api.passwordReset.requestCode);
   const resetPasswordAction = useAction(api.passwordReset.resetPassword);
+  const requestVerificationAction = useAction(
+    api.emailVerification.requestCode,
+  );
+  const verifyEmailAction = useAction(api.emailVerification.verifyCode);
   const [step, setStep] = React.useState<Step>("signIn");
   const [email, setEmail] = React.useState(
     () => searchParams.get("email")?.trim().toLowerCase() ?? "",
@@ -81,6 +85,7 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
   const [newPassword, setNewPassword] = React.useState("");
   const [confirmNewPassword, setConfirmNewPassword] = React.useState("");
   const [showNewPassword, setShowNewPassword] = React.useState(false);
+  const [verificationCode, setVerificationCode] = React.useState("");
 
   React.useEffect(() => {
     if (!authLoading && isAuthenticated) {
@@ -123,6 +128,10 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
       } else if (message.includes("INVALID_TWO_FACTOR_CODE")) {
         setTwoFactorRequired(true);
         setError("That authenticator or recovery code isn't valid.");
+      } else if (message.includes("EMAIL_VERIFICATION_REQUIRED")) {
+        setVerificationCode("");
+        setStep("verifyEmail");
+        setError("Verify your email to finish signing in.");
       } else {
         console.error("Password sign-in error:", err);
         setError("That email and password combination didn't work.");
@@ -158,12 +167,35 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
       }
 
       try {
-        await createAccountAction({
+        const created = await createAccountAction({
           email: normalizedEmail,
           password,
           username: handle,
           name: displayNameValue,
         });
+        if (created.verificationRequired) {
+          setVerificationCode("");
+          setStep("verifyEmail");
+          toast.success(
+            created.verificationQueued
+              ? "Account created — check your email for the verification code."
+              : "Account created. Use Resend code to request verification email delivery.",
+          );
+          return;
+        }
+        await signIn("password", {
+          flow: "signIn",
+          email: normalizedEmail,
+          password,
+        });
+        rememberAccount({
+          email: normalizedEmail,
+          name: displayNameValue,
+          username: handle,
+        });
+        toast.success("Account created — welcome to Kyro!");
+        navigate(redirect);
+        return;
       } catch (createError) {
         const message =
           createError instanceof Error
@@ -199,19 +231,6 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
         navigate(redirect);
         return;
       }
-
-      await signIn("password", {
-        flow: "signIn",
-        email: normalizedEmail,
-        password,
-      });
-      rememberAccount({
-        email: normalizedEmail,
-        name: displayNameValue,
-        username: handle,
-      });
-      toast.success("Account created — welcome to Kyro!");
-      navigate(redirect);
     } catch (err) {
       setError(
         err instanceof Error
@@ -228,6 +247,7 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
     setError(null);
     setTwoFactorRequired(false);
     setTwoFactorCode("");
+    setVerificationCode("");
   };
 
   const startSignIn = () => {
@@ -235,6 +255,7 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
     setError(null);
     setTwoFactorRequired(false);
     setTwoFactorCode("");
+    setVerificationCode("");
   };
 
   const startForgotPassword = () => {
@@ -260,9 +281,7 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
       setConfirmNewPassword("");
       setStep("reset");
       toast.success(
-        result.sent
-          ? "Code sent — check your inbox."
-          : "If that email has a Kyro account, a code is on its way.",
+        "If that email has a Kyro account, a reset code will be sent shortly.",
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't send the code.");
@@ -274,6 +293,61 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
   const handleRequestCode = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     await sendResetCode();
+  };
+
+  const resendVerificationCode = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const result = await requestVerificationAction({
+        email: email.trim().toLowerCase(),
+      });
+      if (result.throttled) {
+        setError("Please wait before requesting another verification code.");
+        return;
+      }
+      toast.success(
+        "If this address is awaiting verification, a new code will be sent shortly.",
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Couldn't request another code.",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleVerifyEmail = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (verificationCode.length !== 6 || isLoading) return;
+    setIsLoading(true);
+    setError(null);
+    try {
+      const normalizedEmail = email.trim().toLowerCase();
+      await verifyEmailAction({
+        email: normalizedEmail,
+        code: verificationCode,
+      });
+      await signIn("password", {
+        flow: "signIn",
+        email: normalizedEmail,
+        password,
+      });
+      rememberAccount({
+        email: normalizedEmail,
+        name: displayName.trim() || username.trim() || undefined,
+        username: username.trim().toLowerCase() || undefined,
+      });
+      toast.success("Email verified — welcome to Kyro!");
+      navigate(redirect);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Could not verify that code.",
+      );
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   /** Step 2 of recovery: code + new password. Signs in on success. */
@@ -320,6 +394,10 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
           setTwoFactorRequired(true);
           setTwoFactorCode("");
           setError("Password changed. Enter your second factor to finish.");
+        } else if (message.includes("EMAIL_VERIFICATION_REQUIRED")) {
+          setVerificationCode("");
+          setStep("verifyEmail");
+          setError("Password changed. Verify your email to finish.");
         } else {
           setError("Password changed — sign in with your new password.");
         }
@@ -597,7 +675,7 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
               <CardHeader className="text-center -mt-6">
                 <CardTitle className="text-xl">Create your account</CardTitle>
                 <CardDescription>
-                  Pick a username and set a password — no email code needed.
+                  Pick a username and password, then verify your email once.
                 </CardDescription>
               </CardHeader>
               <form onSubmit={handleRegisterSubmit} className="space-y-4">
@@ -723,6 +801,76 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
                 </div>
               </form>
             </>
+          ) : step === "verifyEmail" ? (
+            <form onSubmit={handleVerifyEmail} className="space-y-4">
+              <CardHeader className="text-center -mt-6">
+                <CardTitle className="text-xl">Verify your email</CardTitle>
+                <CardDescription>
+                  Enter the 6-digit code sent to{" "}
+                  <span className="font-medium text-foreground">{email}</span>.
+                  It expires in 10 minutes and works once.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label htmlFor="verification-code">Verification code</Label>
+                  <Input
+                    id="verification-code"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={6}
+                    placeholder="123456"
+                    className="text-center text-lg font-semibold tracking-[0.4em]"
+                    disabled={isLoading}
+                    required
+                    value={verificationCode}
+                    onChange={(event) =>
+                      setVerificationCode(
+                        event.target.value.replace(/\D/g, "").slice(0, 6),
+                      )
+                    }
+                  />
+                </div>
+                {error && (
+                  <p
+                    role="alert"
+                    className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-red-500"
+                  >
+                    {error}
+                  </p>
+                )}
+                <Button
+                  type="submit"
+                  className="w-full"
+                  disabled={isLoading || verificationCode.length !== 6}
+                >
+                  {isLoading ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Check className="size-4" />
+                  )}
+                  Verify and continue
+                </Button>
+                <div className="flex items-center justify-between gap-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    disabled={isLoading}
+                    onClick={startSignIn}
+                  >
+                    Back to sign-in
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={isLoading}
+                    onClick={() => void resendVerificationCode()}
+                  >
+                    Resend code
+                  </Button>
+                </div>
+              </CardContent>
+            </form>
           ) : step === "forgot" ? (
             <form onSubmit={handleRequestCode} className="space-y-4">
               <CardHeader className="text-center -mt-6">
