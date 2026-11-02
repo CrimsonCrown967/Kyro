@@ -4,6 +4,7 @@ import { Download, Loader2 } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import { readableError } from "@/lib/errors";
 import { toast } from "sonner";
 
 function safeFileName(value: string) {
@@ -48,11 +49,7 @@ export function ServerConfigurationExport({
       URL.revokeObjectURL(url);
       toast.success("Community configuration downloaded.");
     } catch (error) {
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Could not export this community.",
-      );
+      toast.error(readableError(error, "Could not export this community."));
     } finally {
       setBusy(false);
     }

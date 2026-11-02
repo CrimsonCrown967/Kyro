@@ -19,6 +19,7 @@ import {
   type PendingAttachment,
 } from "@/lib/upload";
 import { cn } from "@/lib/utils";
+import { readableError } from "@/lib/errors";
 import { toast } from "sonner";
 import { EmojiPicker } from "@/components/app/EmojiPicker";
 import { UserAvatar } from "@/components/app/UserAvatar";
@@ -175,9 +176,7 @@ export function Composer({
       onSent?.();
       textareaRef.current?.focus();
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Message failed to send.",
-      );
+      toast.error(readableError(error, "Message failed to send."));
     } finally {
       setBusy(false);
     }

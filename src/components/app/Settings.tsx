@@ -68,6 +68,7 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { MAX_UPLOAD_BYTES, useUploadFile } from "@/lib/upload";
 import { cn } from "@/lib/utils";
+import { readableError } from "@/lib/errors";
 import { toast } from "sonner";
 
 type ProfileLink = { label: string; url: string };
@@ -2805,9 +2806,7 @@ function TwoFactorSettings() {
       setCode("");
       setRecoveryCodes([]);
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Could not start setup.",
-      );
+      toast.error(readableError(error, "Could not start setup."));
     } finally {
       setBusy(false);
     }
@@ -2823,9 +2822,7 @@ function TwoFactorSettings() {
       setCode("");
       toast.success("Two-step verification enabled.");
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Could not verify that code.",
-      );
+      toast.error(readableError(error, "Could not verify that code."));
     } finally {
       setBusy(false);
     }
@@ -2841,9 +2838,7 @@ function TwoFactorSettings() {
       setRecoveryCodes([]);
       toast.success("Two-step verification disabled.");
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Could not disable it.",
-      );
+      toast.error(readableError(error, "Could not disable it."));
     } finally {
       setBusy(false);
     }
@@ -2859,11 +2854,7 @@ function TwoFactorSettings() {
       setShowRegenerate(false);
       toast.success("New recovery codes created. Old codes no longer work.");
     } catch (error) {
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Could not regenerate recovery codes.",
-      );
+      toast.error(readableError(error, "Could not regenerate recovery codes."));
     } finally {
       setBusy(false);
     }

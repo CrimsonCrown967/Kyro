@@ -16,6 +16,7 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useNow } from "@/hooks/use-now";
 import { cn } from "@/lib/utils";
+import { readableError } from "@/lib/errors";
 import { toast } from "sonner";
 
 type ModerationAction = "note" | "warning" | "timeout";
@@ -86,9 +87,7 @@ export function ModerateMemberDialog({
       );
       setReason("");
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Could not create that case.",
-      );
+      toast.error(readableError(error, "Could not create that case."));
     } finally {
       setBusy(false);
     }
@@ -106,9 +105,7 @@ export function ModerateMemberDialog({
       toast.success("Timeout cleared.");
       setReason("");
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Could not clear the timeout.",
-      );
+      toast.error(readableError(error, "Could not clear the timeout."));
     } finally {
       setBusy(false);
     }

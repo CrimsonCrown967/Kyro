@@ -115,7 +115,6 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
       toast.success("Welcome back!");
       navigate(redirect);
     } catch (err) {
-      console.error("Password sign-in error:", err);
       const message = err instanceof Error ? err.message : String(err);
       if (message.includes("TWO_FACTOR_REQUIRED")) {
         setTwoFactorRequired(true);
@@ -125,6 +124,7 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
         setTwoFactorRequired(true);
         setError("That authenticator or recovery code isn't valid.");
       } else {
+        console.error("Password sign-in error:", err);
         setError("That email and password combination didn't work.");
       }
       setIsLoading(false);
