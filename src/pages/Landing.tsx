@@ -17,13 +17,21 @@ import {
 } from "@/components/icons";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
+import { useQuery } from "convex/react";
 import { KyroWordmark } from "@/components/KyroMark";
 import { Button } from "@/components/ui/button";
+import { api } from "@/convex/_generated/api";
+import { cn } from "@/lib/utils";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 18 },
   show: { opacity: 1, y: 0 },
 };
+
+const COUNT_FORMAT = new Intl.NumberFormat(undefined, {
+  notation: "compact",
+  maximumFractionDigits: 1,
+});
 
 function Reveal({
   children,
@@ -138,15 +146,16 @@ const STEPS = [
 ];
 
 export default function Landing() {
+  const stats = useQuery(api.platformStats.get);
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* ── Nav ─────────────────────────────────────────────── */}
       <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur-md">
-        <div className="mx-auto flex h-16 max-w-6xl items-center gap-6 px-4 sm:px-6">
+        <div className="mx-auto flex h-20 max-w-7xl items-center gap-6 px-4 sm:px-6">
           <Link to="/" className="shrink-0">
             <KyroWordmark />
           </Link>
-          <nav className="hidden items-center gap-1 text-sm text-muted-foreground md:flex">
+          <nav className="mx-auto hidden items-center gap-1 text-sm font-medium text-muted-foreground md:flex">
             <a
               href="#features"
               className="rounded-md px-3 py-2 transition-colors hover:bg-surface hover:text-foreground"
@@ -189,70 +198,79 @@ export default function Landing() {
       <section className="relative overflow-hidden">
         <div className="kyro-grid pointer-events-none absolute inset-0 opacity-70" />
         <div className="kyro-orb pointer-events-none absolute -top-24 left-1/2 h-96 w-[46rem] -translate-x-1/2" />
-        <div className="relative mx-auto max-w-6xl px-4 pb-16 pt-16 sm:px-6 sm:pt-24">
-          <Reveal className="mx-auto max-w-3xl text-center">
-            <span className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-surface px-3 py-1 text-xs font-medium text-muted-foreground">
-              <span className="size-1.5 rounded-full bg-success" />
-              Completely free · no premium tier · no subscriptions
-            </span>
-            <h1 className="mt-6 text-balance text-4xl font-bold leading-[1.05] tracking-tight sm:text-6xl">
-              Connect. Play.{" "}
-              <span className="kyro-gradient-text">Belong.</span>
-            </h1>
-            <p className="mx-auto mt-5 max-w-2xl text-pretty text-base text-muted-foreground sm:text-lg">
-              Kyro is a complete communication platform for communities —
-              servers, channels, friends, roles, moderation and search. Every
-              feature is unlocked for everyone, because there is nothing to
-              upgrade to.
-            </p>
-            <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <Button asChild size="lg" className="h-11 px-6">
-                <Link to="/auth">
-                  Get started free <ArrowRight className="ml-2 size-4" />
-                </Link>
-              </Button>
-              <Button asChild size="lg" variant="outline" className="h-11 px-6">
-                <Link to="/auth?returnTo=/dashboard">Open the app</Link>
-              </Button>
-            </div>
-            <p className="mt-4 text-xs text-muted-foreground">
-              Email and password sign-up — no credit card, ever.
-            </p>
-          </Reveal>
-
-          {/* App preview, drawn from the real interface's shape. */}
-          <Reveal delay={0.15} className="mt-14">
-            <div className="relative mx-auto max-w-5xl overflow-hidden rounded-2xl border border-border/70 bg-panel shadow-2xl shadow-brand/10">
-              <div className="flex h-9 items-center gap-1.5 border-b border-border/60 bg-surface px-4">
-                <span className="size-2.5 rounded-full bg-destructive/70" />
-                <span className="size-2.5 rounded-full bg-warning/70" />
-                <span className="size-2.5 rounded-full bg-success/70" />
-                <span className="ml-3 truncate text-[11px] text-muted-foreground">
-                  kyro · midnight raiders
-                </span>
+        <div className="relative mx-auto max-w-7xl px-4 pb-0 pt-12 sm:px-6 sm:pt-20">
+          <div className="grid min-h-[42rem] items-center gap-12 pb-16 lg:grid-cols-[minmax(0,.85fr)_minmax(34rem,1.25fr)] lg:gap-16">
+            <Reveal className="max-w-2xl text-left">
+              <span className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-surface px-3 py-1 text-xs font-medium text-muted-foreground">
+                <span className="size-1.5 rounded-full bg-success" />
+                Completely free · no premium tier · no subscriptions
+              </span>
+              <h1 className="mt-7 text-balance text-5xl font-black leading-[0.96] tracking-[-0.055em] sm:text-7xl">
+                A community platform built{" "}
+                <span className="kyro-gradient-text">around you.</span>
+              </h1>
+              <p className="mt-7 max-w-xl text-pretty text-base leading-8 text-muted-foreground sm:text-lg">
+                Chat, voice, forums, discovery, community tools and safer
+                account security for friends, creators and online communities.
+                Every feature stays free.
+              </p>
+              <div className="mt-9 flex flex-col items-start gap-3 sm:flex-row sm:items-center">
+                <Button asChild size="lg" className="h-11 px-6">
+                  <Link to="/auth">
+                    Get started free <ArrowRight className="ml-2 size-4" />
+                  </Link>
+                </Button>
+                <Button
+                  asChild
+                  size="lg"
+                  variant="outline"
+                  className="h-11 px-6"
+                >
+                  <Link to="/auth?returnTo=/dashboard">Open the app</Link>
+                </Button>
               </div>
-              <div className="flex h-72 sm:h-80">
-                {/* rail */}
-                <div className="flex w-14 shrink-0 flex-col items-center gap-2 border-r border-border/60 bg-rail py-3">
-                  {[0, 1, 2].map((item) => (
-                    <span
-                      key={item}
-                      className={`size-9 rounded-2xl ${item === 0 ? "kyro-gradient-bg" : "bg-surface"} transition-all`}
-                    />
-                  ))}
-                  <span className="mt-1 size-9 rounded-2xl border border-dashed border-border text-muted-foreground">
-                    <span className="flex h-full items-center justify-center text-lg leading-none">
-                      +
-                    </span>
+              <p className="mt-4 text-xs text-muted-foreground">
+                Email and password sign-up — no credit card, ever.
+              </p>
+            </Reveal>
+
+            {/* App preview, drawn from the real interface's shape. */}
+            <Reveal delay={0.15} className="min-w-0 lg:-mr-10">
+              <div className="relative mx-auto max-w-5xl overflow-hidden rounded-2xl border border-border/70 bg-panel shadow-[0_30px_90px_rgba(35,45,110,.22)]">
+                <div className="flex h-9 items-center gap-1.5 border-b border-border/60 bg-surface px-4">
+                  <span className="size-2.5 rounded-full bg-destructive/70" />
+                  <span className="size-2.5 rounded-full bg-warning/70" />
+                  <span className="size-2.5 rounded-full bg-success/70" />
+                  <span className="ml-3 truncate text-[11px] text-muted-foreground">
+                    kyro · midnight raiders
                   </span>
                 </div>
-                {/* sidebar */}
-                <div className="hidden w-52 shrink-0 border-r border-border/60 bg-sidebar p-3 sm:block">
-                  <p className="px-1 pb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Midnight Raiders
-                  </p>
-                  {["announce", "general", "raid-planning", "clips-and-highlights"].map(
-                    (channel, index) => (
+                <div className="flex h-72 sm:h-80">
+                  {/* rail */}
+                  <div className="flex w-14 shrink-0 flex-col items-center gap-2 border-r border-border/60 bg-rail py-3">
+                    {[0, 1, 2].map((item) => (
+                      <span
+                        key={item}
+                        className={`size-9 rounded-2xl ${item === 0 ? "kyro-gradient-bg" : "bg-surface"} transition-all`}
+                      />
+                    ))}
+                    <span className="mt-1 size-9 rounded-2xl border border-dashed border-border text-muted-foreground">
+                      <span className="flex h-full items-center justify-center text-lg leading-none">
+                        +
+                      </span>
+                    </span>
+                  </div>
+                  {/* sidebar */}
+                  <div className="hidden w-52 shrink-0 border-r border-border/60 bg-sidebar p-3 sm:block">
+                    <p className="px-1 pb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Midnight Raiders
+                    </p>
+                    {[
+                      "announce",
+                      "general",
+                      "raid-planning",
+                      "clips-and-highlights",
+                    ].map((channel, index) => (
                       <p
                         key={channel}
                         className={`truncate rounded px-2 py-1.5 text-sm ${
@@ -263,82 +281,127 @@ export default function Landing() {
                       >
                         # {channel}
                       </p>
-                    ),
-                  )}
-                  <p className="px-1 pb-1 pt-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Voice lounge
-                  </p>
-                  {["Lobby", "Strategy"].map((room) => (
-                    <p key={room} className="truncate px-2 py-1.5 text-sm text-muted-foreground">
-                      ⌁ {room}
-                    </p>
-                  ))}
-                </div>
-                {/* chat */}
-                <div className="flex min-w-0 flex-1 flex-col bg-panel">
-                  <div className="flex items-center gap-2 border-b border-border/60 px-4 py-2.5">
-                    <span className="text-muted-foreground">#</span>
-                    <span className="text-sm font-semibold">general</span>
-                    <span className="hidden truncate text-xs text-muted-foreground sm:block">
-                      zero spoilers, please
-                    </span>
-                  </div>
-                  <div className="flex-1 space-y-3.5 overflow-hidden p-4">
-                    {[
-                      { name: "nova", time: "21:04", text: "patch notes dropped — buffed our strat 🎉" },
-                      { name: "kai", time: "21:05", text: "reading them now, queue in 10?" },
-                      { name: "mira", time: "21:06", text: "mods moved the scrim to #raid-planning" },
-                    ].map((message) => (
-                      <div key={message.name} className="flex gap-3">
-                        <span
-                          className="size-8 shrink-0 rounded-full"
-                          style={{
-                            background: `linear-gradient(135deg, var(--brand), var(--cyan))`,
-                          }}
-                        />
-                        <div className="min-w-0">
-                          <p className="flex items-baseline gap-2">
-                            <span className="text-sm font-semibold text-primary">
-                              {message.name}
-                            </span>
-                            <span className="text-[10px] text-muted-foreground">
-                              {message.time}
-                            </span>
-                          </p>
-                          <p className="truncate text-sm text-foreground/90">
-                            {message.text}
-                          </p>
-                        </div>
-                      </div>
                     ))}
-                    <div className="mt-4 flex h-9 items-center gap-2 rounded-lg border border-border/60 bg-surface px-3 text-sm text-muted-foreground">
-                      Message #general
+                    <p className="px-1 pb-1 pt-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Voice lounge
+                    </p>
+                    {["Lobby", "Strategy"].map((room) => (
+                      <p
+                        key={room}
+                        className="truncate px-2 py-1.5 text-sm text-muted-foreground"
+                      >
+                        ⌁ {room}
+                      </p>
+                    ))}
+                  </div>
+                  {/* chat */}
+                  <div className="flex min-w-0 flex-1 flex-col bg-panel">
+                    <div className="flex items-center gap-2 border-b border-border/60 px-4 py-2.5">
+                      <span className="text-muted-foreground">#</span>
+                      <span className="text-sm font-semibold">general</span>
+                      <span className="hidden truncate text-xs text-muted-foreground sm:block">
+                        zero spoilers, please
+                      </span>
+                    </div>
+                    <div className="flex-1 space-y-3.5 overflow-hidden p-4">
+                      {[
+                        {
+                          name: "nova",
+                          time: "21:04",
+                          text: "patch notes dropped — buffed our strat 🎉",
+                        },
+                        {
+                          name: "kai",
+                          time: "21:05",
+                          text: "reading them now, queue in 10?",
+                        },
+                        {
+                          name: "mira",
+                          time: "21:06",
+                          text: "mods moved the scrim to #raid-planning",
+                        },
+                      ].map((message) => (
+                        <div key={message.name} className="flex gap-3">
+                          <span
+                            className="size-8 shrink-0 rounded-full"
+                            style={{
+                              background: `linear-gradient(135deg, var(--brand), var(--cyan))`,
+                            }}
+                          />
+                          <div className="min-w-0">
+                            <p className="flex items-baseline gap-2">
+                              <span className="text-sm font-semibold text-primary">
+                                {message.name}
+                              </span>
+                              <span className="text-[10px] text-muted-foreground">
+                                {message.time}
+                              </span>
+                            </p>
+                            <p className="truncate text-sm text-foreground/90">
+                              {message.text}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                      <div className="mt-4 flex h-9 items-center gap-2 rounded-lg border border-border/60 bg-surface px-3 text-sm text-muted-foreground">
+                        Message #general
+                      </div>
                     </div>
                   </div>
-                </div>
-                {/* members */}
-                <div className="hidden w-40 shrink-0 border-l border-border/60 bg-panel p-3 lg:block">
-                  <p className="pb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Online · 4
-                  </p>
-                  {["nova", "kai", "mira", "oren"].map((member) => (
-                    <p key={member} className="flex items-center gap-2 py-1.5 text-sm">
-                      <span className="relative">
-                        <span
-                          className="block size-6 rounded-full"
-                          style={{
-                            background: `linear-gradient(135deg, var(--brand), var(--cyan))`,
-                          }}
-                        />
-                        <span className="absolute -bottom-0.5 -right-0.5 size-2 rounded-full border border-panel bg-success" />
-                      </span>
-                      {member}
+                  {/* members */}
+                  <div className="hidden w-40 shrink-0 border-l border-border/60 bg-panel p-3 lg:block">
+                    <p className="pb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Online · 4
                     </p>
-                  ))}
+                    {["nova", "kai", "mira", "oren"].map((member) => (
+                      <p
+                        key={member}
+                        className="flex items-center gap-2 py-1.5 text-sm"
+                      >
+                        <span className="relative">
+                          <span
+                            className="block size-6 rounded-full"
+                            style={{
+                              background: `linear-gradient(135deg, var(--brand), var(--cyan))`,
+                            }}
+                          />
+                          <span className="absolute -bottom-0.5 -right-0.5 size-2 rounded-full border border-panel bg-success" />
+                        </span>
+                        {member}
+                      </p>
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
-          </Reveal>
+            </Reveal>
+          </div>
+
+          <div className="grid border-x border-t border-border/60 bg-background/70 sm:grid-cols-3">
+            {[
+              ["Registered users", stats?.users],
+              ["Communities", stats?.communities],
+              ["Members online", stats?.onlineMembers],
+            ].map(([label, value], index) => (
+              <div
+                key={String(label)}
+                className={cn(
+                  "px-6 py-7 text-center sm:px-8 sm:text-left",
+                  index > 0 &&
+                    "border-t border-border/60 sm:border-l sm:border-t-0",
+                )}
+              >
+                <p className="text-3xl font-black tracking-tight sm:text-4xl">
+                  {typeof value === "number" ? COUNT_FORMAT.format(value) : "—"}
+                </p>
+                <p className="mt-1 flex items-center justify-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground sm:justify-start">
+                  {index === 2 && (
+                    <span className="size-2 animate-pulse rounded-full bg-success" />
+                  )}
+                  {label}
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -405,8 +468,8 @@ export default function Landing() {
             </h2>
             <p className="mt-4 text-muted-foreground">
               Most platforms split communities into free and paid — better
-              audio, custom profiles, longer uploads behind a subscription.
-              Kyro has one tier, and everyone is on it.
+              audio, custom profiles, longer uploads behind a subscription. Kyro
+              has one tier, and everyone is on it.
             </p>
             <ul className="mt-6 space-y-3">
               {[
@@ -443,7 +506,10 @@ export default function Landing() {
                   ["Roles & channels", "Unlimited"],
                   ["Moderation suite", "Included"],
                 ].map(([label, value]) => (
-                  <div key={label} className="flex items-center justify-between">
+                  <div
+                    key={label}
+                    className="flex items-center justify-between"
+                  >
                     <dt className="text-muted-foreground">{label}</dt>
                     <dd className="font-medium">{value}</dd>
                   </div>
@@ -572,7 +638,9 @@ export default function Landing() {
                   <Users className="size-5" />
                 </span>
                 <div>
-                  <h3 className="text-sm font-semibold">You choose who reaches you</h3>
+                  <h3 className="text-sm font-semibold">
+                    You choose who reaches you
+                  </h3>
                   <p className="mt-1 text-sm text-muted-foreground">
                     Direct messages from everyone, friends only, or nobody —
                     plus blocking and an invisible presence mode that reports
@@ -593,8 +661,8 @@ export default function Landing() {
             Your people are one handle away.
           </h2>
           <p className="mx-auto mt-3 max-w-xl text-sm text-white/85 sm:text-base">
-            Create a Kyro account in seconds, claim @yourname, and open the
-            door to your first community.
+            Create a Kyro account in seconds, claim @yourname, and open the door
+            to your first community.
           </p>
           <div className="mt-7 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <Button
@@ -612,7 +680,9 @@ export default function Landing() {
               variant="outline"
               className="h-11 border-white/40 bg-transparent px-7 text-white hover:bg-white/10 hover:text-white"
             >
-              <Link to="/auth?returnTo=/dashboard">I already have an account</Link>
+              <Link to="/auth?returnTo=/dashboard">
+                I already have an account
+              </Link>
             </Button>
           </div>
         </div>
@@ -624,8 +694,8 @@ export default function Landing() {
           <div>
             <KyroWordmark />
             <p className="mt-3 max-w-xs text-sm text-muted-foreground">
-              Connect. Play. Belong. A complete, free communication platform
-              for communities of every size.
+              Connect. Play. Belong. A complete, free communication platform for
+              communities of every size.
             </p>
           </div>
           <div className="grid grid-cols-2 gap-8 text-sm sm:grid-cols-3">
@@ -662,7 +732,10 @@ export default function Landing() {
                   </Link>
                 </li>
                 <li>
-                  <Link to="/auth?returnTo=/dashboard" className="hover:text-foreground">
+                  <Link
+                    to="/auth?returnTo=/dashboard"
+                    className="hover:text-foreground"
+                  >
                     Open Kyro
                   </Link>
                 </li>

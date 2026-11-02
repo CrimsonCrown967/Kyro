@@ -321,6 +321,22 @@ export const Paperclip = (props: IconProps) => (
   </Icon>
 );
 
+export const Mic = (props: IconProps) => (
+  <Icon {...props}>
+    <rect x="9" y="3" width="6" height="10.5" rx="3" />
+    <path d="M5.5 11.5a6.5 6.5 0 0 0 13 0" />
+    <path d="M12 18v3" />
+    <path d="M8.5 21h7" />
+  </Icon>
+);
+
+export const StopCircle = (props: IconProps) => (
+  <Icon {...props}>
+    <circle cx="12" cy="12" r="9" />
+    <rect x="8.5" y="8.5" width="7" height="7" rx="1.5" />
+  </Icon>
+);
+
 export const MicOff = (props: IconProps) => (
   <Icon {...props}>
     <rect x="9" y="3" width="6" height="10.5" rx="3" />

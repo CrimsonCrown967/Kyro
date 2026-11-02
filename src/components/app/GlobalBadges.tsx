@@ -38,6 +38,27 @@ export function BadgeTip({
   );
 }
 
+/** Blue check pill reserved for identities operated by the Kyro team. */
+export function OfficialBadge({ compact = false }: { compact?: boolean }) {
+  return (
+    <BadgeTip
+      label="Official Kyro account"
+      blurb="This identity is operated by Kyro."
+    >
+      <span className="inline-flex shrink-0 items-center gap-1 rounded-[4px] bg-blue-600 px-1.5 py-0.5 text-[9px] font-black uppercase leading-none tracking-wide text-white shadow-sm ring-1 ring-blue-300/40">
+        <svg
+          viewBox="0 0 16 16"
+          aria-hidden="true"
+          className="size-3 fill-white"
+        >
+          <path d="M8 1.25 9.7 2.4l2.05-.05.58 1.96 1.69 1.16-.68 1.93.68 1.93-1.69 1.16-.58 1.96-2.05-.05L8 13.55 6.3 12.4l-2.05.05-.58-1.96L1.98 9.33l.68-1.93-.68-1.93 1.69-1.16.58-1.96 2.05.05L8 1.25Zm2.86 4.4a.7.7 0 0 0-.99-.01L7.13 8.32 6.08 7.29a.7.7 0 1 0-.98 1l1.54 1.5a.7.7 0 0 0 .98 0l3.23-3.15a.7.7 0 0 0 .01-.99Z" />
+        </svg>
+        {compact ? <span className="sr-only">Official</span> : "Official"}
+      </span>
+    </BadgeTip>
+  );
+}
+
 /**
  * Kyro's platform-wide (global) badges — shown in their own dedicated
  * "Badges" shelf on a profile, deliberately separate from community roles.

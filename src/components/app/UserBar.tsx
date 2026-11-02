@@ -12,7 +12,7 @@ import { api } from "@/convex/_generated/api";
 import { DeviceBadge, UserAvatar } from "@/components/app/UserAvatar";
 import { ServerTagChip } from "@/components/app/ServerTag";
 import { CrownBadge } from "@/components/app/CrownBadge";
-import { InlineBadge } from "@/components/app/GlobalBadges";
+import { InlineBadge, OfficialBadge } from "@/components/app/GlobalBadges";
 import { StyledDisplayName } from "@/components/app/StyledDisplayName";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -114,6 +114,7 @@ export function UserBar({ onOpenSettings }: { onOpenSettings?: () => void }) {
                   user={me}
                   className="truncate text-sm leading-tight"
                 />
+                {me.official && <OfficialBadge compact />}
                 {me.badges.length > 0 ? (
                   <InlineBadge
                     badges={me.badges}

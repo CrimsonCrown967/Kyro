@@ -12,6 +12,7 @@ import {
   Link2,
   Lock,
   Loader2,
+  Mic,
   Pencil,
   Pin,
   Phone,
@@ -31,7 +32,7 @@ import {
   ServerInviteCard,
 } from "@/components/app/ServerInviteCard";
 import { CrownBadge } from "@/components/app/CrownBadge";
-import { InlineBadge } from "@/components/app/GlobalBadges";
+import { InlineBadge, OfficialBadge } from "@/components/app/GlobalBadges";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -68,6 +69,7 @@ export interface MessageAuthor {
   avatarUrl: string | null;
   presence: PresenceState;
   isFounder?: boolean;
+  official?: boolean;
   /** Global badges (hydrated server-side) — highest is shown inline. */ badges?: string[];
   /** The badge this author picked to show next to their name. */
   primaryBadge?: string | null;
@@ -709,6 +711,7 @@ function MessageRow({
                   "Unknown user"
                 )}
               </button>
+              {author?.official && <OfficialBadge compact />}
               {author?.badges && author.badges.length > 0 ? (
                 <InlineBadge
                   badges={author.badges}
@@ -857,7 +860,26 @@ function MessageRow({
             <div className="mt-1.5 flex flex-wrap gap-2">
               {" "}
               {message.attachments.map((attachment) =>
-                attachment.mimeType.startsWith("video/") && attachment.url ? (
+                attachment.mimeType.startsWith("audio/") && attachment.url ? (
+                  <div
+                    key={attachment.storageId}
+                    className="w-full max-w-sm rounded-xl border border-border/70 bg-surface px-3 py-2.5"
+                  >
+                    <p className="mb-2 flex items-center gap-2 text-xs font-semibold">
+                      <span className="flex size-7 items-center justify-center rounded-full bg-primary/12 text-primary">
+                        <Mic className="size-3.5" />
+                      </span>
+                      Voice message
+                    </p>
+                    <audio
+                      src={attachment.url}
+                      controls
+                      preload="metadata"
+                      className="h-9 w-full"
+                    />
+                  </div>
+                ) : attachment.mimeType.startsWith("video/") &&
+                  attachment.url ? (
                   <video
                     key={attachment.storageId}
                     src={attachment.url}

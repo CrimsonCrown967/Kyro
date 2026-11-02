@@ -10,6 +10,8 @@ import {
 } from "@/components/ui/dialog";
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
+import { readableError } from "@/lib/errors";
+import { toast } from "sonner";
 
 function clamp(value: number, min = -100, max = 100) {
   return Math.min(max, Math.max(min, value));
@@ -85,6 +87,8 @@ export function ImageCropDialog({
       });
       const name = `${file.name.replace(/\.[^.]+$/, "")}-cropped.webp`;
       await onComplete(new File([blob], name, { type: "image/webp" }));
+    } catch (error) {
+      toast.error(readableError(error, "Could not crop that image."));
     } finally {
       setBusy(false);
     }
@@ -94,6 +98,8 @@ export function ImageCropDialog({
     setBusy(true);
     try {
       await onComplete(file);
+    } catch (error) {
+      toast.error(readableError(error, "Could not use that image."));
     } finally {
       setBusy(false);
     }
@@ -101,7 +107,7 @@ export function ImageCropDialog({
 
   return (
     <Dialog open onOpenChange={(open) => !open && onCancel()}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="flex max-h-[92vh] flex-col overflow-hidden sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
@@ -109,103 +115,108 @@ export function ImageCropDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div
-          className={cn(
-            "relative mx-auto w-full max-w-xl touch-none cursor-grab overflow-hidden border border-border bg-black/70 active:cursor-grabbing",
-            rounded ? "rounded-full" : "rounded-xl",
-          )}
-          style={{ aspectRatio: aspect }}
-          onPointerDown={(event) => {
-            event.currentTarget.setPointerCapture(event.pointerId);
-            dragRef.current = {
-              x: event.clientX,
-              y: event.clientY,
-              offsetX,
-              offsetY,
-            };
-          }}
-          onPointerMove={(event) => {
-            const drag = dragRef.current;
-            if (!drag) return;
-            const rect = event.currentTarget.getBoundingClientRect();
-            setOffsetX(
-              clamp(
-                drag.offsetX + ((event.clientX - drag.x) / rect.width) * 200,
-              ),
-            );
-            setOffsetY(
-              clamp(
-                drag.offsetY + ((event.clientY - drag.y) / rect.height) * 200,
-              ),
-            );
-          }}
-          onPointerUp={() => {
-            dragRef.current = null;
-          }}
-        >
-          <img
-            ref={imageRef}
-            src={sourceUrl}
-            alt="Crop preview"
-            className="pointer-events-none absolute left-1/2 top-1/2 size-full select-none object-cover"
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
+          <div
+            className={cn(
+              "relative mx-auto w-full max-w-xl touch-none cursor-grab overflow-hidden border border-border bg-black/70 active:cursor-grabbing",
+              rounded ? "rounded-full" : "rounded-xl",
+            )}
             style={{
-              transform: `translate(-50%, -50%) translate(${offsetX / 2}%, ${offsetY / 2}%) scale(${zoom})`,
+              aspectRatio: aspect,
+              maxWidth: aspect <= 1 ? "min(36rem, 52vh)" : "36rem",
             }}
-          />
-          <span className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/25" />
-          <span className="pointer-events-none absolute inset-1/3 border border-dashed border-white/45" />
+            onPointerDown={(event) => {
+              event.currentTarget.setPointerCapture(event.pointerId);
+              dragRef.current = {
+                x: event.clientX,
+                y: event.clientY,
+                offsetX,
+                offsetY,
+              };
+            }}
+            onPointerMove={(event) => {
+              const drag = dragRef.current;
+              if (!drag) return;
+              const rect = event.currentTarget.getBoundingClientRect();
+              setOffsetX(
+                clamp(
+                  drag.offsetX + ((event.clientX - drag.x) / rect.width) * 200,
+                ),
+              );
+              setOffsetY(
+                clamp(
+                  drag.offsetY + ((event.clientY - drag.y) / rect.height) * 200,
+                ),
+              );
+            }}
+            onPointerUp={() => {
+              dragRef.current = null;
+            }}
+          >
+            <img
+              ref={imageRef}
+              src={sourceUrl}
+              alt="Crop preview"
+              className="pointer-events-none absolute left-1/2 top-1/2 size-full select-none object-cover"
+              style={{
+                transform: `translate(-50%, -50%) translate(${offsetX / 2}%, ${offsetY / 2}%) scale(${zoom})`,
+              }}
+            />
+            <span className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/25" />
+            <span className="pointer-events-none absolute inset-1/3 border border-dashed border-white/45" />
+          </div>
+
+          <div className="grid gap-4 rounded-xl border border-border/70 bg-surface p-4">
+            <label className="grid grid-cols-[5rem_1fr_3rem] items-center gap-3 text-sm">
+              <span>Zoom</span>
+              <Slider
+                min={100}
+                max={300}
+                step={5}
+                value={[Math.round(zoom * 100)]}
+                onValueChange={(values) => setZoom((values[0] ?? 100) / 100)}
+              />
+              <span className="text-right text-xs text-muted-foreground">
+                {Math.round(zoom * 100)}%
+              </span>
+            </label>
+            <label className="grid grid-cols-[5rem_1fr_3rem] items-center gap-3 text-sm">
+              <span>Horizontal</span>
+              <Slider
+                min={-100}
+                max={100}
+                step={1}
+                value={[offsetX]}
+                onValueChange={(values) => setOffsetX(values[0] ?? 0)}
+              />
+              <span className="text-right text-xs text-muted-foreground">
+                {Math.round(offsetX)}
+              </span>
+            </label>
+            <label className="grid grid-cols-[5rem_1fr_3rem] items-center gap-3 text-sm">
+              <span>Vertical</span>
+              <Slider
+                min={-100}
+                max={100}
+                step={1}
+                value={[offsetY]}
+                onValueChange={(values) => setOffsetY(values[0] ?? 0)}
+              />
+              <span className="text-right text-xs text-muted-foreground">
+                {Math.round(offsetY)}
+              </span>
+            </label>
+          </div>
+
+          {(file.type === "image/gif" || file.type === "image/apng") && (
+            <p className="text-xs text-warning">
+              Cropping exports a high-quality static WebP. Choose “Use original”
+              to keep this image animated.
+            </p>
+          )}
         </div>
 
-        <div className="grid gap-4 rounded-xl border border-border/70 bg-surface p-4">
-          <label className="grid grid-cols-[5rem_1fr_3rem] items-center gap-3 text-sm">
-            <span>Zoom</span>
-            <Slider
-              min={100}
-              max={300}
-              step={5}
-              value={[Math.round(zoom * 100)]}
-              onValueChange={(values) => setZoom((values[0] ?? 100) / 100)}
-            />
-            <span className="text-right text-xs text-muted-foreground">
-              {Math.round(zoom * 100)}%
-            </span>
-          </label>
-          <label className="grid grid-cols-[5rem_1fr_3rem] items-center gap-3 text-sm">
-            <span>Horizontal</span>
-            <Slider
-              min={-100}
-              max={100}
-              step={1}
-              value={[offsetX]}
-              onValueChange={(values) => setOffsetX(values[0] ?? 0)}
-            />
-            <span className="text-right text-xs text-muted-foreground">
-              {Math.round(offsetX)}
-            </span>
-          </label>
-          <label className="grid grid-cols-[5rem_1fr_3rem] items-center gap-3 text-sm">
-            <span>Vertical</span>
-            <Slider
-              min={-100}
-              max={100}
-              step={1}
-              value={[offsetY]}
-              onValueChange={(values) => setOffsetY(values[0] ?? 0)}
-            />
-            <span className="text-right text-xs text-muted-foreground">
-              {Math.round(offsetY)}
-            </span>
-          </label>
-        </div>
-
-        {(file.type === "image/gif" || file.type === "image/apng") && (
-          <p className="text-xs text-warning">
-            Cropping exports a high-quality static WebP. Choose “Use original”
-            to keep this image animated.
-          </p>
-        )}
-
-        <div className="flex flex-wrap justify-end gap-2">
+        <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-border/60 pt-3">
           <Button type="button" variant="ghost" onClick={onCancel}>
             Cancel
           </Button>

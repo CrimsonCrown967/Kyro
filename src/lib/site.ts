@@ -1,10 +1,10 @@
 /**
  * Shareable links (server invites, join links) must always point at Kyro's
- * canonical domain — kyro.nylix.org — even when the app is being previewed on
+ * canonical domain — kyro-chat.cyou — even when the app is being previewed on
  * a staging hostname like kyro.freebuff.app. Localhost and custom preview
  * hosts keep their own origin so links still work while developing.
  */
-const CANONICAL_HOST = "kyro.nylix.org";
+const CANONICAL_HOST = "kyro-chat.cyou";
 
 export function siteOrigin(): string {
   if (typeof window === "undefined") return `https://${CANONICAL_HOST}`;

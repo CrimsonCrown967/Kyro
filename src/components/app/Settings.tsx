@@ -34,6 +34,7 @@ import { StyledDisplayName } from "@/components/app/StyledDisplayName";
 import { DecorationPickerDialog } from "@/components/app/DecorationPickerDialog";
 import { ProfileDecorationLayer } from "@/components/app/DecorationArt";
 import { ImageCropDialog } from "@/components/app/ImageCropDialog";
+import { TotpQrCode } from "@/components/app/TotpQrCode";
 import { ConfirmDangerDialog } from "@/components/app/dialogs";
 import { Button } from "@/components/ui/button";
 import {
@@ -64,11 +65,17 @@ import {
   GlobalBadgeIcon,
   GlobalBadges,
   InlineBadge,
+  OfficialBadge,
 } from "@/components/app/GlobalBadges";
 import { Slider } from "@/components/ui/slider";
 import { MAX_UPLOAD_BYTES, useUploadFile } from "@/lib/upload";
 import { cn } from "@/lib/utils";
 import { readableError } from "@/lib/errors";
+import {
+  forgetAccount,
+  rememberAccount,
+  rememberedAccounts,
+} from "@/lib/accounts";
 import { toast } from "sonner";
 
 type ProfileLink = { label: string; url: string };
@@ -92,6 +99,7 @@ const TABS: { id: TabId; label: string; icon: typeof UserIcon }[] = [
 
 /** Mirrors USERNAME_COOLDOWN_MS in src/convex/users.ts — shown as a hint. */
 const USERNAME_CHANGE_COOLDOWN_MS = 60 * 60 * 1000;
+const EMAIL_CHANGE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** The four states a person can pick; offline is never a manual choice. */
 const PRESENCE_CHOICES = [
@@ -421,6 +429,123 @@ function ChangePasswordDialog({
             >
               {busy && <Loader2 className="mr-2 size-4 animate-spin" />}
               Change password
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Email change requires the current password and is limited to once a week. */
+function ChangeEmailDialog({
+  open,
+  currentEmail,
+  onOpenChange,
+}: {
+  open: boolean;
+  currentEmail: string;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const changeEmail = useAction(api.users.changeEmail.changeEmail);
+  const [nextEmail, setNextEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const close = (value: boolean) => {
+    if (!value) {
+      setNextEmail("");
+      setPassword("");
+    }
+    onOpenChange(value);
+  };
+
+  const submit = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const normalized = nextEmail.trim().toLowerCase();
+      await changeEmail({ newEmail: normalized, currentPassword: password });
+      const remembered = rememberedAccounts().find(
+        (account) => account.email === currentEmail.toLowerCase(),
+      );
+      forgetAccount(currentEmail);
+      rememberAccount({
+        email: normalized,
+        name: remembered?.name,
+        username: remembered?.username,
+        avatarUrl: remembered?.avatarUrl,
+      });
+      toast.success(
+        "Email changed. Use the new address next time you sign in.",
+      );
+      close(false);
+    } catch (error) {
+      toast.error(readableError(error, "Could not change your email."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={close}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Change email</DialogTitle>
+          <DialogDescription>
+            Your current email is {currentEmail}. For account safety, email
+            addresses can only be changed once every 7 days.
+          </DialogDescription>
+        </DialogHeader>
+        <form
+          className="space-y-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void submit();
+          }}
+        >
+          <div className="grid gap-2">
+            <Label htmlFor="email-new">New email</Label>
+            <Input
+              id="email-new"
+              type="email"
+              autoComplete="email"
+              value={nextEmail}
+              onChange={(event) => setNextEmail(event.target.value)}
+              placeholder="you@example.com"
+              required
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="email-current-password">Current password</Label>
+            <PasswordInput
+              id="email-current-password"
+              autoComplete="current-password"
+              value={password}
+              onChange={setPassword}
+              label="current password"
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={busy}
+              onClick={() => close(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={
+                busy ||
+                !password ||
+                !nextEmail.includes("@") ||
+                nextEmail.trim().toLowerCase() === currentEmail.toLowerCase()
+              }
+            >
+              {busy && <Loader2 className="mr-2 size-4 animate-spin" />}
+              Change email
             </Button>
           </div>
         </form>
@@ -805,6 +930,7 @@ function AccountTab({ onEditProfile }: { onEditProfile: () => void }) {
   const [revealed, setRevealed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [passwordOpen, setPasswordOpen] = useState(false);
+  const [emailOpen, setEmailOpen] = useState(false);
   const updatePrivacy = useMutation(api.users.updatePrivacy);
   const revokeOthers = useMutation(api.users.revokeOtherSessions);
 
@@ -842,6 +968,15 @@ function AccountTab({ onEditProfile }: { onEditProfile: () => void }) {
       return `${hours} hour${hours === 1 ? "" : "s"}${rest ? ` ${rest} min` : ""}`;
     }
     return `${minutes} minute${minutes === 1 ? "" : "s"}`;
+  })();
+  const emailCooldownMs = me.emailChangedAt
+    ? now === 0
+      ? EMAIL_CHANGE_COOLDOWN_MS
+      : Math.max(0, EMAIL_CHANGE_COOLDOWN_MS - (now - me.emailChangedAt))
+    : 0;
+  const emailCooldownLabel = (() => {
+    const days = Math.ceil(emailCooldownMs / (24 * 60 * 60 * 1000));
+    return `${days} day${days === 1 ? "" : "s"}`;
   })();
 
   const save = async (kind: "name" | "username") => {
@@ -999,9 +1134,22 @@ function AccountTab({ onEditProfile }: { onEditProfile: () => void }) {
 
             <AccountRow
               label="Email"
+              hint={
+                emailCooldownMs > 0
+                  ? `You can change your email again in ${emailCooldownLabel}.`
+                  : "You can change your email once every 7 days."
+              }
               action={
                 me.email ? (
                   <div className="flex shrink-0 gap-1.5">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={emailCooldownMs > 0}
+                      onClick={() => setEmailOpen(true)}
+                    >
+                      Change
+                    </Button>
                     <Button
                       size="sm"
                       variant="ghost"
@@ -1132,6 +1280,13 @@ function AccountTab({ onEditProfile }: { onEditProfile: () => void }) {
         open={passwordOpen}
         onOpenChange={setPasswordOpen}
       />
+      {me.email && (
+        <ChangeEmailDialog
+          open={emailOpen}
+          currentEmail={me.email}
+          onOpenChange={setEmailOpen}
+        />
+      )}
     </>
   );
 }
@@ -2346,6 +2501,7 @@ function ProfilePreviewPane({
           <h3 className="mt-2 break-words text-lg font-semibold leading-snug">
             <StyledDisplayName user={{ ...me, name: nameValue }} />
             <span className="ml-2 inline-flex items-center gap-1 align-middle">
+              {me.official && <OfficialBadge compact />}
               <InlineBadge badges={me.badges} primaryBadge={badgeId} />
               {me.badges.length > 1 && (
                 <span className="inline-flex size-4 items-center justify-center rounded-full bg-white/15 text-[9px] font-bold text-zinc-100">
@@ -2934,35 +3090,42 @@ function TwoFactorSettings() {
 
             {setup && !status.twoFactorEnabled && (
               <div className="space-y-3 rounded-xl border border-primary/25 bg-primary/5 p-4">
-                <div>
-                  <p className="text-sm font-semibold">
-                    1. Add Kyro to your app
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Enter this setup key manually. It is shown only during this
-                    setup flow.
-                  </p>
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <code className="break-all rounded-md border border-border bg-background px-3 py-2 text-xs">
-                      {setup.secret}
-                    </code>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() =>
-                        void navigator.clipboard
-                          .writeText(setup.secret)
-                          .then(() => toast.success("Setup key copied."))
-                      }
-                    >
-                      <Copy className="mr-1.5 size-3.5" /> Copy
-                    </Button>
-                    <a
-                      href={setup.uri}
-                      className="text-xs font-medium text-primary hover:underline"
-                    >
-                      Open authenticator app
-                    </a>
+                <div className="grid gap-4 sm:grid-cols-[11rem_minmax(0,1fr)] sm:items-center">
+                  <TotpQrCode uri={setup.uri} />
+                  <div>
+                    <p className="text-sm font-semibold">
+                      1. Scan with Google Authenticator
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Scan this QR code with Google Authenticator, 1Password,
+                      Authy, or another TOTP app. It is generated locally in
+                      your browser.
+                    </p>
+                    <p className="mt-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Or enter this setup key
+                    </p>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                      <code className="break-all rounded-md border border-border bg-background px-3 py-2 text-xs">
+                        {setup.secret}
+                      </code>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                          void navigator.clipboard
+                            .writeText(setup.secret)
+                            .then(() => toast.success("Setup key copied."))
+                        }
+                      >
+                        <Copy className="mr-1.5 size-3.5" /> Copy
+                      </Button>
+                      <a
+                        href={setup.uri}
+                        className="text-xs font-medium text-primary hover:underline"
+                      >
+                        Open authenticator app
+                      </a>
+                    </div>
                   </div>
                 </div>
                 <div>

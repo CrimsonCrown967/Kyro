@@ -134,6 +134,8 @@ export interface PublicUser {
   isAnonymous: boolean;
   /** Kyro's founder: their crown badge is shown to every viewer, everywhere. */
   isFounder: boolean;
+  /** Official Kyro-operated account. Founder is always official too. */
+  official: boolean;
   /**
    * Global (platform-wide) badges shown in the profile's own badge shelf —
    * separate from community roles. Always in this order:
@@ -283,6 +285,7 @@ export async function hydrateUser(
     lastSeen: presenceDetailsVisible ? (user.lastSeen ?? null) : null,
     isAnonymous: user.isAnonymous === true,
     isFounder,
+    official: user.official === true || isFounder,
     badges,
     links: (user.links ?? []).slice(0, 6),
     avatarFrame: user.avatarFrame ?? null,

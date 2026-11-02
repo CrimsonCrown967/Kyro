@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from "react-router";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { ProfileDecorationLayer } from "@/components/app/DecorationArt";
-import { GlobalBadges } from "@/components/app/GlobalBadges";
+import { GlobalBadges, OfficialBadge } from "@/components/app/GlobalBadges";
 import { ServerTagChip } from "@/components/app/ServerTag";
 import { StyledDisplayName } from "@/components/app/StyledDisplayName";
 import { PresenceDot, UserAvatar } from "@/components/app/UserAvatar";
@@ -106,6 +106,7 @@ export function UserPreviewPanel() {
               <UserAvatar user={user} size="xl" />
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <StyledDisplayName user={user} className="text-2xl" />
+                {user.official && <OfficialBadge />}
                 {user.serverTag && (
                   <ServerTagChip tag={user.serverTag} ownerName={user.name} />
                 )}

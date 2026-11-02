@@ -90,6 +90,7 @@ export const me = query({
       role: user.role ?? null,
       hasUsername: Boolean(user.username),
       usernameChangedAt: user.usernameChangedAt ?? null,
+      emailChangedAt: user.emailChangedAt ?? null,
     };
   },
 });
@@ -925,6 +926,7 @@ export const exportData = mutation({
         status: user.status,
         customStatus: user.customStatus,
         createdAt: user.createdAt,
+        emailChangedAt: user.emailChangedAt,
       },
       friends: friendDocs
         .filter((doc): doc is Doc<"users"> => Boolean(doc))

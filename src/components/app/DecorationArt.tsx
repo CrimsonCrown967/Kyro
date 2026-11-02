@@ -24,7 +24,7 @@ export function AvatarDecorationArt({
       data-animated={item.animated ? "true" : "false"}
       data-kind={item.kind}
       className={cn(
-        "avatar-decoration-art pointer-events-none absolute -inset-[24%] z-20 size-[148%] overflow-visible",
+        "avatar-decoration-art pointer-events-none absolute left-1/2 top-1/2 z-20 size-[138%] -translate-x-1/2 -translate-y-1/2 overflow-visible",
         className,
       )}
       style={{ color: a }}

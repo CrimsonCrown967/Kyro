@@ -32,6 +32,7 @@ import {
   GLOBAL_BADGE_META,
   GRANTABLE_BADGES,
   InlineBadge,
+  OfficialBadge,
 } from "@/components/app/GlobalBadges";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -217,6 +218,7 @@ export function ProfileCard() {
                 <DialogHeader className="mt-3 space-y-1 text-left">
                   <DialogTitle className="flex flex-wrap items-center gap-x-2 gap-y-1 text-2xl font-bold leading-tight sm:text-3xl">
                     <StyledDisplayName user={user} className="break-words" />
+                    {user.official && <OfficialBadge />}
                     <InlineBadge
                       badges={user.badges}
                       primaryBadge={user.primaryBadge}

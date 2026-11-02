@@ -167,7 +167,7 @@ export function InviteDialog({
   }, []);
   const [copied, setCopied] = useState<string | null>(null);
 
-  // Canonical Kyro origin — invites point at kyro.nylix.org everywhere.
+  // Canonical Kyro origin — invites point at kyro-chat.cyou everywhere.
   const linkFor = (code: string) => inviteUrl(code);
 
   const create = async () => {

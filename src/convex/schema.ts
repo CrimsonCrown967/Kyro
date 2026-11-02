@@ -53,6 +53,8 @@ const schema = defineSchema(
       coFounder: v.optional(v.boolean()),
       /** Site-wide Verified badge — granted by admins. */
       verified: v.optional(v.boolean()),
+      /** Official Kyro-operated identity, rendered with an OFFICIAL check. */
+      official: v.optional(v.boolean()),
       /** Site-wide Bug Hunter badge — granted for a confirmed bug report. */
       bugHunter: v.optional(v.boolean()),
       /** Site-wide VIP badge — granted to very important members. */
@@ -112,6 +114,8 @@ const schema = defineSchema(
       createdAt: v.optional(v.number()),
       /** Username changes are limited to once every hour. */
       usernameChangedAt: v.optional(v.number()),
+      /** Email changes are limited to once every seven days. */
+      emailChangedAt: v.optional(v.number()),
       /** External profile links (YouTube, site, portfolio …), max 6. */
       links: v.optional(
         v.array(v.object({ label: v.string(), url: v.string() })),

@@ -1,5 +1,13 @@
 import { useAction, useConvex, useMutation } from "convex/react";
-import { BarChart3, Paperclip, Send, Smile, X } from "@/components/icons";
+import {
+  BarChart3,
+  Mic,
+  Paperclip,
+  Send,
+  Smile,
+  StopCircle,
+  X,
+} from "@/components/icons";
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -76,8 +84,16 @@ export function Composer({
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionStart, setMentionStart] = useState<number | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);
+  const [recording, setRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const lastTypingRef = useRef(0);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const recordingStreamRef = useRef<MediaStream | null>(null);
+  const recordingChunksRef = useRef<Blob[]>([]);
+  const discardRecordingRef = useRef(false);
+  const recordingIntervalRef = useRef<number | null>(null);
+  const recordingTimeoutRef = useRef<number | null>(null);
 
   const updateMentionState = (value: string, cursor: number | null) => {
     if (cursor === null) {
@@ -147,6 +163,22 @@ export function Composer({
     element.style.height = `${Math.min(element.scrollHeight, 220)}px`;
   }, [draft]);
 
+  useEffect(
+    () => () => {
+      discardRecordingRef.current = true;
+      const recorder = recorderRef.current;
+      if (recorder && recorder.state !== "inactive") recorder.stop();
+      recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
+      if (recordingIntervalRef.current !== null) {
+        window.clearInterval(recordingIntervalRef.current);
+      }
+      if (recordingTimeoutRef.current !== null) {
+        window.clearTimeout(recordingTimeoutRef.current);
+      }
+    },
+    [containerId, containerType],
+  );
+
   const send = async () => {
     const content = draft.trim();
     if (!content && attachments.length === 0) return;
@@ -196,12 +228,116 @@ export function Composer({
         const stored = await upload(file);
         setAttachments((state) => [...state, stored]);
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Upload failed.");
+        toast.error(readableError(error, "Upload failed."));
       } finally {
         setUploading((count) => count - 1);
       }
     }
   };
+
+  const clearRecordingTimers = () => {
+    if (recordingIntervalRef.current !== null) {
+      window.clearInterval(recordingIntervalRef.current);
+      recordingIntervalRef.current = null;
+    }
+    if (recordingTimeoutRef.current !== null) {
+      window.clearTimeout(recordingTimeoutRef.current);
+      recordingTimeoutRef.current = null;
+    }
+  };
+
+  const stopRecording = (discard = false) => {
+    discardRecordingRef.current = discard;
+    clearRecordingTimers();
+    const recorder = recorderRef.current;
+    if (recorder && recorder.state !== "inactive") recorder.stop();
+    recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
+    setRecording(false);
+  };
+
+  const startRecording = async () => {
+    if (recording || uploading > 0 || busy) return;
+    if (attachments.length >= MAX_ATTACHMENTS) {
+      toast.error(`You can attach up to ${MAX_ATTACHMENTS} files.`);
+      return;
+    }
+    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+      toast.error("Voice messages aren't supported by this browser.");
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
+      const preferredTypes = [
+        "audio/webm;codecs=opus",
+        "audio/webm",
+        "audio/mp4",
+        "audio/ogg;codecs=opus",
+      ];
+      const mimeType = preferredTypes.find((type) =>
+        MediaRecorder.isTypeSupported(type),
+      );
+      const recorder = new MediaRecorder(stream, {
+        ...(mimeType ? { mimeType } : {}),
+        audioBitsPerSecond: 48_000,
+      });
+      recordingChunksRef.current = [];
+      discardRecordingRef.current = false;
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) recordingChunksRef.current.push(event.data);
+      };
+      recorder.onstop = () => {
+        clearRecordingTimers();
+        stream.getTracks().forEach((track) => track.stop());
+        recorderRef.current = null;
+        recordingStreamRef.current = null;
+        const chunks = recordingChunksRef.current;
+        recordingChunksRef.current = [];
+        if (discardRecordingRef.current || chunks.length === 0) return;
+        const type = recorder.mimeType || mimeType || "audio/webm";
+        const extension = type.includes("mp4")
+          ? "m4a"
+          : type.includes("ogg")
+            ? "ogg"
+            : "webm";
+        const file = new File(
+          [new Blob(chunks, { type })],
+          `voice-message-${Date.now()}.${extension}`,
+          { type },
+        );
+        void addFiles([file]);
+      };
+      recorderRef.current = recorder;
+      recordingStreamRef.current = stream;
+      recorder.start(500);
+      setRecordingSeconds(0);
+      setRecording(true);
+      recordingIntervalRef.current = window.setInterval(
+        () => setRecordingSeconds((seconds) => seconds + 1),
+        1000,
+      );
+      recordingTimeoutRef.current = window.setTimeout(
+        () => stopRecording(false),
+        5 * 60 * 1000,
+      );
+    } catch (error) {
+      recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
+      toast.error(
+        error instanceof DOMException && error.name === "NotAllowedError"
+          ? "Microphone permission was denied. Allow it to record a voice message."
+          : readableError(error, "Could not start voice recording."),
+      );
+    }
+  };
+
+  const recordingTime = `${Math.floor(recordingSeconds / 60)}:${String(
+    recordingSeconds % 60,
+  ).padStart(2, "0")}`;
 
   if (disabledReason) {
     return (
@@ -264,6 +400,22 @@ export function Composer({
               Uploading {uploading}…
             </span>
           )}
+        </div>
+      )}
+
+      {recording && (
+        <div className="mb-1 flex items-center justify-between gap-3 rounded-xl border border-destructive/35 bg-destructive/10 px-3 py-2 text-xs">
+          <span className="flex items-center gap-2 font-semibold text-destructive">
+            <span className="size-2 animate-pulse rounded-full bg-destructive" />
+            Recording · {recordingTime}
+          </span>
+          <button
+            type="button"
+            onClick={() => stopRecording(true)}
+            className="font-medium text-muted-foreground hover:text-destructive"
+          >
+            Discard
+          </button>
         </div>
       )}
 
@@ -458,6 +610,31 @@ export function Composer({
 
         <button
           type="button"
+          aria-label={
+            recording ? "Stop and attach voice message" : "Record voice message"
+          }
+          title={
+            recording ? "Stop and attach voice message" : "Record voice message"
+          }
+          onClick={() =>
+            recording ? stopRecording(false) : void startRecording()
+          }
+          className={cn(
+            "rounded-md p-2 transition-colors",
+            recording
+              ? "bg-destructive/15 text-destructive"
+              : "text-muted-foreground hover:bg-background hover:text-foreground",
+          )}
+        >
+          {recording ? (
+            <StopCircle className="size-4" />
+          ) : (
+            <Mic className="size-4" />
+          )}
+        </button>
+
+        <button
+          type="button"
           aria-label="Create poll"
           title="Create poll"
           onClick={() => setPollOpen(true)}
@@ -470,7 +647,12 @@ export function Composer({
           size="icon"
           variant="ghost"
           onClick={() => void send()}
-          disabled={busy || (!draft.trim() && attachments.length === 0)}
+          disabled={
+            busy ||
+            recording ||
+            uploading > 0 ||
+            (!draft.trim() && attachments.length === 0)
+          }
           aria-label="Send message"
           className="text-primary hover:bg-primary/10"
         >

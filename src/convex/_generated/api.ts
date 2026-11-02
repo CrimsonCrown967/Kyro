@@ -27,10 +27,12 @@ import type * as forums from "../forums.js";
 import type * as gifs from "../gifs.js";
 import type * as http from "../http.js";
 import type * as lib from "../lib.js";
+import type * as maintenance from "../maintenance.js";
 import type * as messages from "../messages.js";
 import type * as moderation from "../moderation.js";
 import type * as notifications from "../notifications.js";
 import type * as passwordReset from "../passwordReset.js";
+import type * as platformStats from "../platformStats.js";
 import type * as polls from "../polls.js";
 import type * as reports from "../reports.js";
 import type * as roles from "../roles.js";
@@ -46,6 +48,8 @@ import type * as threads from "../threads.js";
 import type * as totp from "../totp.js";
 import type * as uploadSecurity from "../uploadSecurity.js";
 import type * as users from "../users.js";
+import type * as users_changeEmail from "../users/changeEmail.js";
+import type * as users_changeEmailInternal from "../users/changeEmailInternal.js";
 import type * as users_changePassword from "../users/changePassword.js";
 import type * as users_createAccount from "../users/createAccount.js";
 import type * as users_lib from "../users/lib.js";
@@ -70,10 +74,12 @@ const fullApi: ApiFromModules<{
   "gifs": typeof gifs,
   "http": typeof http,
   "lib": typeof lib,
+  "maintenance": typeof maintenance,
   "messages": typeof messages,
   "moderation": typeof moderation,
   "notifications": typeof notifications,
   "passwordReset": typeof passwordReset,
+  "platformStats": typeof platformStats,
   "polls": typeof polls,
   "reports": typeof reports,
   "roles": typeof roles,
@@ -89,6 +95,8 @@ const fullApi: ApiFromModules<{
   "totp": typeof totp,
   "uploadSecurity": typeof uploadSecurity,
   "users": typeof users,
+  "users/changeEmail": typeof users_changeEmail,
+  "users/changeEmailInternal": typeof users_changeEmailInternal,
   "users/changePassword": typeof users_changePassword,
   "users/createAccount": typeof users_createAccount,
   "users/lib": typeof users_lib,

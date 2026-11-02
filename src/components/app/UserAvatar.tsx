@@ -168,18 +168,23 @@ export function UserAvatar({
   const frame = findFrame(user.avatarFrame);
 
   return (
-    <span className={cn("relative inline-flex shrink-0", className)}>
+    <span
+      className={cn(
+        "relative inline-flex shrink-0 items-center justify-center",
+        SIZES[size],
+        className,
+      )}
+    >
       <span
         className={cn(
-          "relative z-10 inline-flex rounded-full",
+          "relative z-10 inline-flex size-full rounded-full",
           frame && `bg-gradient-to-br ${frame.gradient} p-[2px]`,
         )}
         title={frame ? `${frame.label} avatar frame` : undefined}
       >
         <span
           className={cn(
-            "flex items-center justify-center overflow-hidden rounded-full font-semibold text-white",
-            SIZES[size],
+            "flex size-full items-center justify-center overflow-hidden rounded-full font-semibold text-white",
           )}
           style={
             user.avatarUrl

@@ -6,7 +6,7 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { UserAvatar, DeviceBadge } from "@/components/app/UserAvatar";
 import { ServerTagChip } from "@/components/app/ServerTag";
 import { CrownBadge } from "@/components/app/CrownBadge";
-import { InlineBadge } from "@/components/app/GlobalBadges";
+import { InlineBadge, OfficialBadge } from "@/components/app/GlobalBadges";
 import { StyledDisplayName } from "@/components/app/StyledDisplayName";
 import { Input } from "@/components/ui/input";
 import type { PresenceState } from "@/lib/format";
@@ -21,6 +21,7 @@ type Member = {
     presence: PresenceState;
     customStatus: string | null;
     isFounder?: boolean;
+    official?: boolean;
     /** Global badges (hydrated server-side) — chosen/highest shown inline. */
     badges?: string[];
     /** The badge this member picked to show next to their name. */
@@ -104,6 +105,7 @@ export function MemberList({ serverId }: { serverId: string }) {
             roleColor={member.topRoleColor}
             className="truncate text-sm"
           />
+          {member.user.official && <OfficialBadge compact />}
           {member.user.badges && member.user.badges.length > 0 ? (
             <InlineBadge
               badges={member.user.badges}
