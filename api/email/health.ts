@@ -1,5 +1,5 @@
-import { verifySmtpConnection } from "../../server/email/transport";
-import { isAuthorized, safeErrorCode } from "../../server/email/validation";
+import { verifySmtpConnection } from "../../server/email/transport.js";
+import { isAuthorized, safeErrorCode } from "../../server/email/validation.js";
 
 interface ApiRequest {
   method?: string;

@@ -1,10 +1,10 @@
-import { renderEmailTemplate } from "../../server/email/templates";
-import { sendTransactionalEmail } from "../../server/email/transport";
+import { renderEmailTemplate } from "../../server/email/templates.js";
+import { sendTransactionalEmail } from "../../server/email/transport.js";
 import {
   isAuthorized,
   safeErrorCode,
   validateDispatchRequest,
-} from "../../server/email/validation";
+} from "../../server/email/validation.js";
 
 interface ApiRequest {
   method?: string;

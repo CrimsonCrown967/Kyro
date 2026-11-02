@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import nodemailer, { type Transporter } from "nodemailer-secure";
-import type { RenderedEmail } from "./templates";
-import { validateMailbox } from "./validation";
+import type { RenderedEmail } from "./templates.js";
+import { validateMailbox } from "./validation.js";
 
 let cachedTransport: Transporter | null = null;
 

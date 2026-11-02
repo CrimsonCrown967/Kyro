@@ -1,4 +1,4 @@
-import type { EmailTemplateName } from "./validation";
+import type { EmailTemplateName } from "./validation.js";
 
 export interface RenderedEmail {
   subject: string;
