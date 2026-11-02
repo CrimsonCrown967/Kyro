@@ -487,6 +487,7 @@ export const members = query({
           user,
           nickname: row.nickname ?? null,
           joinedAt: row.joinedAt,
+          communicationDisabledUntil: row.communicationDisabledUntil ?? null,
           isOwner: row.userId === ownerId,
           roles: memberRoles.map((role) => ({
             id: role._id as string,
@@ -1013,6 +1014,150 @@ export const update = mutation({
   },
 });
 
+/**
+ * Portable, secret-free community configuration backup. It intentionally
+ * excludes members, messages, invites, bans and uploaded file capabilities.
+ */
+export const exportConfiguration = mutation({
+  args: { serverId: v.id("servers") },
+  handler: async (ctx, { serverId }) => {
+    const { id } = await requireUser(ctx);
+    const access = await requireServerAccess(ctx, serverId, id);
+    if (
+      access.server.ownerId !== id &&
+      !can(access.permissions, PERMISSIONS.MANAGE_SERVER)
+    ) {
+      throw new Error("You don't have permission to export this community.");
+    }
+    const [categories, channels, roles, automod] = await Promise.all([
+      ctx.db
+        .query("categories")
+        .withIndex("by_server", (q) => q.eq("serverId", serverId))
+        .collect(),
+      ctx.db
+        .query("channels")
+        .withIndex("by_server", (q) => q.eq("serverId", serverId))
+        .collect(),
+      ctx.db
+        .query("serverRoles")
+        .withIndex("by_server", (q) => q.eq("serverId", serverId))
+        .collect(),
+      ctx.db
+        .query("serverAutomod")
+        .withIndex("by_server", (q) => q.eq("serverId", serverId))
+        .unique(),
+    ]);
+    const roleKeys = new Map(
+      roles.map((role) => [role._id, `role:${role.name}:${role.position}`]),
+    );
+    const categoryKeys = new Map(
+      categories.map((category) => [
+        category._id,
+        `category:${category.name}:${category.position}`,
+      ]),
+    );
+    const channelKeys = new Map(
+      channels.map((channel) => [
+        channel._id,
+        `channel:${channel.name}:${channel.position}`,
+      ]),
+    );
+    const server = access.server;
+    const exportedAt = new Date().toISOString();
+    const payload = {
+      format: "kyro-community-configuration",
+      version: 1,
+      exportedAt,
+      community: {
+        name: server.name,
+        description: server.description ?? null,
+        rules: server.rules ?? null,
+        welcomeMessage: server.welcomeMessage ?? null,
+        isPublic: server.isPublic,
+        tags: server.tags ?? [],
+        tag: server.tag ?? null,
+        links: server.links ?? [],
+        verificationLevel: server.verificationLevel ?? "none",
+        minAccountAgeMs: server.minAccountAgeMs ?? 0,
+        applyToJoin: server.applyToJoin === true,
+        applicationQuestions: server.applicationQuestions ?? [],
+        themeAccent: server.themeAccent ?? null,
+        themeTint: server.themeTint ?? null,
+        rulesChannelKey: server.rulesChannelId
+          ? (channelKeys.get(server.rulesChannelId) ?? null)
+          : null,
+      },
+      roles: roles
+        .slice()
+        .sort((a, b) => a.position - b.position)
+        .map((role) => ({
+          key: roleKeys.get(role._id),
+          name: role.name,
+          color: role.color ?? null,
+          position: role.position,
+          permissions: role.permissions,
+          isDefault: role.isDefault,
+        })),
+      categories: categories
+        .slice()
+        .sort((a, b) => a.position - b.position)
+        .map((category) => ({
+          key: categoryKeys.get(category._id),
+          name: category.name,
+          position: category.position,
+        })),
+      channels: channels
+        .slice()
+        .sort((a, b) => a.position - b.position)
+        .map((channel) => ({
+          key: channelKeys.get(channel._id),
+          categoryKey: channel.categoryId
+            ? (categoryKeys.get(channel.categoryId) ?? null)
+            : null,
+          name: channel.name,
+          topic: channel.topic ?? null,
+          kind: channel.kind ?? "text",
+          position: channel.position,
+          slowMode: channel.slowMode ?? 0,
+          readOnly: channel.readOnly === true,
+          permissionOverwrites: (channel.permissionOverwrites ?? []).map(
+            (overwrite) => ({
+              roleKey: roleKeys.get(overwrite.roleId) ?? null,
+              allow: overwrite.allow,
+              deny: overwrite.deny,
+            }),
+          ),
+        })),
+      automod: automod
+        ? {
+            enabled: automod.enabled,
+            blockedWords: automod.blockedWords,
+            blockInvites: automod.blockInvites,
+            blockLinks: automod.blockLinks,
+            maxMentions: automod.maxMentions,
+            blockCaps: automod.blockCaps,
+            blockSpam: automod.blockSpam,
+            exemptRoleKeys: automod.exemptRoleIds
+              .map((roleId) => roleKeys.get(roleId))
+              .filter((key): key is string => key !== undefined),
+            exemptChannelKeys: automod.exemptChannelIds
+              .map((channelId) => channelKeys.get(channelId))
+              .filter((key): key is string => key !== undefined),
+          }
+        : null,
+    };
+    await logAudit(ctx, {
+      serverId,
+      actorId: id,
+      action: "server.export_configuration",
+      targetType: "server",
+      targetId: serverId,
+      details: "Downloaded a secret-free configuration backup",
+    });
+    return payload;
+  },
+});
+
 export const remove = mutation({
   args: { serverId: v.id("servers"), confirm: v.string() },
   handler: async (ctx, { serverId, confirm }) => {
@@ -1181,6 +1326,14 @@ export const kick = mutation({
       throw new Error("You can't remove someone with an equal or higher role.");
     }
     await ctx.db.delete(target._id);
+    await ctx.db.insert("moderationCases", {
+      serverId,
+      userId,
+      moderatorId: id,
+      action: "kick",
+      reason: reason?.trim().slice(0, 500) || "Removed from the community.",
+      createdAt: Date.now(),
+    });
     await logAudit(ctx, {
       serverId,
       actorId: id,
@@ -1241,6 +1394,14 @@ export const ban = mutation({
         createdAt: Date.now(),
       });
     }
+    await ctx.db.insert("moderationCases", {
+      serverId,
+      userId,
+      moderatorId: id,
+      action: "ban",
+      reason: reason?.trim().slice(0, 500) || "Banned from the community.",
+      createdAt: Date.now(),
+    });
     await logAudit(ctx, {
       serverId,
       actorId: id,
@@ -1274,6 +1435,14 @@ export const unban = mutation({
       )
       .unique();
     if (existing) await ctx.db.delete(existing._id);
+    await ctx.db.insert("moderationCases", {
+      serverId,
+      userId,
+      moderatorId: id,
+      action: "unban",
+      reason: "Ban lifted.",
+      createdAt: Date.now(),
+    });
     await logAudit(ctx, {
       serverId,
       actorId: id,

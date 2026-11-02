@@ -2723,53 +2723,382 @@ function SessionsTab() {
   const revokeOthers = useMutation(api.users.revokeOtherSessions);
 
   return (
-    <Section
-      title="Active sessions"
-      description="Sign out anywhere you no longer use Kyro."
-    >
-      <div className="grid gap-2">
-        {sessions === undefined ? (
-          <p className="text-sm text-muted-foreground">Loading…</p>
-        ) : sessions.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            No active sessions found.
-          </p>
+    <>
+      <TwoFactorSettings />
+      <Section
+        title="Active sessions"
+        description="Sign out anywhere you no longer use Kyro."
+      >
+        <div className="grid gap-2">
+          {sessions === undefined ? (
+            <p className="text-sm text-muted-foreground">Loading…</p>
+          ) : sessions.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No active sessions found.
+            </p>
+          ) : (
+            sessions.map((session) => (
+              <div
+                key={session.id}
+                className="flex items-center justify-between gap-3 rounded-lg border border-border/70 bg-surface px-4 py-3"
+              >
+                <div>
+                  <p className="text-sm font-medium">
+                    {session.current ? "This device" : "Another device"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Valid until{" "}
+                    {new Date(session.expirationTime).toLocaleDateString()}
+                  </p>
+                </div>
+                {!session.current && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      void revoke({
+                        sessionId: session.id as Id<"authSessions">,
+                      })
+                    }
+                  >
+                    Revoke
+                  </Button>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+        <div className="mt-3">
+          <Button variant="outline" onClick={() => void revokeOthers()}>
+            Sign out all other sessions
+          </Button>
+        </div>
+      </Section>
+    </>
+  );
+}
+
+function TwoFactorSettings() {
+  const status = useQuery(api.security.status);
+  const begin = useAction(api.security.beginTwoFactorSetup);
+  const confirm = useAction(api.security.confirmTwoFactorSetup);
+  const disable = useAction(api.security.disableTwoFactor);
+  const regenerate = useAction(api.security.regenerateRecoveryCodes);
+  const cancelSetup = useMutation(api.security.cancelTwoFactorSetup);
+  const [setup, setSetup] = useState<{ secret: string; uri: string } | null>(
+    null,
+  );
+  const [code, setCode] = useState("");
+  const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
+  const [showDisable, setShowDisable] = useState(false);
+  const [showRegenerate, setShowRegenerate] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const passkeySupported =
+    typeof window !== "undefined" && "PublicKeyCredential" in window;
+
+  const start = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const result = await begin();
+      setSetup(result);
+      setCode("");
+      setRecoveryCodes([]);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not start setup.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const finish = async () => {
+    if (busy || code.trim().length !== 6) return;
+    setBusy(true);
+    try {
+      const result = await confirm({ code });
+      setRecoveryCodes(result.recoveryCodes);
+      setSetup(null);
+      setCode("");
+      toast.success("Two-step verification enabled.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not verify that code.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const turnOff = async () => {
+    if (busy || code.trim().length < 6) return;
+    setBusy(true);
+    try {
+      await disable({ code });
+      setCode("");
+      setShowDisable(false);
+      setRecoveryCodes([]);
+      toast.success("Two-step verification disabled.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not disable it.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const refreshCodes = async () => {
+    if (busy || code.trim().length !== 6) return;
+    setBusy(true);
+    try {
+      const result = await regenerate({ code });
+      setRecoveryCodes(result.recoveryCodes);
+      setCode("");
+      setShowRegenerate(false);
+      toast.success("New recovery codes created. Old codes no longer work.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Could not regenerate recovery codes.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const copyRecoveryCodes = async () => {
+    await navigator.clipboard.writeText(recoveryCodes.join("\n"));
+    toast.success("Recovery codes copied.");
+  };
+
+  return (
+    <>
+      <Section
+        title="Two-step verification"
+        description="Require an authenticator app or one-time recovery code after your password."
+      >
+        {status === undefined ? (
+          <p className="text-sm text-muted-foreground">Loading security…</p>
         ) : (
-          sessions.map((session) => (
-            <div
-              key={session.id}
-              className="flex items-center justify-between gap-3 rounded-lg border border-border/70 bg-surface px-4 py-3"
-            >
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/70 bg-surface p-4">
               <div>
-                <p className="text-sm font-medium">
-                  {session.current ? "This device" : "Another device"}
+                <p className="flex items-center gap-2 text-sm font-semibold">
+                  <ShieldCheck className="size-4 text-primary" /> Authenticator
+                  app
+                  <span
+                    className={cn(
+                      "rounded-full px-2 py-0.5 text-[10px]",
+                      status.twoFactorEnabled
+                        ? "bg-success/10 text-success"
+                        : "bg-muted text-muted-foreground",
+                    )}
+                  >
+                    {status.twoFactorEnabled ? "Enabled" : "Off"}
+                  </span>
                 </p>
-                <p className="text-xs text-muted-foreground">
-                  Valid until{" "}
-                  {new Date(session.expirationTime).toLocaleDateString()}
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {status.twoFactorEnabled
+                    ? `${status.recoveryCodesRemaining} unused recovery code${status.recoveryCodesRemaining === 1 ? "" : "s"}.`
+                    : status.setupPending
+                      ? "Setup was started but not confirmed. Restart it to get a fresh key."
+                      : "Works with Google Authenticator, 1Password, Authy and other TOTP apps."}
                 </p>
               </div>
-              {!session.current && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() =>
-                    void revoke({ sessionId: session.id as Id<"authSessions"> })
-                  }
-                >
-                  Revoke
+              {status.twoFactorEnabled ? (
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setCode("");
+                      setShowRegenerate((value) => !value);
+                      setShowDisable(false);
+                    }}
+                  >
+                    New recovery codes
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => {
+                      setCode("");
+                      setShowDisable((value) => !value);
+                      setShowRegenerate(false);
+                    }}
+                  >
+                    Disable
+                  </Button>
+                </div>
+              ) : (
+                <Button size="sm" disabled={busy} onClick={() => void start()}>
+                  {busy && <Loader2 className="mr-1.5 size-4 animate-spin" />}
+                  {status.setupPending ? "Restart setup" : "Enable"}
                 </Button>
               )}
             </div>
-          ))
+
+            {setup && !status.twoFactorEnabled && (
+              <div className="space-y-3 rounded-xl border border-primary/25 bg-primary/5 p-4">
+                <div>
+                  <p className="text-sm font-semibold">
+                    1. Add Kyro to your app
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Enter this setup key manually. It is shown only during this
+                    setup flow.
+                  </p>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <code className="break-all rounded-md border border-border bg-background px-3 py-2 text-xs">
+                      {setup.secret}
+                    </code>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        void navigator.clipboard
+                          .writeText(setup.secret)
+                          .then(() => toast.success("Setup key copied."))
+                      }
+                    >
+                      <Copy className="mr-1.5 size-3.5" /> Copy
+                    </Button>
+                    <a
+                      href={setup.uri}
+                      className="text-xs font-medium text-primary hover:underline"
+                    >
+                      Open authenticator app
+                    </a>
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="two-factor-confirm">
+                    2. Enter the current 6-digit code
+                  </Label>
+                  <div className="mt-1.5 flex gap-2">
+                    <Input
+                      id="two-factor-confirm"
+                      value={code}
+                      onChange={(event) =>
+                        setCode(
+                          event.target.value.replace(/\D/g, "").slice(0, 6),
+                        )
+                      }
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      placeholder="123456"
+                    />
+                    <Button
+                      disabled={busy || code.length !== 6}
+                      onClick={() => void finish()}
+                    >
+                      Confirm
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      onClick={() =>
+                        void cancelSetup().then(() => setSetup(null))
+                      }
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {(showDisable || showRegenerate) && status.twoFactorEnabled && (
+              <div className="rounded-xl border border-border/70 bg-surface p-4">
+                <Label htmlFor="security-confirm-code">
+                  {showDisable
+                    ? "Authenticator or recovery code"
+                    : "Current authenticator code"}
+                </Label>
+                <div className="mt-1.5 flex gap-2">
+                  <Input
+                    id="security-confirm-code"
+                    value={code}
+                    onChange={(event) =>
+                      setCode(event.target.value.toUpperCase())
+                    }
+                    autoComplete="one-time-code"
+                    placeholder={showDisable ? "123456 or XXXX-XXXX" : "123456"}
+                  />
+                  <Button
+                    variant={showDisable ? "destructive" : "default"}
+                    disabled={busy || code.trim().length < 6}
+                    onClick={() =>
+                      void (showDisable ? turnOff() : refreshCodes())
+                    }
+                  >
+                    {busy && <Loader2 className="mr-1.5 size-4 animate-spin" />}
+                    {showDisable ? "Disable" : "Generate"}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {recoveryCodes.length > 0 && (
+              <div className="rounded-xl border border-warning/40 bg-warning/5 p-4">
+                <p className="text-sm font-semibold text-warning">
+                  Save these recovery codes now
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Each code works once. Kyro stores only hashes and cannot show
+                  these codes again.
+                </p>
+                <div className="mt-3 grid grid-cols-2 gap-2 font-mono text-xs sm:grid-cols-5">
+                  {recoveryCodes.map((recoveryCode) => (
+                    <code
+                      key={recoveryCode}
+                      className="rounded border border-border bg-background px-2 py-1.5 text-center"
+                    >
+                      {recoveryCode}
+                    </code>
+                  ))}
+                </div>
+                <Button
+                  className="mt-3"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void copyRecoveryCodes()}
+                >
+                  <Copy className="mr-1.5 size-3.5" /> Copy all codes
+                </Button>
+              </div>
+            )}
+          </div>
         )}
-      </div>
-      <div className="mt-3">
-        <Button variant="outline" onClick={() => void revokeOthers()}>
-          Sign out all other sessions
-        </Button>
-      </div>
-    </Section>
+      </Section>
+
+      <Section
+        title="Passkeys"
+        description="Passwordless WebAuthn sign-in groundwork for phones, security keys and device biometrics."
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/70 bg-surface p-4">
+          <div>
+            <p className="text-sm font-semibold">Passkey-ready account</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {passkeySupported
+                ? "This browser supports passkeys. Registration will unlock when Kyro's auth provider can verify WebAuthn end to end."
+                : "This browser does not currently expose WebAuthn passkey support."}
+            </p>
+            {status && status.passkeyCount > 0 && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                {status.passkeyCount} registered credential
+                {status.passkeyCount === 1 ? "" : "s"}.
+              </p>
+            )}
+          </div>
+          <Button size="sm" variant="outline" disabled>
+            Registration coming next
+          </Button>
+        </div>
+      </Section>
+    </>
   );
 }
 

@@ -861,6 +861,8 @@ export const exportData = mutation({
       messages,
       notes,
       reads,
+      accountSecurity,
+      passkeyCredentials,
     ] = await Promise.all([
       ctx.db
         .query("connections")
@@ -892,6 +894,14 @@ export const exportData = mutation({
         .take(1000),
       ctx.db
         .query("reads")
+        .withIndex("by_user", (q) => q.eq("userId", id))
+        .collect(),
+      ctx.db
+        .query("accountSecurity")
+        .withIndex("by_user", (q) => q.eq("userId", id))
+        .unique(),
+      ctx.db
+        .query("passkeyCredentials")
         .withIndex("by_user", (q) => q.eq("userId", id))
         .collect(),
     ]);
@@ -946,6 +956,17 @@ export const exportData = mutation({
         read: n.read,
         createdAt: new Date(n.createdAt).toISOString(),
       })),
+      security: {
+        twoFactorEnabled: accountSecurity?.twoFactorEnabled === true,
+        recoveryCodesRemaining: accountSecurity?.recoveryCodeHashes.length ?? 0,
+        passkeys: passkeyCredentials.map((passkey) => ({
+          name: passkey.name,
+          createdAt: new Date(passkey.createdAt).toISOString(),
+          lastUsedAt: passkey.lastUsedAt
+            ? new Date(passkey.lastUsedAt).toISOString()
+            : null,
+        })),
+      },
       readCursors: reads.length,
     };
     return payload;
@@ -979,6 +1000,10 @@ export const deleteAccount = mutation({
       blocks,
       sessions,
       accounts,
+      securityRows,
+      passkeys,
+      targetCases,
+      moderatorCases,
     ] = await Promise.all([
       ctx.db
         .query("serverMembers")
@@ -1012,6 +1037,22 @@ export const deleteAccount = mutation({
         .query("authAccounts")
         .withIndex("userIdAndProvider", (q) => q.eq("userId", id))
         .collect(),
+      ctx.db
+        .query("accountSecurity")
+        .withIndex("by_user", (q) => q.eq("userId", id))
+        .collect(),
+      ctx.db
+        .query("passkeyCredentials")
+        .withIndex("by_user", (q) => q.eq("userId", id))
+        .collect(),
+      ctx.db
+        .query("moderationCases")
+        .withIndex("by_user", (q) => q.eq("userId", id))
+        .collect(),
+      ctx.db
+        .query("moderationCases")
+        .withIndex("by_moderator", (q) => q.eq("moderatorId", id))
+        .collect(),
     ]);
 
     for (const membership of memberships) await ctx.db.delete(membership._id);
@@ -1024,6 +1065,12 @@ export const deleteAccount = mutation({
       }
     }
     for (const block of blocks) await ctx.db.delete(block._id);
+    for (const row of securityRows) await ctx.db.delete(row._id);
+    for (const passkey of passkeys) await ctx.db.delete(passkey._id);
+    const caseIds = new Set(
+      [...targetCases, ...moderatorCases].map((row) => row._id),
+    );
+    for (const caseId of caseIds) await ctx.db.delete(caseId);
 
     const ownMessages = await ctx.db
       .query("messages")

@@ -15,6 +15,7 @@ import type * as applications from "../applications.js";
 import type * as auth from "../auth.js";
 import type * as auth_config from "../auth.config.js";
 import type * as auth_emailOtp from "../auth/emailOtp.js";
+import type * as auth_passwordWithTwoFactor from "../auth/passwordWithTwoFactor.js";
 import type * as automod from "../automod.js";
 import type * as bugReports from "../bugReports.js";
 import type * as channels from "../channels.js";
@@ -27,17 +28,22 @@ import type * as gifs from "../gifs.js";
 import type * as http from "../http.js";
 import type * as lib from "../lib.js";
 import type * as messages from "../messages.js";
+import type * as moderation from "../moderation.js";
 import type * as notifications from "../notifications.js";
 import type * as passwordReset from "../passwordReset.js";
 import type * as polls from "../polls.js";
 import type * as reports from "../reports.js";
 import type * as roles from "../roles.js";
 import type * as schema from "../schema.js";
+import type * as security from "../security.js";
+import type * as securityInternal from "../securityInternal.js";
+import type * as securityRefs from "../securityRefs.js";
 import type * as servers from "../servers.js";
 import type * as sha256 from "../sha256.js";
 import type * as social from "../social.js";
 import type * as tempResetPassword from "../tempResetPassword.js";
 import type * as threads from "../threads.js";
+import type * as totp from "../totp.js";
 import type * as uploadSecurity from "../uploadSecurity.js";
 import type * as users from "../users.js";
 import type * as users_changePassword from "../users/changePassword.js";
@@ -52,6 +58,7 @@ const fullApi: ApiFromModules<{
   "auth": typeof auth,
   "auth.config": typeof auth_config,
   "auth/emailOtp": typeof auth_emailOtp,
+  "auth/passwordWithTwoFactor": typeof auth_passwordWithTwoFactor,
   "automod": typeof automod,
   "bugReports": typeof bugReports,
   "channels": typeof channels,
@@ -64,17 +71,22 @@ const fullApi: ApiFromModules<{
   "http": typeof http,
   "lib": typeof lib,
   "messages": typeof messages,
+  "moderation": typeof moderation,
   "notifications": typeof notifications,
   "passwordReset": typeof passwordReset,
   "polls": typeof polls,
   "reports": typeof reports,
   "roles": typeof roles,
   "schema": typeof schema,
+  "security": typeof security,
+  "securityInternal": typeof securityInternal,
+  "securityRefs": typeof securityRefs,
   "servers": typeof servers,
   "sha256": typeof sha256,
   "social": typeof social,
   "tempResetPassword": typeof tempResetPassword,
   "threads": typeof threads,
+  "totp": typeof totp,
   "uploadSecurity": typeof uploadSecurity,
   "users": typeof users,
   "users/changePassword": typeof users_changePassword,

@@ -252,6 +252,8 @@ const schema = defineSchema(
       joinedAt: v.number(),
       /** Mute every notification from this community. */
       muted: v.optional(v.boolean()),
+      /** Community timeout: this member cannot post until this timestamp. */
+      communicationDisabledUntil: v.optional(v.number()),
     })
       .index("by_server", ["serverId"])
       .index("by_user", ["userId"])
@@ -506,6 +508,31 @@ const schema = defineSchema(
       .index("by_server_user", ["serverId", "userId"])
       .index("by_server", ["serverId"]),
 
+    /** Persistent community moderation history for notes and staff actions. */
+    moderationCases: defineTable({
+      serverId: v.id("servers"),
+      userId: v.id("users"),
+      moderatorId: v.id("users"),
+      action: v.union(
+        v.literal("note"),
+        v.literal("warning"),
+        v.literal("timeout"),
+        v.literal("timeout_cleared"),
+        v.literal("kick"),
+        v.literal("ban"),
+        v.literal("unban"),
+      ),
+      reason: v.string(),
+      expiresAt: v.optional(v.number()),
+      resolvedAt: v.optional(v.number()),
+      resolvedById: v.optional(v.id("users")),
+      createdAt: v.number(),
+    })
+      .index("by_server", ["serverId", "createdAt"])
+      .index("by_server_user", ["serverId", "userId", "createdAt"])
+      .index("by_user", ["userId", "createdAt"])
+      .index("by_moderator", ["moderatorId", "createdAt"]),
+
     auditLogs: defineTable({
       serverId: v.id("servers"),
       actorId: v.id("users"),
@@ -661,6 +688,31 @@ const schema = defineSchema(
     })
       .index("by_user", ["userId"])
       .index("by_user_expiry", ["userId", "expiresAt"]),
+
+    /** Authenticator-app state. Secrets never leave private auth functions. */
+    accountSecurity: defineTable({
+      userId: v.id("users"),
+      totpSecret: v.optional(v.string()),
+      twoFactorEnabled: v.boolean(),
+      recoveryCodeHashes: v.array(v.string()),
+      setupStartedAt: v.optional(v.number()),
+      enabledAt: v.optional(v.number()),
+      updatedAt: v.number(),
+    }).index("by_user", ["userId"]),
+
+    /** WebAuthn credential shape reserved for passkey registration/sign-in. */
+    passkeyCredentials: defineTable({
+      userId: v.id("users"),
+      credentialId: v.string(),
+      publicKey: v.string(),
+      counter: v.number(),
+      name: v.string(),
+      transports: v.optional(v.array(v.string())),
+      createdAt: v.number(),
+      lastUsedAt: v.optional(v.number()),
+    })
+      .index("by_user", ["userId"])
+      .index("by_credential", ["credentialId"]),
 
     /**
      * One-shot codes for "forgot password": requested from the auth screen,

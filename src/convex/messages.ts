@@ -479,6 +479,17 @@ export const send = mutation({
       mutedServer = access.member.muted === true;
       const channel = access.channel;
 
+      const timeoutUntil = access.member.communicationDisabledUntil ?? 0;
+      if (
+        timeoutUntil > Date.now() &&
+        access.server.ownerId !== userId &&
+        !can(permissions, PERMISSIONS.MANAGE_MESSAGES)
+      ) {
+        throw new Error(
+          `You're timed out in this community until ${new Date(timeoutUntil).toUTCString()}.`,
+        );
+      }
+
       if (channel.readOnly && !can(permissions, PERMISSIONS.MANAGE_MESSAGES)) {
         throw new Error("This channel is read-only.");
       }

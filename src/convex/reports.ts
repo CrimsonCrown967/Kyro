@@ -61,7 +61,7 @@ export const create = mutation({
           type: "moderation",
           title: `New report in ${server.name}`,
           body: cleanReason,
-          link: `/dashboard/s/${serverId}/settings/moderation`,
+          link: `/dashboard/s/${serverId}/settings/reports`,
         });
       }
     }
@@ -72,6 +72,7 @@ export const create = mutation({
 /** Reports a moderator (or site admin) is allowed to review. */
 export const queue = query({
   args: {
+    serverId: v.optional(v.id("servers")),
     status: v.optional(
       v.union(
         v.literal("open"),
@@ -81,7 +82,7 @@ export const queue = query({
       ),
     ),
   },
-  handler: async (ctx, { status }) => {
+  handler: async (ctx, { serverId, status }) => {
     const { id, user } = await requireActiveUser(ctx);
     const memberships = await ctx.db
       .query("serverMembers")
@@ -93,6 +94,7 @@ export const queue = query({
       const access = await requireServerAccess(ctx, membership.serverId, id);
       if (
         access.server.ownerId === id ||
+        can(access.permissions, PERMISSIONS.MANAGE_SERVER) ||
         can(access.permissions, PERMISSIONS.BAN_MEMBERS) ||
         can(access.permissions, PERMISSIONS.MANAGE_MESSAGES)
       ) {
@@ -110,10 +112,11 @@ export const queue = query({
 
     const visible = reports.filter(
       (report) =>
-        user.role === "admin" ||
-        isFounderUser(user) ||
-        (report.serverId !== undefined &&
-          moderatedServers.has(report.serverId)),
+        (!serverId || report.serverId === serverId) &&
+        (user.role === "admin" ||
+          isFounderUser(user) ||
+          (report.serverId !== undefined &&
+            moderatedServers.has(report.serverId))),
     );
 
     const users = await hydrateUsers(
@@ -129,7 +132,9 @@ export const queue = query({
       status: report.status,
       createdAt: report.createdAt,
       reporter: users.get(report.reporterId) ?? null,
-      reported: report.reportedUserId ? (users.get(report.reportedUserId) ?? null) : null,
+      reported: report.reportedUserId
+        ? (users.get(report.reportedUserId) ?? null)
+        : null,
       serverId: (report.serverId as string | null) ?? null,
     }));
   },
@@ -179,6 +184,7 @@ export const resolve = mutation({
       const access = await requireServerAccess(ctx, report.serverId, id);
       allowed =
         access.server.ownerId === id ||
+        can(access.permissions, PERMISSIONS.MANAGE_SERVER) ||
         can(access.permissions, PERMISSIONS.BAN_MEMBERS) ||
         can(access.permissions, PERMISSIONS.MANAGE_MESSAGES);
     }

@@ -68,6 +68,8 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
   );
   const [accounts, setAccounts] = React.useState(rememberedAccounts);
   const [password, setPassword] = React.useState("");
+  const [twoFactorRequired, setTwoFactorRequired] = React.useState(false);
+  const [twoFactorCode, setTwoFactorCode] = React.useState("");
   const [confirmPassword, setConfirmPassword] = React.useState("");
   const [displayName, setDisplayName] = React.useState("");
   const [username, setUsername] = React.useState("");
@@ -107,17 +109,24 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
         flow: "signIn",
         email: signInEmail,
         password: signInPassword,
+        ...(twoFactorCode.trim() ? { code: twoFactorCode.trim() } : {}),
       });
       rememberAccount({ email: signInEmail });
       toast.success("Welcome back!");
       navigate(redirect);
     } catch (err) {
       console.error("Password sign-in error:", err);
-      setError(
-        err instanceof Error
-          ? err.message
-          : "That email and password combination didn't work.",
-      );
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.includes("TWO_FACTOR_REQUIRED")) {
+        setTwoFactorRequired(true);
+        setTwoFactorCode("");
+        setError(null);
+      } else if (message.includes("INVALID_TWO_FACTOR_CODE")) {
+        setTwoFactorRequired(true);
+        setError("That authenticator or recovery code isn't valid.");
+      } else {
+        setError("That email and password combination didn't work.");
+      }
       setIsLoading(false);
     }
   };
@@ -217,11 +226,15 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
   const startRegister = () => {
     setStep("register");
     setError(null);
+    setTwoFactorRequired(false);
+    setTwoFactorCode("");
   };
 
   const startSignIn = () => {
     setStep("signIn");
     setError(null);
+    setTwoFactorRequired(false);
+    setTwoFactorCode("");
   };
 
   const startForgotPassword = () => {
@@ -295,11 +308,21 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
         });
         navigate(redirect);
         return;
-      } catch {
+      } catch (signInError) {
         // Sessions were invalidated by the reset; fall back to the form.
         setStep("signIn");
-        setPassword("");
-        setError("Password changed — sign in with your new password.");
+        setPassword(newPassword);
+        const message =
+          signInError instanceof Error
+            ? signInError.message
+            : String(signInError);
+        if (message.includes("TWO_FACTOR_REQUIRED")) {
+          setTwoFactorRequired(true);
+          setTwoFactorCode("");
+          setError("Password changed. Enter your second factor to finish.");
+        } else {
+          setError("Password changed — sign in with your new password.");
+        }
       }
     } catch (err) {
       setError(
@@ -391,6 +414,8 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
                                 type="button"
                                 onClick={() => {
                                   setEmail(account.email);
+                                  setTwoFactorRequired(false);
+                                  setTwoFactorCode("");
                                   requestAnimationFrame(() =>
                                     document
                                       .getElementById("signin-password")
@@ -447,7 +472,11 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
                         required
                         autoComplete="email"
                         value={email}
-                        onChange={(e) => setEmail(e.target.value)}
+                        onChange={(e) => {
+                          setEmail(e.target.value);
+                          setTwoFactorRequired(false);
+                          setTwoFactorCode("");
+                        }}
                       />
                     </div>
                   </div>
@@ -465,6 +494,8 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
                         disabled={isLoading}
                         required
                         autoComplete="current-password"
+                        value={password}
+                        onChange={(event) => setPassword(event.target.value)}
                       />
                       <button
                         type="button"
@@ -483,6 +514,31 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
                       </button>
                     </div>
                   </div>
+
+                  {twoFactorRequired && (
+                    <div>
+                      <Label htmlFor="signin-two-factor">
+                        Authenticator or recovery code
+                      </Label>
+                      <Input
+                        id="signin-two-factor"
+                        name="code"
+                        value={twoFactorCode}
+                        onChange={(event) =>
+                          setTwoFactorCode(event.target.value.toUpperCase())
+                        }
+                        placeholder="123456 or XXXX-XXXX"
+                        autoComplete="one-time-code"
+                        autoFocus
+                        disabled={isLoading}
+                        required
+                      />
+                      <p className="mt-1.5 text-[11px] text-muted-foreground">
+                        Open your authenticator app, or use one unused recovery
+                        code.
+                      </p>
+                    </div>
+                  )}
 
                   <div className="flex items-center justify-end">
                     <button
@@ -503,7 +559,7 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
                     ) : (
                       <ArrowRight className="h-4 w-4" />
                     )}
-                    Sign in
+                    {twoFactorRequired ? "Verify and sign in" : "Sign in"}
                   </Button>
 
                   <p className="text-center text-sm text-muted-foreground">

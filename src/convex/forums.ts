@@ -41,8 +41,12 @@ async function requireForumAccess(
   }
   return {
     channel,
-    canPost: can(permissions, PERMISSIONS.SEND_MESSAGES) && !channel.readOnly,
+    canPost:
+      (access.member.communicationDisabledUntil ?? 0) <= Date.now() &&
+      can(permissions, PERMISSIONS.SEND_MESSAGES) &&
+      !channel.readOnly,
     canManage: can(permissions, PERMISSIONS.MANAGE_MESSAGES),
+    timeoutUntil: access.member.communicationDisabledUntil ?? null,
   };
 }
 
@@ -171,6 +175,11 @@ export const createPost = mutation({
   handler: async (ctx, { channelId, title, content, tags }) => {
     const { id } = await requireActiveUser(ctx);
     const access = await requireForumAccess(ctx, id, channelId);
+    if ((access.timeoutUntil ?? 0) > Date.now() && !access.canManage) {
+      throw new Error(
+        `You're timed out in this community until ${new Date(access.timeoutUntil!).toUTCString()}.`,
+      );
+    }
     if (!access.canPost) throw new Error("You can't post in this forum.");
     const cleanTitle = title.trim().slice(0, 120);
     const cleanContent = content.trim();
@@ -205,6 +214,11 @@ export const addComment = mutation({
     const access = await requireForumAccess(ctx, id, post.channelId);
     if (post.locked && !access.canManage)
       throw new Error("This post is locked.");
+    if ((access.timeoutUntil ?? 0) > Date.now() && !access.canManage) {
+      throw new Error(
+        `You're timed out in this community until ${new Date(access.timeoutUntil!).toUTCString()}.`,
+      );
+    }
     if (!access.canPost && !access.canManage) {
       throw new Error("You can't comment in this forum.");
     }

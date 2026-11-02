@@ -17,6 +17,7 @@ type ThreadAccess = {
   thread: Doc<"threads">;
   canSend: boolean;
   canManage: boolean;
+  timeoutUntil: number | null;
 };
 
 async function sourcePermissions(
@@ -32,7 +33,7 @@ async function sourcePermissions(
       userId,
       { enforceBlocks: false },
     );
-    return { canSend: true, canManage: false };
+    return { canSend: true, canManage: false, timeoutUntil: null };
   }
   const channel = await ctx.db.get(sourceId as Id<"channels">);
   if (!channel) throw new Error("That channel no longer exists.");
@@ -55,8 +56,12 @@ async function sourcePermissions(
     throw new Error("You don't have permission to view this thread.");
   }
   return {
-    canSend: !channel.readOnly && can(permissions, PERMISSIONS.SEND_MESSAGES),
+    canSend:
+      (access.member.communicationDisabledUntil ?? 0) <= Date.now() &&
+      !channel.readOnly &&
+      can(permissions, PERMISSIONS.SEND_MESSAGES),
     canManage: can(permissions, PERMISSIONS.MANAGE_MESSAGES),
+    timeoutUntil: access.member.communicationDisabledUntil ?? null,
   };
 }
 
@@ -176,6 +181,11 @@ export const send = mutation({
     const access = await requireThreadAccess(ctx, id, threadId);
     if (access.thread.locked && !access.canManage) {
       throw new Error("This thread is locked.");
+    }
+    if ((access.timeoutUntil ?? 0) > Date.now() && !access.canManage) {
+      throw new Error(
+        `You're timed out in this community until ${new Date(access.timeoutUntil!).toUTCString()}.`,
+      );
     }
     if (!access.canSend && !access.canManage) {
       throw new Error("You can't reply in this thread.");

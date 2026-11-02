@@ -166,6 +166,7 @@ export async function deleteServerData(
     applications,
     automodSettings,
     automodEvents,
+    moderationCases,
   ] = await Promise.all([
     ctx.db
       .query("channels")
@@ -215,6 +216,10 @@ export async function deleteServerData(
       .query("automodEvents")
       .withIndex("by_server", (q) => q.eq("serverId", serverId))
       .collect(),
+    ctx.db
+      .query("moderationCases")
+      .withIndex("by_server", (q) => q.eq("serverId", serverId))
+      .collect(),
   ]);
   for (const channel of channels) await deleteChannelData(ctx, channel);
   for (const emoji of emojis) {
@@ -232,6 +237,7 @@ export async function deleteServerData(
     ...applications,
     ...automodSettings,
     ...automodEvents,
+    ...moderationCases,
   ]) {
     await ctx.db.delete(row._id);
   }

@@ -35,6 +35,11 @@ import {
   JoinApplicationSettings,
 } from "@/components/app/ServerSafetySettings";
 import {
+  ModerateMemberDialog,
+  ModerationCaseActivity,
+} from "@/components/app/ServerModeration";
+import { ServerConfigurationExport } from "@/components/app/ServerConfigurationExport";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -178,7 +183,12 @@ export function ServerSettings({ serverId }: { serverId: string }) {
     PERMISSIONS.MANAGE_SERVER,
   );
   const canRoles = hasPermission(server.permissions, PERMISSIONS.MANAGE_ROLES);
+  const canKick = hasPermission(server.permissions, PERMISSIONS.KICK_MEMBERS);
   const canBans = hasPermission(server.permissions, PERMISSIONS.BAN_MEMBERS);
+  const canModerate =
+    canManage ||
+    canBans ||
+    hasPermission(server.permissions, PERMISSIONS.MANAGE_MESSAGES);
   const canChannels = hasPermission(
     server.permissions,
     PERMISSIONS.MANAGE_CHANNELS,
@@ -205,13 +215,18 @@ export function ServerSettings({ serverId }: { serverId: string }) {
     { id: "channels", label: "Channels", show: canChannels, icon: Hash },
     { id: "roles", label: "Roles", show: canRoles, icon: Shield },
     { id: "emojis", label: "Emojis", show: canEmojis, icon: MessagesSquare },
-    { id: "members", label: "Members", show: canRoles || canBans, icon: Users },
+    {
+      id: "members",
+      label: "Members",
+      show: canRoles || canKick || canModerate,
+      icon: Users,
+    },
     { id: "invites", label: "Invites", show: canInvites, icon: Link2 },
     { id: "bans", label: "Bans", show: canBans, icon: Ban },
     {
       id: "reports",
       label: "Reports",
-      show: canBans || canManage,
+      show: canModerate,
       icon: MessagesSquare,
     },
     { id: "audit", label: "Audit log", show: canAudit, icon: Eye },
@@ -1205,6 +1220,11 @@ export function ServerSettings({ serverId }: { serverId: string }) {
                 roles={server.roles}
               />
 
+              <ServerConfigurationExport
+                serverId={serverId}
+                serverName={server.name}
+              />
+
               <div className="mt-4 flex justify-end">
                 <Button onClick={() => void save()} disabled={saving}>
                   {saving && <Loader2 className="mr-2 size-4 animate-spin" />}
@@ -1254,7 +1274,10 @@ export function ServerSettings({ serverId }: { serverId: string }) {
             <MembersTab
               serverId={serverId}
               canRoles={canRoles}
+              canKick={canKick}
               canBans={canBans}
+              canModerate={canModerate}
+              canApplications={canBans || canManage}
             />
           )}
 
@@ -2930,11 +2953,17 @@ function ApplicationReview({ serverId }: { serverId: string }) {
 function MembersTab({
   serverId,
   canRoles,
+  canKick,
   canBans,
+  canModerate,
+  canApplications,
 }: {
   serverId: string;
   canRoles: boolean;
+  canKick: boolean;
   canBans: boolean;
+  canModerate: boolean;
+  canApplications: boolean;
 }) {
   const members = useQuery(api.servers.members, {
     serverId: serverId as Id<"servers">,
@@ -2948,6 +2977,7 @@ function MembersTab({
   const ban = useMutation(api.servers.ban);
   const [term, setTerm] = useState("");
   const [busy, setBusy] = useState(false);
+  const [moderatingId, setModeratingId] = useState<string | null>(null);
 
   const run = async (action: Promise<unknown>, success?: string) => {
     if (busy) return;
@@ -2987,7 +3017,7 @@ function MembersTab({
 
   return (
     <section className="rounded-xl border border-border/70 bg-panel p-5">
-      {canBans && <ApplicationReview serverId={serverId} />}
+      {canApplications && <ApplicationReview serverId={serverId} />}
       <h2 className="text-base font-semibold">
         Members
         {members ? ` · ${members.online.length + members.offline.length}` : ""}
@@ -3122,47 +3152,73 @@ function MembersTab({
                     )}
                   </div>
                 </div>
-                {canBans && !member.isOwner && member.user.id !== me?.id && (
-                  <div className="flex shrink-0 gap-3">
-                    <button
-                      type="button"
-                      disabled={busy}
-                      className="text-xs font-medium text-destructive hover:underline disabled:opacity-50"
-                      onClick={() =>
-                        void run(
-                          kick({
-                            serverId: serverId as Id<"servers">,
-                            userId: member.user.id as Id<"users">,
-                          }),
-                          `${member.user.name} was kicked.`,
-                        )
-                      }
-                    >
-                      Kick
-                    </button>
-                    <button
-                      type="button"
-                      disabled={busy}
-                      className="text-xs font-medium text-destructive hover:underline disabled:opacity-50"
-                      onClick={() =>
-                        void run(
-                          ban({
-                            serverId: serverId as Id<"servers">,
-                            userId: member.user.id as Id<"users">,
-                          }),
-                          `${member.user.name} was banned.`,
-                        )
-                      }
-                    >
-                      Ban
-                    </button>
-                  </div>
-                )}
+                {(canKick || canBans || canModerate) &&
+                  !member.isOwner &&
+                  member.user.id !== me?.id && (
+                    <div className="flex shrink-0 flex-wrap justify-end gap-3">
+                      {canModerate && (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          className="text-xs font-medium text-primary hover:underline disabled:opacity-50"
+                          onClick={() => setModeratingId(member.user.id)}
+                        >
+                          Moderate
+                        </button>
+                      )}
+                      {canKick && (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          className="text-xs font-medium text-destructive hover:underline disabled:opacity-50"
+                          onClick={() =>
+                            void run(
+                              kick({
+                                serverId: serverId as Id<"servers">,
+                                userId: member.user.id as Id<"users">,
+                              }),
+                              `${member.user.name} was kicked.`,
+                            )
+                          }
+                        >
+                          Kick
+                        </button>
+                      )}
+                      {canBans && (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          className="text-xs font-medium text-destructive hover:underline disabled:opacity-50"
+                          onClick={() =>
+                            void run(
+                              ban({
+                                serverId: serverId as Id<"servers">,
+                                userId: member.user.id as Id<"users">,
+                              }),
+                              `${member.user.name} was banned.`,
+                            )
+                          }
+                        >
+                          Ban
+                        </button>
+                      )}
+                    </div>
+                  )}
               </div>
             );
           })
         )}
       </div>
+      {moderatingId &&
+        all.find((member) => member.user.id === moderatingId) && (
+          <ModerateMemberDialog
+            serverId={serverId}
+            member={all.find((member) => member.user.id === moderatingId)!}
+            onOpenChange={(open) => {
+              if (!open) setModeratingId(null);
+            }}
+          />
+        )}
     </section>
   );
 }
@@ -3280,7 +3336,9 @@ function ReportRow({
 }
 
 function ReportsTab({ serverId }: { serverId: string }) {
-  const queue = useQuery(api.reports.queue, {});
+  const queue = useQuery(api.reports.queue, {
+    serverId: serverId as Id<"servers">,
+  });
   const me = useQuery(api.users.me);
   const isAdmin = me?.role === "admin";
 
@@ -3308,6 +3366,7 @@ function ReportsTab({ serverId }: { serverId: string }) {
           ))
         )}
       </div>
+      <ModerationCaseActivity serverId={serverId} />
       <AutoModEvents serverId={serverId} />
     </section>
   );
