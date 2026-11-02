@@ -91,8 +91,8 @@ curl -H "Authorization: Bearer $EMAIL_DISPATCH_SECRET" \
 ```
 
 Expected response: `{"ok":true}`. A `502` response includes a safe code such
-as `EAUTH_535`, `ETIMEDOUT`, or `DISPATCH_NOT_CONFIGURED`; it never returns the
-SMTP password or raw SMTP exchange.
+as `EAUTH_535`, `ETIMEDOUT`, or `SMTP_CONFIG_MISSING`; it never returns the SMTP
+password or raw SMTP exchange.
 
 Only after this succeeds:
 

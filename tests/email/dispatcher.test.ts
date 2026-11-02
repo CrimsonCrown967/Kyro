@@ -62,7 +62,7 @@ test("dispatcher reports missing SMTP configuration without leaking details", as
     response as never,
   );
   assert.equal(response.statusCode, 502);
-  assert.deepEqual(response.body, { ok: false, code: "SMTP_FAILURE" });
+  assert.deepEqual(response.body, { ok: false, code: "SMTP_CONFIG_MISSING" });
   assert.equal(JSON.stringify(response.body).includes("SMTP_PASS"), false);
 });
 

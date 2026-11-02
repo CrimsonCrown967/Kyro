@@ -73,6 +73,13 @@ export function validateDispatchRequest(value: unknown): DispatchRequest {
 }
 
 export function safeErrorCode(error: unknown): string {
+  const message = error instanceof Error ? error.message : "";
+  if (message.startsWith("Missing server environment variable:")) {
+    return "SMTP_CONFIG_MISSING";
+  }
+  if (message.startsWith("SMTP_PORT must be")) {
+    return "SMTP_CONFIG_INVALID";
+  }
   const row = error as {
     code?: unknown;
     command?: unknown;
