@@ -1,7 +1,7 @@
 import { internalMutation } from "./_generated/server";
 import { configuredFounderId } from "./lib";
 
-/** Idempotent one-off used to mark Kyro's official identities. */
+/** Idempotent one-off used to keep the Kyro service identity official. */
 export const markOfficialAccounts = internalMutation({
   args: {},
   handler: async (ctx) => {
@@ -14,13 +14,17 @@ export const markOfficialAccounts = internalMutation({
     await ctx.db.patch(kyro._id, { name: "Kyro", official: true });
 
     const founderId = configuredFounderId();
+    let founderOfficialRemoved = false;
     if (founderId) {
       const founder = await ctx.db.get(founderId as typeof kyro._id);
-      if (founder) await ctx.db.patch(founder._id, { official: true });
+      if (founder?.official === true) {
+        await ctx.db.patch(founder._id, { official: undefined });
+        founderOfficialRemoved = true;
+      }
     }
     return {
       kyroUserId: kyro._id,
-      founderMarked: founderId !== null,
+      founderOfficialRemoved,
     };
   },
 });

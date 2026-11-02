@@ -285,7 +285,7 @@ export async function hydrateUser(
     lastSeen: presenceDetailsVisible ? (user.lastSeen ?? null) : null,
     isAnonymous: user.isAnonymous === true,
     isFounder,
-    official: user.official === true || isFounder,
+    official: user.official === true,
     badges,
     links: (user.links ?? []).slice(0, 6),
     avatarFrame: user.avatarFrame ?? null,
