@@ -2,8 +2,9 @@ import { useMutation } from "convex/react";
 import { useCallback } from "react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import { MAX_UPLOAD_BYTES } from "@/lib/uploadLimits";
 
-export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+export { MAX_UPLOAD_BYTES } from "@/lib/uploadLimits";
 export const MAX_ATTACHMENTS = 6;
 export const ACCEPTED_UPLOAD =
   "image/*,video/*,audio/*,application/pdf,text/plain,text/markdown,application/json,.zip,.csv";

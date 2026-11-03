@@ -1138,7 +1138,8 @@ export const deleteAccount = mutation({
       await ctx.db.delete(session._id);
     }
     for (const account of accounts) await ctx.db.delete(account._id);
-    if (user.avatarStorageId) await ctx.storage.delete(user.avatarStorageId);
+    await deleteClaimedUpload(ctx, user.avatarStorageId, "user_avatar", id);
+    await deleteClaimedUpload(ctx, user.bannerStorageId, "user_banner", id);
     await ctx.db.delete(id);
   },
 });

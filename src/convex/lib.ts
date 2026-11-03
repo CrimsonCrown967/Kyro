@@ -4,6 +4,7 @@ import {
   hasPermission,
   type Permission,
 } from "../lib/permissions";
+import { MAX_UPLOAD_BYTES } from "../lib/uploadLimits";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 
@@ -19,7 +20,7 @@ export const PRESENCE_TIMEOUT_MS = 150_000;
 
 export const MAX_MESSAGE_LENGTH = 2000;
 export const MAX_ATTACHMENTS = 6;
-export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+export const MAX_ATTACHMENT_BYTES = MAX_UPLOAD_BYTES;
 
 /**
  * Most recent bug reports the Admin Portal reads. The overview badge and the

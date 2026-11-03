@@ -3,6 +3,7 @@ import { mutation } from "./_generated/server";
 import { requireProfile } from "./lib";
 import {
   MAX_UPLOAD_BYTES,
+  deleteStorageObjectIfPresent,
   isAllowedUploadType,
   uploadByStorageId,
 } from "./uploadSecurity";
@@ -48,7 +49,7 @@ export const registerUpload = mutation({
     if (!metadata) throw new Error("That upload no longer exists.");
     const mimeType = metadata.contentType ?? "application/octet-stream";
     if (metadata.size > MAX_UPLOAD_BYTES || !isAllowedUploadType(mimeType)) {
-      await ctx.storage.delete(storageId);
+      await deleteStorageObjectIfPresent(ctx, storageId);
       throw new Error(
         metadata.size > MAX_UPLOAD_BYTES
           ? "That file is larger than the 10 MB upload limit."

@@ -5,6 +5,7 @@ import {
   RemoteParticipant,
   Room,
   RoomEvent,
+  ScreenSharePresets,
   Track,
   TrackPublication,
   supportsAudioOutputSelection,
@@ -40,6 +41,13 @@ import { cn } from "@/lib/utils";
 import { useNow } from "@/hooks/use-now";
 
 type ContainerType = "channel" | "conversation";
+
+/** Screen shares are capped at 720p/30fps to protect CPU and bandwidth. */
+const SCREEN_SHARE_RESOLUTION = {
+  width: 1280,
+  height: 720,
+  frameRate: 30,
+} as const;
 
 type TokenResponse = {
   ok: true;
@@ -460,14 +468,22 @@ export function LiveKitVoiceRoom({
     if (!room || !allowedSources.includes("screen_share")) return;
     try {
       const enabled = !room.localParticipant.isScreenShareEnabled;
-      await room.localParticipant.setScreenShareEnabled(enabled, {
-        audio: allowedSources.includes("screen_share_audio"),
-        video: true,
-        selfBrowserSurface: "include",
-        surfaceSwitching: "include",
-        systemAudio: "include",
-        contentHint: "detail",
-      });
+      await room.localParticipant.setScreenShareEnabled(
+        enabled,
+        {
+          audio: allowedSources.includes("screen_share_audio"),
+          video: true,
+          resolution: SCREEN_SHARE_RESOLUTION,
+          selfBrowserSurface: "include",
+          surfaceSwitching: "include",
+          systemAudio: "include",
+          contentHint: "detail",
+        },
+        {
+          screenShareEncoding: ScreenSharePresets.h720fps30.encoding,
+          degradationPreference: "maintain-resolution",
+        },
+      );
       setSharing(enabled);
       updateSeat({ sharing: enabled });
       refresh();

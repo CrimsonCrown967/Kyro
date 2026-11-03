@@ -1,8 +1,9 @@
 import type { Doc, Id } from "./_generated/dataModel";
 import type { Ctx } from "./lib";
 import type { MutationCtx } from "./_generated/server";
+import { MAX_UPLOAD_BYTES } from "../lib/uploadLimits";
 
-export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+export { MAX_UPLOAD_BYTES };
 
 export type UploadClaim =
   | "message"
@@ -59,7 +60,30 @@ export async function requireOwnedUpload(
   if (options.imageOnly && !isImageUploadType(upload.mimeType)) {
     throw new Error("Choose an image file for that upload.");
   }
+  const metadata = await ctx.db.system.get("_storage", storageId);
+  if (!metadata) {
+    throw new Error(
+      "That upload is no longer available. Please upload the file again.",
+    );
+  }
+  if (metadata.size > MAX_UPLOAD_BYTES) {
+    throw new Error("That file is larger than the 10 MB upload limit.");
+  }
   return upload;
+}
+
+/**
+ * Delete an object only when it still exists. Convex throws "storage id ...
+ * not found" for stale references, and that must never block the record update
+ * that is replacing the reference.
+ */
+export async function deleteStorageObjectIfPresent(
+  ctx: MutationCtx,
+  storageId: Id<"_storage">,
+): Promise<void> {
+  const metadata = await ctx.db.system.get("_storage", storageId);
+  if (!metadata) return;
+  await ctx.storage.delete(storageId);
 }
 
 /** Claim an unclaimed upload for exactly one application record. */
@@ -96,7 +120,9 @@ export async function deleteClaimedUpload(
     // deleting an unproven object is not.
     return;
   }
-  await ctx.storage.delete(storageId);
+  await deleteStorageObjectIfPresent(ctx, storageId);
+  // Remove the metadata row even when the object itself is already gone, so a
+  // stale reference cannot keep failing the same update forever.
   await ctx.db.delete(upload._id);
 }
 
@@ -107,6 +133,6 @@ export async function deleteUnclaimedUpload(
 ): Promise<void> {
   const upload = await requireOwnedUpload(ctx, ownerId, storageId);
   if (upload.claimType !== undefined) return;
-  await ctx.storage.delete(storageId);
+  await deleteStorageObjectIfPresent(ctx, storageId);
   await ctx.db.delete(upload._id);
 }
