@@ -240,7 +240,9 @@ export function LiveKitVoiceRoom({
       setConnection(
         state === ConnectionState.Disconnected && reconnectingRef.current
           ? ConnectionState.Reconnecting
-          : state,
+          : state === ConnectionState.SignalReconnecting
+            ? ConnectionState.Reconnecting
+            : state,
       );
       refresh();
     };
