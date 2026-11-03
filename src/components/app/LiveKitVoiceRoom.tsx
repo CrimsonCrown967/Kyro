@@ -159,6 +159,7 @@ export function LiveKitVoiceRoom({
   const onLeaveRef = useRef(onLeave);
   const audioContainerRef = useRef<HTMLDivElement>(null);
   const deafenedRef = useRef(false);
+  const reconnectingRef = useRef(false);
   const leaveSignaledRef = useRef(false);
   const stateRef = useRef({
     muted: false,
@@ -227,6 +228,7 @@ export function LiveKitVoiceRoom({
       refresh();
     };
     const onDisconnected = () => {
+      reconnectingRef.current = false;
       setConnection(ConnectionState.Disconnected);
       if (!disposed) {
         toast.error("Voice connection ended.");
@@ -235,7 +237,43 @@ export function LiveKitVoiceRoom({
       refresh();
     };
     const onConnectionChanged = (state: ConnectionState) => {
-      setConnection(state);
+      setConnection(
+        state === ConnectionState.Disconnected && reconnectingRef.current
+          ? ConnectionState.Reconnecting
+          : state,
+      );
+      refresh();
+    };
+    const onReconnecting = () => {
+      reconnectingRef.current = true;
+      setConnection(ConnectionState.Reconnecting);
+      refresh();
+    };
+    const onReconnected = () => {
+      reconnectingRef.current = false;
+      setConnection(ConnectionState.Connected);
+      refresh();
+    };
+    const onLocalTrackMuted = (publication: TrackPublication) => {
+      if (
+        nextRoom.localParticipant.getTrackPublication(publication.source) ===
+        publication
+      ) {
+        if (publication.source === Track.Source.Microphone) setMuted(true);
+        if (publication.source === Track.Source.Camera) setCameraEnabled(false);
+        if (publication.source === Track.Source.ScreenShare) setSharing(false);
+      }
+      refresh();
+    };
+    const onLocalTrackUnmuted = (publication: TrackPublication) => {
+      if (
+        nextRoom.localParticipant.getTrackPublication(publication.source) ===
+        publication
+      ) {
+        if (publication.source === Track.Source.Microphone) setMuted(false);
+        if (publication.source === Track.Source.Camera) setCameraEnabled(true);
+        if (publication.source === Track.Source.ScreenShare) setSharing(true);
+      }
       refresh();
     };
     const events = [
@@ -243,21 +281,21 @@ export function LiveKitVoiceRoom({
       RoomEvent.ParticipantDisconnected,
       RoomEvent.TrackPublished,
       RoomEvent.TrackUnpublished,
-      RoomEvent.TrackMuted,
-      RoomEvent.TrackUnmuted,
       RoomEvent.LocalTrackPublished,
       RoomEvent.LocalTrackUnpublished,
       RoomEvent.ActiveSpeakersChanged,
       RoomEvent.ParticipantMetadataChanged,
       RoomEvent.MediaDevicesChanged,
-      RoomEvent.Reconnected,
-      RoomEvent.Reconnecting,
     ] as const;
     events.forEach((event) => nextRoom.on(event, refresh));
     nextRoom.on(RoomEvent.TrackSubscribed, onTrackSubscribed);
     nextRoom.on(RoomEvent.TrackUnsubscribed, onTrackUnsubscribed);
+    nextRoom.on(RoomEvent.TrackMuted, onLocalTrackMuted);
+    nextRoom.on(RoomEvent.TrackUnmuted, onLocalTrackUnmuted);
     nextRoom.on(RoomEvent.Disconnected, onDisconnected);
     nextRoom.on(RoomEvent.ConnectionStateChanged, onConnectionChanged);
+    nextRoom.on(RoomEvent.Reconnecting, onReconnecting);
+    nextRoom.on(RoomEvent.Reconnected, onReconnected);
     nextRoom.on(RoomEvent.MediaDevicesChanged, refreshDevices);
 
     const connect = async () => {
