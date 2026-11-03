@@ -6,6 +6,7 @@ import {
   Copy,
   Link2,
   MessageCircle,
+  Phone,
   Settings,
   Sparkles,
   UserPlus,
@@ -79,6 +80,7 @@ export function ProfileCard() {
   const block = useMutation(api.social.block);
   const unblock = useMutation(api.social.unblock);
   const createDirect = useMutation(api.conversations.createDirect);
+  const startCall = useMutation(api.voice.startCall);
   const setBadges = useMutation(api.users.setBadges);
   const removeAdminBadge = useMutation(api.users.removeMyAdminBadge);
   const restoreAdminBadge = useMutation(api.admin.restoreMyAdminBadge);
@@ -114,6 +116,19 @@ export function ProfileCard() {
         close(false);
         navigate(`/dashboard/dm/${conversationId}`);
       }),
+    );
+  };
+
+  const openCall = async () => {
+    if (!userId) return;
+    await run(
+      createDirect({ userId: userId as Id<"users"> }).then(
+        async (conversationId) => {
+          await startCall({ conversationId });
+          close(false);
+          navigate(`/dashboard/dm/${conversationId}`);
+        },
+      ),
     );
   };
 
@@ -695,13 +710,23 @@ export function ProfileCard() {
                   {social.messageReason}
                 </p>
               )}
-              <Button
-                className="h-10 w-full text-sm font-semibold"
-                disabled={busy || (social ? !social.canMessage : false)}
-                onClick={() => void openMessage()}
-              >
-                <MessageCircle className="mr-2 size-4" /> Message
-              </Button>
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  className="h-10 text-sm font-semibold"
+                  disabled={busy || (social ? !social.canMessage : false)}
+                  onClick={() => void openMessage()}
+                >
+                  <MessageCircle className="mr-2 size-4" /> Message
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-10 text-sm font-semibold"
+                  disabled={busy || (social ? !social.canMessage : false)}
+                  onClick={() => void openCall()}
+                >
+                  <Phone className="mr-2 size-4" /> Call
+                </Button>
+              </div>
             </div>
           ) : null}
         </div>

@@ -5,7 +5,8 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
 import { Headphones, Loader2, Volume2 } from "@/components/icons";
-import { VoiceRoster, VoiceRoom } from "@/components/app/Voice";
+import { VoiceRoster } from "@/components/app/Voice";
+import { LiveKitVoiceRoomLoader as VoiceRoom } from "@/components/app/LiveKitVoiceRoomLoader";
 
 /**
  * A community voice channel: drop in, talk, drop out. The room auto-joins on

@@ -63,6 +63,11 @@ import type * as users_lib from "../users/lib.js";
 import type * as verificationCodes from "../verificationCodes.js";
 import type * as verificationRefs from "../verificationRefs.js";
 import type * as voice from "../voice.js";
+import type * as voiceAuth from "../voiceAuth.js";
+import type * as voiceAuthInternal from "../voiceAuthInternal.js";
+import type * as voiceAuthRefs from "../voiceAuthRefs.js";
+import type * as voiceMaintenance from "../voiceMaintenance.js";
+import type * as voiceTickets from "../voiceTickets.js";
 import type * as warnings from "../warnings.js";
 
 const fullApi: ApiFromModules<{
@@ -119,6 +124,11 @@ const fullApi: ApiFromModules<{
   "verificationCodes": typeof verificationCodes,
   "verificationRefs": typeof verificationRefs,
   "voice": typeof voice,
+  "voiceAuth": typeof voiceAuth,
+  "voiceAuthInternal": typeof voiceAuthInternal,
+  "voiceAuthRefs": typeof voiceAuthRefs,
+  "voiceMaintenance": typeof voiceMaintenance,
+  "voiceTickets": typeof voiceTickets,
   "warnings": typeof warnings,
 }> = anyApi as any;
 

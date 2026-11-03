@@ -17,6 +17,11 @@ export const PERMISSIONS = {
   CREATE_INVITES: "create_invites",
   VIEW_CHANNEL: "view_channel",
   SEND_MESSAGES: "send_messages",
+  CONNECT_VOICE: "connect_voice",
+  SPEAK_VOICE: "speak_voice",
+  VIDEO: "video",
+  SHARE_SCREEN: "share_screen",
+  MANAGE_VOICE: "manage_voice",
   MENTION_EVERYONE: "mention_everyone",
   MANAGE_EMOJIS: "manage_emojis",
   VIEW_AUDIT_LOG: "view_audit_log",
@@ -30,6 +35,11 @@ export const ALL_PERMISSIONS = Object.values(PERMISSIONS) as Permission[];
 export const CHANNEL_PERMISSIONS: Permission[] = [
   PERMISSIONS.VIEW_CHANNEL,
   PERMISSIONS.SEND_MESSAGES,
+  PERMISSIONS.CONNECT_VOICE,
+  PERMISSIONS.SPEAK_VOICE,
+  PERMISSIONS.VIDEO,
+  PERMISSIONS.SHARE_SCREEN,
+  PERMISSIONS.MANAGE_VOICE,
   PERMISSIONS.MANAGE_MESSAGES,
   PERMISSIONS.MENTION_EVERYONE,
 ];
@@ -39,6 +49,10 @@ export const DEFAULT_EVERYONE_PERMISSIONS: Permission[] = [
   PERMISSIONS.CREATE_INVITES,
   PERMISSIONS.VIEW_CHANNEL,
   PERMISSIONS.SEND_MESSAGES,
+  PERMISSIONS.CONNECT_VOICE,
+  PERMISSIONS.SPEAK_VOICE,
+  PERMISSIONS.VIDEO,
+  PERMISSIONS.SHARE_SCREEN,
 ];
 
 /** Permissions granted to the community owner regardless of roles. */
@@ -121,6 +135,26 @@ export const PERMISSION_META: Record<
   send_messages: {
     label: "Send messages",
     description: "Post messages in text channels.",
+  },
+  connect_voice: {
+    label: "Connect to voice",
+    description: "Join voice channels in this community.",
+  },
+  speak_voice: {
+    label: "Speak in voice",
+    description: "Publish microphone audio in voice channels.",
+  },
+  video: {
+    label: "Use camera",
+    description: "Publish camera video in voice channels.",
+  },
+  share_screen: {
+    label: "Share screen",
+    description: "Share a screen, application window or browser tab.",
+  },
+  manage_voice: {
+    label: "Manage voice",
+    description: "Mute or disconnect other voice participants.",
   },
   mention_everyone: {
     label: "Mention @everyone and @here",

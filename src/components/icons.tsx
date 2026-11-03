@@ -347,6 +347,34 @@ export const MicOff = (props: IconProps) => (
   </Icon>
 );
 
+export const Video = (props: IconProps) => (
+  <Icon {...props}>
+    <rect x="3" y="6" width="13" height="12" rx="3" />
+    <path d="m16 10 5-3v10l-5-3" />
+  </Icon>
+);
+
+export const VideoOff = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M10.8 6H6a3 3 0 0 0-3 3v6a3 3 0 0 0 3 3h7a3 3 0 0 0 3-3v-1.2" />
+    <path d="m16 10 5-3v10l-3.2-1.9" />
+    <path d="m3 3 18 18" />
+  </Icon>
+);
+
+export const Maximize = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M8 3H3v5" />
+    <path d="m3 3 6 6" />
+    <path d="M16 21h5v-5" />
+    <path d="m21 21-6-6" />
+    <path d="M21 8V3h-5" />
+    <path d="m21 3-6 6" />
+    <path d="M3 16v5h5" />
+    <path d="m3 21 6-6" />
+  </Icon>
+);
+
 /* ------------------------------------------------------------------ */
 /* Feedback & status                                                   */
 /* ------------------------------------------------------------------ */

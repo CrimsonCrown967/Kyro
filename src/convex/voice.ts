@@ -10,6 +10,11 @@ import {
   requireUser,
   type Ctx,
 } from "./lib";
+import {
+  channelPermissions,
+  hasPermission,
+  PERMISSIONS,
+} from "../lib/permissions";
 
 /**
  * Live audio for Kyro: voice channels in communities and voice calls in DMs.
@@ -40,7 +45,27 @@ async function requireVoiceAccess(
     if (!channel || channel.kind !== "voice") {
       throw new Error("That voice channel no longer exists.");
     }
-    await requireServerAccess(ctx, channel.serverId, userId);
+    const access = await requireServerAccess(ctx, channel.serverId, userId);
+    const defaultRole = await ctx.db
+      .query("serverRoles")
+      .withIndex("by_server", (q) => q.eq("serverId", channel.serverId))
+      .filter((q) => q.eq(q.field("isDefault"), true))
+      .first();
+    const permissions =
+      access.server.ownerId === userId
+        ? access.permissions
+        : channelPermissions(
+            access.permissions,
+            access.member.roleIds,
+            defaultRole?._id ?? null,
+            channel.permissionOverwrites,
+          );
+    if (
+      !hasPermission(permissions, PERMISSIONS.VIEW_CHANNEL) ||
+      !hasPermission(permissions, PERMISSIONS.CONNECT_VOICE)
+    ) {
+      throw new Error("You do not have permission to join that voice channel.");
+    }
     return;
   }
   await requireConversationAccess(
@@ -93,9 +118,13 @@ export const join = mutation({
     containerId: v.string(),
     muted: v.optional(v.boolean()),
     deafened: v.optional(v.boolean()),
+    camera: v.optional(v.boolean()),
     sharing: v.optional(v.boolean()),
   },
-  handler: async (ctx, { containerType, containerId, muted, deafened, sharing }) => {
+  handler: async (
+    ctx,
+    { containerType, containerId, muted, deafened, camera, sharing },
+  ) => {
     const { id } = await requireActiveUser(ctx);
     await requireVoiceAccess(ctx, id, containerType, containerId);
     const now = Date.now();
@@ -112,6 +141,7 @@ export const join = mutation({
         lastSeenAt: now,
         ...(muted !== undefined ? { muted } : {}),
         ...(deafened !== undefined ? { deafened } : {}),
+        ...(camera !== undefined ? { camera } : {}),
         ...(sharing !== undefined ? { sharing } : {}),
       });
       return;
@@ -141,6 +171,7 @@ export const join = mutation({
       lastSeenAt: now,
       muted: muted ?? false,
       deafened: deafened ?? false,
+      camera: camera ?? false,
       sharing: sharing ?? false,
     });
   },
@@ -159,7 +190,10 @@ export const leave = mutation({
       .withIndex("by_user", (q) => q.eq("userId", id))
       .collect();
     for (const row of rows) {
-      if (row.containerType === containerType && row.containerId === containerId) {
+      if (
+        row.containerType === containerType &&
+        row.containerId === containerId
+      ) {
         await ctx.db.delete(row._id);
       }
     }
@@ -185,6 +219,7 @@ export const roster = query({
       userId: session.userId as string,
       muted: session.muted === true,
       deafened: session.deafened === true,
+      camera: session.camera === true,
       sharing: session.sharing === true,
       joinedAt: session.joinedAt,
       user: users.get(session.userId) ?? null,
@@ -312,8 +347,13 @@ export const startCall = mutation({
       conversationId,
       id,
     );
-    if (conversation.type === "dm" && conversation.participantIds.length === 2) {
-      const other = conversation.participantIds.find((userId) => userId !== id)!;
+    if (
+      conversation.type === "dm" &&
+      conversation.participantIds.length === 2
+    ) {
+      const other = conversation.participantIds.find(
+        (userId) => userId !== id,
+      )!;
       const allowed = await canSendDirectMessage(ctx, id, other);
       if (!allowed.ok) throw new Error(allowed.reason);
     }
@@ -325,7 +365,11 @@ export const startCall = mutation({
       .order("desc")
       .first();
     const now = Date.now();
-    if (open && !open.endedAt && now - open.startedAt < 5 * 60_000) {
+    if (
+      open &&
+      !open.endedAt &&
+      (open.answeredAt !== undefined || now - open.startedAt < 5 * 60_000)
+    ) {
       return open._id;
     }
     if (open?.endedAt && now - open.endedAt < 10_000) {
@@ -346,7 +390,8 @@ export const answerCall = mutation({
     const { id } = await requireActiveUser(ctx);
     const call = await ctx.db.get(callId);
     if (!call) throw new Error("That call is over.");
-    if (!call.calleeIds.includes(id)) throw new Error("You're not being called.");
+    if (!call.calleeIds.includes(id))
+      throw new Error("You're not being called.");
     if (call.endedAt || Date.now() - call.startedAt > 5 * 60_000) {
       throw new Error("That call is over.");
     }
@@ -457,7 +502,7 @@ export const currentCall = query({
     if (!call) return null;
     const now = Date.now();
     if (call.endedAt) return null;
-    if (now - call.startedAt > 5 * 60_000) {
+    if (!call.answeredAt && now - call.startedAt > 5 * 60_000) {
       // Abandoned without hanging up — treat it as missed from here on.
       return null;
     }

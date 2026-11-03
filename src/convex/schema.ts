@@ -830,6 +830,8 @@ const schema = defineSchema(
       lastSeenAt: v.number(),
       muted: v.optional(v.boolean()),
       deafened: v.optional(v.boolean()),
+      /** True while this member is publishing a camera track. */
+      camera: v.optional(v.boolean()),
       /** True while this member is broadcasting their screen into the room. */
       sharing: v.optional(v.boolean()),
     })
@@ -848,6 +850,38 @@ const schema = defineSchema(
     })
       .index("by_to_container", ["toId", "containerKey"])
       .index("by_container", ["containerKey"]),
+
+    /**
+     * One-time grants bridge authenticated Convex permissions to Vercel's
+     * LiveKit token/moderation Functions without exposing either service key.
+     */
+    livekitTickets: defineTable({
+      ticketHash: v.string(),
+      purpose: v.union(v.literal("join"), v.literal("moderate")),
+      userId: v.id("users"),
+      roomName: v.string(),
+      identity: v.string(),
+      displayName: v.string(),
+      metadata: v.string(),
+      canPublishSources: v.array(
+        v.union(
+          v.literal("microphone"),
+          v.literal("camera"),
+          v.literal("screen_share"),
+          v.literal("screen_share_audio"),
+        ),
+      ),
+      canManage: v.boolean(),
+      action: v.optional(v.union(v.literal("mute"), v.literal("disconnect"))),
+      targetIdentity: v.optional(v.string()),
+      trackSid: v.optional(v.string()),
+      expiresAt: v.number(),
+      consumedAt: v.optional(v.number()),
+      createdAt: v.number(),
+    })
+      .index("by_hash", ["ticketHash"])
+      .index("by_expiry", ["expiresAt"])
+      .index("by_user", ["userId", "createdAt"]),
 
     channelNotificationSettings: defineTable({
       userId: v.id("users"),

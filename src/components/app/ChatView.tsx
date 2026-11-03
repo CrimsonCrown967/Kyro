@@ -12,7 +12,8 @@ import {
   type ReplyTarget,
 } from "@/components/app/MessageList";
 import { ReportDialog } from "@/components/app/dialogs";
-import { DmCallHeader, VoiceRoom } from "@/components/app/Voice";
+import { DmCallHeader } from "@/components/app/Voice";
+import { LiveKitVoiceRoomLoader as VoiceRoom } from "@/components/app/LiveKitVoiceRoomLoader";
 import { UserAvatar } from "@/components/app/UserAvatar";
 import { WorkspaceActions } from "@/components/app/WorkspaceActions";
 import { StyledDisplayName } from "@/components/app/StyledDisplayName";
