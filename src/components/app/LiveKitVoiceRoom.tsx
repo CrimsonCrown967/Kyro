@@ -468,7 +468,7 @@ export function LiveKitVoiceRoom({
     if (!room || !allowedSources.includes("screen_share")) return;
     try {
       const enabled = !room.localParticipant.isScreenShareEnabled;
-      await room.localParticipant.setScreenShareEnabled(
+      const publication = await room.localParticipant.setScreenShareEnabled(
         enabled,
         {
           audio: allowedSources.includes("screen_share_audio"),
@@ -484,6 +484,16 @@ export function LiveKitVoiceRoom({
           degradationPreference: "maintain-resolution",
         },
       );
+      if (enabled) {
+        // Chromium treats display-capture resolution hints as "ideal" rather
+        // than a hard ceiling. Apply max constraints to the captured track so
+        // high-resolution monitors cannot publish above 720p/30fps.
+        await publication?.videoTrack?.mediaStreamTrack.applyConstraints({
+          width: { max: SCREEN_SHARE_RESOLUTION.width },
+          height: { max: SCREEN_SHARE_RESOLUTION.height },
+          frameRate: { max: SCREEN_SHARE_RESOLUTION.frameRate },
+        });
+      }
       setSharing(enabled);
       updateSeat({ sharing: enabled });
       refresh();
