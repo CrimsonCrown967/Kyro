@@ -3,9 +3,12 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, query, type MutationCtx } from "./_generated/server";
 import {
   BUG_LIST_LIMIT,
+  PRESENCE_TIMEOUT_MS,
   activeSiteBan,
+  canViewIpDirectory,
   hydrateUsers,
   isFounderUser,
+  isSyntheticUser,
   notify,
   requireActiveUser,
   requireUser,
@@ -151,6 +154,7 @@ export const overview = query({
 
     return {
       allowed: true as const,
+      canViewIps: canViewIpDirectory(user),
       me: {
         id,
         name: user.name ?? user.username ?? "Staff",
@@ -182,6 +186,61 @@ export const overview = query({
         details: action.details ?? null,
         createdAt: action.createdAt,
         actor: actors.get(action.actorId) ?? null,
+      })),
+    };
+  },
+});
+
+/**
+ * Staff-only client IP directory. Only the two allowlisted accounts can read
+ * it, and seeded/demo accounts plus those two accounts are never listed.
+ */
+export const ipDirectory = query({
+  args: {},
+  handler: async (ctx) => {
+    const { id, user } = await requireUser(ctx);
+    if (!canViewIpDirectory(user)) {
+      throw new Error(
+        "The IP detector is restricted to Kyro and adrianeosyne.",
+      );
+    }
+    if (await activeSiteBan(ctx, id)) {
+      throw new Error("Banned accounts cannot open the IP detector.");
+    }
+
+    const now = Date.now();
+    const users = await ctx.db.query("users").take(2000);
+    const rows = users
+      .filter(
+        (row) =>
+          row.deletedAt === undefined &&
+          !isSyntheticUser(row) &&
+          !canViewIpDirectory(row),
+      )
+      .sort((a, b) => {
+        const recency = (b.lastIpAt ?? 0) - (a.lastIpAt ?? 0);
+        if (recency !== 0) return recency;
+        const aName = (a.name ?? a.username ?? "").toLowerCase();
+        const bName = (b.name ?? b.username ?? "").toLowerCase();
+        return aName.localeCompare(bName);
+      });
+
+    return {
+      generatedAt: now,
+      total: rows.length,
+      captured: rows.filter((row) => row.lastIp !== undefined).length,
+      users: rows.map((row) => ({
+        id: row._id as string,
+        name: row.name ?? row.username ?? "Kyro user",
+        username: row.username ?? null,
+        lastIp: row.lastIp ?? null,
+        lastIpAt: row.lastIpAt ?? null,
+        lastSeen: row.lastSeen ?? null,
+        online:
+          row.lastSeen !== undefined &&
+          now - row.lastSeen < PRESENCE_TIMEOUT_MS,
+        device: row.device ?? null,
+        memberSince: row.createdAt ?? row._creationTime,
       })),
     };
   },

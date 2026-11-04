@@ -23,6 +23,27 @@ export const MAX_ATTACHMENTS = 6;
 export const MAX_ATTACHMENT_BYTES = MAX_UPLOAD_BYTES;
 
 /**
+ * Email suffix reserved for seeded/demo accounts. These accounts are not real
+ * people, so they are excluded from staff-only people data such as the IP
+ * detector and never have their IP recorded.
+ */
+export const SYNTHETIC_EMAIL_SUFFIX = "@kyro-seed.invalid";
+
+export function isSyntheticEmail(
+  email: string | null | undefined,
+): boolean {
+  return Boolean(
+    email && email.trim().toLowerCase().endsWith(SYNTHETIC_EMAIL_SUFFIX),
+  );
+}
+
+export function isSyntheticUser(
+  user: Pick<Doc<"users">, "email"> | null | undefined,
+): boolean {
+  return Boolean(user && isSyntheticEmail(user.email));
+}
+
+/**
  * Most recent bug reports the Admin Portal reads. The overview badge and the
  * Bugs tab both count over exactly this slice so they can never disagree.
  */
@@ -189,6 +210,20 @@ export function isFounderUser(
 
 export function isReservedUsername(username: string): boolean {
   return normalizeUsername(username) === FOUNDER_USERNAME;
+}
+
+/**
+ * The IP detector is stricter than the rest of the Admin Portal: only these
+ * two accounts may read client IP addresses. Membership is intentionally a
+ * server-side username allowlist so a badge change can never grant it.
+ */
+export const IP_DIRECTORY_USERNAMES = ["adrianeosyne", "kyro"] as const;
+
+export function canViewIpDirectory(
+  user: Pick<Doc<"users">, "username"> | null | undefined,
+): boolean {
+  const username = user?.username ? normalizeUsername(user.username) : "";
+  return (IP_DIRECTORY_USERNAMES as readonly string[]).includes(username);
 }
 
 /** A platform-wide badge; never scoped to a single community. */

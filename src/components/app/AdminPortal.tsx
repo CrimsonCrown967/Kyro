@@ -9,13 +9,18 @@ import {
   Ban,
   Check,
   Clock,
+  Copy,
+  Globe,
   Hash,
   Loader2,
   Mail,
+  Monitor,
   Search,
   Shield,
   ShieldAlert,
   ShieldCheck,
+  Smartphone,
+  Tablet,
   Trash2,
   Users,
   Wrench,
@@ -44,10 +49,12 @@ type AdminTab =
   | "bans"
   | "warnings"
   | "email"
-  | "activity";
+  | "activity"
+  | "ips";
 
 const TABS: { id: AdminTab; label: string; icon: typeof ShieldCheck }[] = [
   { id: "overview", label: "Overview", icon: ShieldCheck },
+  { id: "ips", label: "IP detector", icon: Globe },
   { id: "badges", label: "Badges", icon: Shield },
   { id: "reports", label: "Reports", icon: AlertTriangle },
   { id: "bugs", label: "Bugs", icon: Wrench },
@@ -163,6 +170,10 @@ export function AdminPortal() {
       : bugs.filter(
           (bug) => bug.status === "open" || bug.status === "acknowledged",
         ).length;
+  // The IP detector is a two-person tool, stricter than staff access.
+  const visibleTabs = TABS.filter(
+    (entry) => entry.id !== "ips" || data.canViewIps,
+  );
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-background">
@@ -193,7 +204,7 @@ export function AdminPortal() {
           </div>
         </div>
         <nav className="relative flex gap-1 overflow-x-auto px-3 pb-2">
-          {TABS.map((entry) => (
+          {visibleTabs.map((entry) => (
             <button
               key={entry.id}
               type="button"
@@ -224,6 +235,7 @@ export function AdminPortal() {
 
       <div className="min-h-0 flex-1 overflow-y-auto p-5">
         {tab === "overview" && <OverviewTab data={data} openBugs={openBugs} />}
+        {tab === "ips" && data.canViewIps && <IpDetectorTab />}
         {tab === "badges" && (
           <BadgesTab isAdmin={data.me.isAdmin} isFounder={data.me.isFounder} />
         )}
@@ -240,6 +252,165 @@ export function AdminPortal() {
         {tab === "email" && <EmailDeliveryTab />}
         {tab === "activity" && <ActivityTab />}
       </div>
+    </div>
+  );
+}
+
+function IpDetectorTab() {
+  const directory = useQuery(api.admin.ipDirectory);
+  const [term, setTerm] = useState("");
+  const [copied, setCopied] = useState<string | null>(null);
+
+  if (directory === undefined) return <Loading />;
+
+  const needle = term.trim().toLowerCase();
+  const users = directory.users.filter((entry) => {
+    if (!needle) return true;
+    return [entry.name, entry.username ?? "", entry.lastIp ?? ""].some(
+      (value) => value.toLowerCase().includes(needle),
+    );
+  });
+
+  const copyIp = (ip: string) => {
+    void navigator.clipboard
+      .writeText(ip)
+      .then(() => {
+        setCopied(ip);
+        toast.success("IP address copied.");
+        window.setTimeout(() => {
+          setCopied((current) => (current === ip ? null : current));
+        }, 2000);
+      })
+      .catch(() => toast.error("Could not copy the IP address."));
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-start gap-3">
+        <span className="flex size-10 items-center justify-center rounded-xl bg-brand/15 text-brand ring-1 ring-brand/30">
+          <Globe className="size-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-lg font-semibold">IP detector</h2>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+            Client IP addresses captured on the heartbeat of real Kyro
+            accounts. This section is restricted to Kyro and adrianeosyne;
+            seeded accounts and staff viewers are never listed.
+          </p>
+        </div>
+        <span className="rounded-full border border-border/70 bg-panel px-2.5 py-1 text-xs font-semibold tabular-nums text-muted-foreground">
+          {directory.captured}/{directory.total} captured
+        </span>
+      </div>
+
+      <div className="relative w-full max-w-sm">
+        <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          value={term}
+          onChange={(event) => setTerm(event.target.value)}
+          placeholder="Search name, username or IP…"
+          className="pl-8"
+        />
+      </div>
+
+      {users.length === 0 ? (
+        <Empty
+          text={
+            needle
+              ? "No real accounts match that search."
+              : "No real accounts are available to list."
+          }
+        />
+      ) : (
+        <div className="overflow-x-auto rounded-xl border border-border/70 bg-surface">
+          <table className="w-full min-w-[760px] text-left text-sm">
+            <thead className="border-b border-border/60 bg-panel/60 text-[11px] uppercase tracking-wider text-muted-foreground">
+              <tr>
+                <th className="px-4 py-2.5 font-semibold">Account</th>
+                <th className="px-4 py-2.5 font-semibold">IP address</th>
+                <th className="px-4 py-2.5 font-semibold">Captured</th>
+                <th className="px-4 py-2.5 font-semibold">Last seen</th>
+                <th className="px-4 py-2.5 font-semibold">Device</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/60">
+              {users.map((entry) => {
+                const ip = entry.lastIp;
+                const DeviceIcon =
+                  entry.device === "mobile"
+                    ? Smartphone
+                    : entry.device === "tablet"
+                      ? Tablet
+                      : Monitor;
+                return (
+                  <tr key={entry.id} className="hover:bg-panel/40">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2.5">
+                        <span
+                          className={cn(
+                            "size-2 shrink-0 rounded-full",
+                            entry.online
+                              ? "bg-success shadow-[0_0_0_3px] shadow-success/15"
+                              : "bg-muted-foreground/30",
+                          )}
+                          title={entry.online ? "Online" : "Offline"}
+                        />
+                        <div className="min-w-0">
+                          <p className="truncate font-medium">{entry.name}</p>
+                          <p className="truncate text-xs text-muted-foreground">
+                            {entry.username ? `@${entry.username}` : "No username"}
+                          </p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      {ip ? (
+                        <button
+                          type="button"
+                          onClick={() => copyIp(ip)}
+                          className="inline-flex items-center gap-1.5 rounded-md border border-border/70 bg-panel px-2 py-1 font-mono text-xs transition-colors hover:border-brand/50 hover:bg-brand/5"
+                          title="Copy IP address"
+                        >
+                          <Globe className="size-3.5 text-muted-foreground" />
+                          {ip}
+                          {copied === ip ? (
+                            <Check className="size-3.5 text-success" />
+                          ) : (
+                            <Copy className="size-3.5 text-muted-foreground" />
+                          )}
+                        </button>
+                      ) : (
+                        <span
+                          className="text-xs font-medium text-warning"
+                          title="This account has not sent an authenticated heartbeat since IP capture was enabled."
+                        >
+                          Awaiting heartbeat
+                        </span>
+                      )}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">
+                      {entry.lastIpAt ? timeAgo(entry.lastIpAt) : "—"}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">
+                      {entry.online
+                        ? "Online now"
+                        : entry.lastSeen
+                          ? timeAgo(entry.lastSeen)
+                          : "Never"}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="inline-flex items-center gap-1.5 text-xs capitalize text-muted-foreground">
+                        <DeviceIcon className="size-4" />
+                        {entry.device ?? "unknown"}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

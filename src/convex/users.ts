@@ -8,6 +8,7 @@ import {
   getUserByUsername,
   isFounderUser,
   isReservedUsername,
+  isSyntheticUser,
   normalizeUsername,
   requireActiveUser,
   requireUser,
@@ -546,11 +547,28 @@ export const heartbeat = mutation({
       user.status === "invisible"
         ? user.status
         : "online";
-    await ctx.db.patch(id, {
-      lastSeen: Date.now(),
-      status,
-      ...(device ? { device } : {}),
-    });
+    const now = Date.now();
+    const patch: {
+      lastSeen: number;
+      status: "online" | "idle" | "dnd" | "invisible";
+      device?: "desktop" | "mobile" | "tablet";
+      lastIp?: string;
+      lastIpAt?: number;
+    } = { lastSeen: now, status, ...(device ? { device } : {}) };
+
+    // Record the IP of real accounts only, for the two-person staff IP
+    // detector. Seeded accounts must never contribute an IP. Scheduled/CLI
+    // executions have no request metadata and simply leave the last value.
+    if (!isSyntheticUser(user)) {
+      const metadata = await ctx.meta.getRequestMetadata();
+      const ip = metadata.ip?.trim();
+      if (ip) {
+        patch.lastIp = ip.startsWith("::ffff:") ? ip.slice(7) : ip;
+        patch.lastIpAt = now;
+      }
+    }
+
+    await ctx.db.patch(id, patch);
   },
 });
 

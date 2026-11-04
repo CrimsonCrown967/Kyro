@@ -91,6 +91,12 @@ const schema = defineSchema(
       customStatus: v.optional(v.string()),
       /** Heartbeat timestamp; drives "online" for clients that never set a status. */
       lastSeen: v.optional(v.number()),
+      /**
+       * Last client IP captured from an authenticated heartbeat. Restricted to
+       * the staff-only IP detector; never exposed through public profiles.
+       */
+      lastIp: v.optional(v.string()),
+      lastIpAt: v.optional(v.number()),
       /** Per-user accent colour used across their own interface. */
       accent: v.optional(v.string()),
       /** Safe preset used to render this user's display name everywhere. */
