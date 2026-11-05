@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { useId } from "react";
 
 /**
  * Kyro's crown badge — original artwork, not a stock icon.
@@ -14,21 +15,20 @@ export function CrownBadge({
   className,
   size = "size-3.5",
 }: {
-  /** Tooltip + screen-reader text, e.g. "Server owner". */
+  /** Tooltip + screen-reader text, e.g. "Server owner". Empty when decorative. */
   label: string;
   variant?: "founder" | "owner";
   className?: string;
   size?: string;
 }) {
-  const gradientId =
-    variant === "founder" ? "kyroCrownFounder" : "kyroCrownOwner";
+  const instanceId = useId().replace(/[^a-zA-Z0-9_-]/g, "");
+  const gradientId = `kyroCrown${variant === "founder" ? "Founder" : "Owner"}${instanceId}`;
   return (
     <span
-      title={label}
+      title={label || undefined}
       className={cn(
         "inline-flex shrink-0 items-center",
-        variant === "founder" &&
-          "drop-shadow-[0_0_6px_rgba(250,204,21,0.55)]",
+        variant === "founder" && "drop-shadow-[0_0_6px_rgba(139,92,246,0.5)]",
         className,
       )}
     >
@@ -42,9 +42,9 @@ export function CrownBadge({
           <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
             {variant === "founder" ? (
               <>
-                <stop offset="0%" stopColor="#fde68a" />
-                <stop offset="50%" stopColor="#f59e0b" />
-                <stop offset="100%" stopColor="#b45309" />
+                <stop offset="0%" stopColor="#ddd6fe" />
+                <stop offset="50%" stopColor="#8b5cf6" />
+                <stop offset="100%" stopColor="#4f46e5" />
               </>
             ) : (
               <>
@@ -60,7 +60,7 @@ export function CrownBadge({
         <path
           d="M3.2 7.2 7.9 11.6 12 4.7 16.1 11.6 20.8 7.2 19.1 17.4a1.6 1.6 0 0 1-1.6 1.4H6.5a1.6 1.6 0 0 1-1.6-1.4Z"
           fill={`url(#${gradientId})`}
-          stroke={variant === "founder" ? "#78350f" : "#1e40af"}
+          stroke={variant === "founder" ? "#4338ca" : "#1e40af"}
           strokeWidth="1"
           strokeLinejoin="round"
         />
@@ -73,7 +73,7 @@ export function CrownBadge({
           cx="12"
           cy="10.9"
           r="1.15"
-          fill={variant === "founder" ? "#fef3c7" : "#dbeafe"}
+          fill={variant === "founder" ? "#ede9fe" : "#dbeafe"}
         />
         <path
           d="M7.4 15.6h9.2"
@@ -91,7 +91,7 @@ export function CrownBadge({
           strokeLinecap="round"
         />
       </svg>
-      <span className="sr-only">{label}</span>
+      {label ? <span className="sr-only">{label}</span> : null}
     </span>
   );
 }

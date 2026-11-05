@@ -112,15 +112,17 @@ export function UserPreviewPanel() {
             </div>
 
             <div className="relative z-10 -mt-11 flex min-h-0 flex-1 flex-col px-5 pb-5">
-              <span className="w-fit rounded-full bg-popover p-1 ring-1 ring-border">
-                <UserAvatar user={user} size="xl" />
-              </span>
-              <BadgeTray
-                badges={user.badges}
-                primaryBadge={user.primaryBadge}
-                official={user.official}
-                className="absolute right-0 top-14 z-20"
-              />
+              <div className="flex items-end justify-between gap-3">
+                <span className="w-fit rounded-full bg-popover p-1 ring-1 ring-border">
+                  <UserAvatar user={user} size="xl" />
+                </span>
+                <BadgeTray
+                  badges={user.badges}
+                  primaryBadge={user.primaryBadge}
+                  official={user.official}
+                  className="mb-1 max-w-[min(13rem,68%)]"
+                />
+              </div>
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <StyledDisplayName user={user} className="text-2xl" />
                 {user.serverTag && (

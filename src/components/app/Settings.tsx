@@ -1976,10 +1976,10 @@ function ProfileTab() {
                     });
                   }}
                   className={cn(
-                    "relative flex flex-col items-center gap-1.5 rounded-lg border p-3 text-xs transition-colors",
+                    "relative flex flex-col items-center gap-1.5 rounded-xl border p-3 text-xs transition-colors",
                     active
-                      ? "border-primary ring-1 ring-primary/40 bg-primary/10 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
-                      : "border-border/70 bg-surface/40 text-muted-foreground hover:text-foreground",
+                      ? "border-indigo-300/30 bg-[#151d32] text-indigo-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_8px_20px_rgba(2,6,23,.24)] ring-1 ring-indigo-400/20"
+                      : "border-indigo-300/10 bg-[#11182a]/35 text-muted-foreground hover:border-indigo-300/25 hover:bg-[#151d32]/80 hover:text-indigo-50",
                   )}
                 >
                   {active && (
@@ -1987,7 +1987,7 @@ function ProfileTab() {
                       ✓
                     </span>
                   )}
-                  <GlobalBadgeIcon badge={badge} className="size-5" />
+                  <GlobalBadgeIcon badge={badge} className="size-6" />
                   {GLOBAL_BADGE_META[badge].label}
                 </button>
               );
@@ -2438,12 +2438,6 @@ function ProfilePreviewPane({
         }
       >
         <ProfileDecorationLayer decorationId={me.profileDecoration} />
-        <BadgeTray
-          badges={me.badges}
-          primaryBadge={badgeId}
-          official={me.official}
-          className="absolute right-3 top-3 z-20"
-        />
         {/* Banner: current picture, else the chosen colour theme. */}
         <div
           className={cn(
@@ -2467,8 +2461,16 @@ function ProfilePreviewPane({
         </div>
 
         <div className="relative z-10 px-4 pb-4">
-          <div className="-mt-8 inline-block rounded-full bg-zinc-950 p-1 ring-1 ring-white/10">
-            <UserAvatar user={{ ...me, avatarFrame: frameValue }} size="lg" />
+          <div className="-mt-8 flex items-end justify-between gap-3">
+            <span className="inline-block rounded-full bg-zinc-950 p-1 ring-1 ring-white/10">
+              <UserAvatar user={{ ...me, avatarFrame: frameValue }} size="lg" />
+            </span>
+            <BadgeTray
+              badges={me.badges}
+              primaryBadge={badgeId}
+              official={me.official}
+              className="mb-1 max-w-[min(13rem,68%)]"
+            />
           </div>
 
           <h3 className="mt-2 break-words text-lg font-semibold leading-snug">

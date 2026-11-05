@@ -235,17 +235,17 @@ export function ProfileCard() {
                 </div>
 
                 <div className="relative px-5 pb-5">
-                  <div className="-mt-14 sm:-mt-16">
+                  <div className="-mt-14 flex items-end justify-between gap-3 sm:-mt-16">
                     <span className="inline-flex rounded-full bg-background p-1.5 shadow-lg ring-1 ring-border/70">
                       <UserAvatar user={user} size="2xl" />
                     </span>
+                    <BadgeTray
+                      badges={user.badges}
+                      primaryBadge={user.primaryBadge}
+                      official={user.official}
+                      className="mb-1 max-w-[min(13rem,60%)]"
+                    />
                   </div>
-                  <BadgeTray
-                    badges={user.badges}
-                    primaryBadge={user.primaryBadge}
-                    official={user.official}
-                    className="absolute right-5 top-4"
-                  />
 
                   <DialogHeader className="mt-3 space-y-1 text-left">
                     <DialogTitle className="flex flex-wrap items-center gap-x-2 gap-y-1 text-2xl font-bold leading-tight sm:text-3xl">
@@ -500,11 +500,11 @@ export function ProfileCard() {
                                     type="button"
                                     disabled={busy}
                                     className={cn(
-                                      "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold tracking-wide transition-opacity",
-                                      "shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]",
+                                      "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-semibold tracking-wide transition-colors",
+                                      "shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]",
                                       granted
                                         ? GLOBAL_BADGE_META[badge].chip
-                                        : "border-border/70 bg-surface/40 text-muted-foreground hover:text-foreground",
+                                        : "border-indigo-300/10 bg-[#11182a]/35 text-muted-foreground hover:border-indigo-300/25 hover:bg-[#151d32]/80 hover:text-indigo-50",
                                       busy ? "opacity-60" : "",
                                     )}
                                     onClick={() => {

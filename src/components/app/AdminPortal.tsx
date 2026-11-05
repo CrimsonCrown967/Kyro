@@ -689,7 +689,7 @@ function OverviewTab({
             {(me?.badges ?? []).map((badge) => (
               <span
                 key={badge}
-                className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-panel px-2.5 py-1 text-xs"
+                className="inline-flex items-center gap-2 rounded-lg border border-indigo-300/15 bg-[#11182a]/85 px-2.5 py-1.5 text-xs text-indigo-50 shadow-[inset_0_1px_0_rgba(255,255,255,.05)]"
               >
                 <GlobalBadgeIcon
                   badge={badge as GlobalBadgeKey}
@@ -896,10 +896,10 @@ function BadgesTab({
                             : "Grant badge"
                       }
                       className={cn(
-                        "inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs transition-colors",
+                        "inline-flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs transition-colors",
                         held
-                          ? "border-brand/40 bg-brand/10 text-foreground"
-                          : "border-border/70 text-muted-foreground hover:border-brand/40 hover:text-foreground",
+                          ? "border-indigo-300/25 bg-[#151d32] text-indigo-50 shadow-[inset_0_1px_0_rgba(255,255,255,.05)]"
+                          : "border-indigo-300/10 bg-[#11182a]/35 text-muted-foreground hover:border-indigo-300/25 hover:bg-[#151d32]/80 hover:text-indigo-50",
                         locked && "cursor-not-allowed opacity-60",
                       )}
                     >

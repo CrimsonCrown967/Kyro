@@ -5,7 +5,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 
 /**
  * Hover/focus tooltip explaining a badge. Rendered through a portal with
@@ -35,16 +35,52 @@ export function BadgeTip({
       <TooltipContent
         side="top"
         sideOffset={8}
-        className="z-[100] w-max max-w-60 rounded-lg border-0 bg-zinc-900 px-3.5 py-2 text-center text-zinc-50 shadow-[0_10px_30px_rgba(0,0,0,0.45)] ring-1 ring-white/10 [&>svg]:hidden"
+        collisionPadding={12}
+        className="z-[100] w-max max-w-60 rounded-lg border-0 bg-[#11182a] px-3.5 py-2 text-center text-indigo-50 shadow-[0_12px_32px_rgba(0,0,0,0.5)] ring-1 ring-indigo-300/20 [&>svg]:hidden"
       >
         <span className="block text-sm font-bold">{label}</span>
         {blurb ? (
-          <span className="mt-0.5 block text-xs font-medium leading-snug text-zinc-300">
+          <span className="mt-0.5 block text-xs font-medium leading-snug text-indigo-100/70">
             {blurb}
           </span>
         ) : null}
       </TooltipContent>
     </Tooltip>
+  );
+}
+
+function OfficialBadgeIcon({ className }: { className?: string }) {
+  const gradientId = `kyroOfficial${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
+  const fill = `url(#${gradientId})`;
+
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      focusable="false"
+      className={cn("size-5 shrink-0", className)}
+    >
+      <defs>
+        <linearGradient id={gradientId} x1="4" y1="3" x2="20" y2="21">
+          <stop offset="0%" stopColor="#67e8f9" />
+          <stop offset="52%" stopColor="#3b82f6" />
+          <stop offset="100%" stopColor="#6366f1" />
+        </linearGradient>
+      </defs>
+      <circle cx="12" cy="12" r="10" fill={fill} fillOpacity="0.1" />
+      <path
+        d="M12 3.4 19 6v4.9c0 4.4-2.6 7.7-7 9.7-4.4-2-7-5.3-7-9.7V6Z"
+        fill={fill}
+      />
+      <path
+        d="m8.7 11.8 2.1 2.1 4.7-4.8"
+        fill="none"
+        stroke="#fff"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.9"
+      />
+    </svg>
   );
 }
 
@@ -55,14 +91,8 @@ export function OfficialBadge({ compact = false }: { compact?: boolean }) {
       label="Official Kyro account"
       blurb="This identity is operated by Kyro."
     >
-      <span className="inline-flex shrink-0 items-center gap-1 rounded-[4px] bg-blue-600 px-1.5 py-0.5 text-[9px] font-black uppercase leading-none tracking-wide text-white shadow-sm ring-1 ring-blue-300/40">
-        <svg
-          viewBox="0 0 16 16"
-          aria-hidden="true"
-          className="size-3 fill-white"
-        >
-          <path d="M8 1.25 9.7 2.4l2.05-.05.58 1.96 1.69 1.16-.68 1.93.68 1.93-1.69 1.16-.58 1.96-2.05-.05L8 13.55 6.3 12.4l-2.05.05-.58-1.96L1.98 9.33l.68-1.93-.68-1.93 1.69-1.16.58-1.96 2.05.05L8 1.25Zm2.86 4.4a.7.7 0 0 0-.99-.01L7.13 8.32 6.08 7.29a.7.7 0 1 0-.98 1l1.54 1.5a.7.7 0 0 0 .98 0l3.23-3.15a.7.7 0 0 0 .01-.99Z" />
-        </svg>
+      <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-indigo-300/20 bg-[#151d32] px-1.5 py-0.5 text-[9px] font-black uppercase leading-none tracking-wide text-indigo-50 shadow-sm">
+        <OfficialBadgeIcon className="size-3.5" />
         {compact ? <span className="sr-only">Official</span> : "Official"}
       </span>
     </BadgeTip>
@@ -73,23 +103,9 @@ export function OfficialBadge({ compact = false }: { compact?: boolean }) {
  * Kyro's platform-wide (global) badges — shown in their own dedicated
  * "Badges" shelf on a profile, deliberately separate from community roles.
  *
- * Every icon is original 2D vector artwork drawn for Kyro. The family shares
- * one "gem plate" silhouette — a rounded diamond set at 45° with an inner
- * gloss — and each badge gets its own hue + glyph:
- *  - founder    — royal crown, gold plate
- *  - cofounder  — crown + star, violet plate
- *  - admin      — star, crimson plate
- *  - manager    — three rank chevrons, lime plate
- *  - staff      — key, sky plate
- *  - moderator  — shield + check, emerald plate
- *  - trialstaff — hourglass, steel plate
- *  - verified   — seal + check, blue plate
- *  - bughunter  — bug under a target ring, amber plate
- *  - vip        — faceted diamond, violet plate
- *  - og         — rocket with star, teal plate
- *  - supporter  — heart, rose plate
- *  - donator    — coin, gold plate
- *  - partner    — interlocked rings, indigo plate
+ * Every icon is original 2D vector artwork drawn for Kyro. Staff badges share
+ * a shield silhouette, achievements keep a distinct glyph, and the entire set
+ * uses one cyan → indigo → violet palette so it reads as a single collection.
  */
 export type GlobalBadgeKey =
   | "founder"
@@ -114,72 +130,72 @@ export const GLOBAL_BADGE_META: Record<
   founder: {
     label: "Kyro Founder",
     blurb: "Built Kyro from the ground up.",
-    chip: "border-amber-300/60 bg-gradient-to-br from-amber-400/30 via-yellow-500/10 to-amber-500/5 text-amber-600 dark:text-amber-300",
+    chip: "border-indigo-300/20 bg-[#151d32] text-indigo-100",
   },
   cofounder: {
     label: "Co Founder",
     blurb: "Co-founded Kyro and helps steer it.",
-    chip: "border-violet-400/60 bg-gradient-to-br from-violet-500/30 via-purple-500/15 to-amber-400/10 text-violet-600 dark:text-violet-300",
+    chip: "border-indigo-300/20 bg-[#151d32] text-indigo-100",
   },
   admin: {
     label: "Admin",
     blurb: "Runs the Kyro platform.",
-    chip: "border-rose-400/50 bg-gradient-to-br from-rose-500/25 via-rose-500/10 to-rose-500/0 text-rose-600 dark:text-rose-300",
+    chip: "border-indigo-300/20 bg-[#151d32] text-indigo-100",
   },
   manager: {
     label: "Manager",
     blurb: "Leads Kyro's staff and communities.",
-    chip: "border-lime-400/50 bg-gradient-to-br from-lime-500/25 via-lime-500/10 to-lime-500/0 text-lime-600 dark:text-lime-300",
+    chip: "border-indigo-300/20 bg-[#151d32] text-indigo-100",
   },
   staff: {
     label: "Staff",
     blurb: "Part of the Kyro staff team.",
-    chip: "border-sky-400/50 bg-gradient-to-br from-sky-500/25 via-sky-500/10 to-sky-500/0 text-sky-600 dark:text-sky-300",
+    chip: "border-indigo-300/20 bg-[#151d32] text-indigo-100",
   },
   moderator: {
     label: "Moderator",
     blurb: "Keeps Kyro safe for everyone.",
-    chip: "border-emerald-400/50 bg-gradient-to-br from-emerald-500/25 via-emerald-500/10 to-emerald-500/0 text-emerald-600 dark:text-emerald-300",
+    chip: "border-indigo-300/20 bg-[#151d32] text-indigo-100",
   },
   trialstaff: {
     label: "Trial Staff",
     blurb: "Trying out for the Kyro staff team.",
-    chip: "border-slate-400/50 bg-gradient-to-br from-slate-400/25 via-slate-500/10 to-slate-500/0 text-slate-600 dark:text-slate-300",
+    chip: "border-indigo-300/20 bg-[#151d32] text-indigo-100",
   },
   verified: {
     label: "Verified",
     blurb: "Verified by the Kyro team.",
-    chip: "border-blue-400/50 bg-gradient-to-br from-blue-500/25 via-blue-500/10 to-blue-500/0 text-blue-600 dark:text-blue-300",
+    chip: "border-indigo-300/20 bg-[#151d32] text-indigo-100",
   },
   bughunter: {
     label: "Bug Hunter",
     blurb: "Helped squash bugs in Kyro.",
-    chip: "border-amber-400/60 bg-gradient-to-br from-orange-500/25 via-amber-500/10 to-amber-500/0 text-amber-600 dark:text-amber-300",
+    chip: "border-indigo-300/20 bg-[#151d32] text-indigo-100",
   },
   vip: {
     label: "VIP",
     blurb: "A very important Kyro member.",
-    chip: "border-fuchsia-400/50 bg-gradient-to-br from-fuchsia-500/25 via-purple-500/10 to-purple-500/0 text-fuchsia-600 dark:text-fuchsia-300",
+    chip: "border-indigo-300/20 bg-[#151d32] text-indigo-100",
   },
   og: {
     label: "OG",
     blurb: "Been here since the early days.",
-    chip: "border-teal-400/50 bg-gradient-to-br from-teal-500/25 via-teal-500/10 to-teal-500/0 text-teal-600 dark:text-teal-300",
+    chip: "border-indigo-300/20 bg-[#151d32] text-indigo-100",
   },
   supporter: {
     label: "Supporter",
     blurb: "Stands behind Kyro.",
-    chip: "border-pink-400/50 bg-gradient-to-br from-pink-500/25 via-rose-500/10 to-rose-500/0 text-pink-600 dark:text-pink-300",
+    chip: "border-indigo-300/20 bg-[#151d32] text-indigo-100",
   },
   donator: {
     label: "Donator",
     blurb: "Donated to help Kyro grow.",
-    chip: "border-yellow-400/60 bg-gradient-to-br from-yellow-500/25 via-amber-400/10 to-amber-400/0 text-yellow-600 dark:text-yellow-300",
+    chip: "border-indigo-300/20 bg-[#151d32] text-indigo-100",
   },
   partner: {
     label: "Partner",
     blurb: "An official Kyro partner.",
-    chip: "border-indigo-400/50 bg-gradient-to-br from-indigo-500/25 via-indigo-500/10 to-indigo-500/0 text-indigo-600 dark:text-indigo-300",
+    chip: "border-indigo-300/20 bg-[#151d32] text-indigo-100",
   },
 };
 
@@ -219,6 +235,12 @@ export const BADGE_PRIORITY: GlobalBadgeKey[] = [
   "verified",
 ];
 
+const GLOBAL_BADGE_SET = new Set<string>(BADGE_PRIORITY);
+
+function isGlobalBadgeKey(value: string): value is GlobalBadgeKey {
+  return GLOBAL_BADGE_SET.has(value);
+}
+
 /** The single highest-priority badge a user holds, or null for none. */
 export function topGlobalBadge(
   badges: readonly string[],
@@ -227,7 +249,7 @@ export function topGlobalBadge(
 }
 
 /**
- * Inline badge next to a name, styled exactly like the founder crown.
+ * Compact single-badge renderer for surfaces that explicitly request one.
  * Shows the badge the user picked in Settings → Profile → Badge (when they
  * hold it), else their highest one (founder → co-founder → admin → manager →
  * staff → moderator → trial staff → …). Badges stay visible throughout the
@@ -245,8 +267,11 @@ export function InlineBadge({
   size?: string;
 }) {
   const chosen =
-    primaryBadge && primaryBadge !== "none" && badges.includes(primaryBadge)
-      ? (primaryBadge as GlobalBadgeKey)
+    primaryBadge &&
+    primaryBadge !== "none" &&
+    isGlobalBadgeKey(primaryBadge) &&
+    badges.includes(primaryBadge)
+      ? primaryBadge
       : topGlobalBadge(badges);
   if (!chosen) return null;
   const meta = GLOBAL_BADGE_META[chosen];
@@ -261,9 +286,8 @@ export function InlineBadge({
 }
 
 /**
- * Profile-only badge shelf. Every badge is icon-only and lives together in
- * the top-right tray, matching the supplied reference instead of being mixed
- * into display names or community roles.
+ * Compact profile badge capsule. Every earned badge uses the same deep-navy,
+ * blue-violet visual family and stays separate from community roles.
  */
 export function BadgeTray({
   badges,
@@ -281,8 +305,9 @@ export function BadgeTray({
   const lead =
     primaryBadge &&
     primaryBadge !== "none" &&
-    ordered.includes(primaryBadge as GlobalBadgeKey)
-      ? (primaryBadge as GlobalBadgeKey)
+    isGlobalBadgeKey(primaryBadge) &&
+    ordered.includes(primaryBadge)
+      ? primaryBadge
       : null;
   const display = lead
     ? [lead, ...ordered.filter((badge) => badge !== lead)]
@@ -292,7 +317,7 @@ export function BadgeTray({
   return (
     <div
       className={cn(
-        "inline-flex max-w-52 flex-wrap items-center justify-end gap-1 rounded-lg border border-white/10 bg-[#111214]/95 px-2 py-1.5 shadow-[0_8px_24px_rgba(0,0,0,.35)]",
+        "inline-flex max-w-52 flex-wrap items-center justify-start gap-0.5 rounded-xl border border-indigo-300/15 bg-[#11182a]/95 p-1 shadow-[0_10px_28px_rgba(2,6,23,.48)] backdrop-blur-md",
         className,
       )}
       aria-label="Profile badges"
@@ -302,31 +327,18 @@ export function BadgeTray({
           label="Official Kyro account"
           blurb="This identity is operated by Kyro."
         >
-          <svg
-            viewBox="0 0 24 24"
-            aria-hidden="true"
-            className="size-6 drop-shadow-[0_1px_2px_rgba(0,0,0,.45)]"
-          >
-            <path
-              fill="#5865f2"
-              d="M12 2.2 20 5.3v5.55c0 5.1-3.05 8.83-8 10.95-4.95-2.12-8-5.85-8-10.95V5.3L12 2.2Z"
-            />
-            <path
-              fill="none"
-              stroke="white"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="2.15"
-              d="m8.2 11.9 2.35 2.25 5.2-5.25"
-            />
-          </svg>
+          <span className="flex size-7 items-center justify-center rounded-lg transition-colors hover:bg-indigo-300/10">
+            <OfficialBadgeIcon className="size-5" />
+          </span>
         </BadgeTip>
       ) : null}
       {display.map((badge) => {
         const meta = GLOBAL_BADGE_META[badge];
         return (
           <BadgeTip key={badge} label={meta.label} blurb={meta.blurb}>
-            <GlobalBadgeIcon badge={badge} className="size-6" />
+            <span className="flex size-7 items-center justify-center rounded-lg transition-colors hover:bg-indigo-300/10">
+              <GlobalBadgeIcon badge={badge} className="size-5" />
+            </span>
           </BadgeTip>
         );
       })}
@@ -368,13 +380,9 @@ export function CommunityRoleChips({
   );
 }
 
-/**
- * The shared "gem plate" silhouette every badge glyph sits on: a diamond
- * rotated 45° whose join rounding is faked with a thick round-joined stroke
- * of the gradient itself. One shape for the whole family keeps ten badges
- * reading as one set.
- */
-const PLATE = "M12 2.6 21.4 12 12 21.4 2.6 12Z";
+/** Shared shield silhouette for the Fenrid-inspired blue/violet badge family. */
+const PLATE =
+  "M12 2.8 20 5.8v5.45c0 4.8-3.05 8.1-8 9.95-4.95-1.85-8-5.15-8-9.95V5.8Z";
 
 /** Per-badge gradients and outline colours, keyed once. */
 const BADGE_ART: Record<
@@ -382,57 +390,57 @@ const BADGE_ART: Record<
   { stops: [string, string, string]; edge: string; vertical?: boolean }
 > = {
   cofounder: {
-    stops: ["#c4b5fd", "#8b5cf6", "#4c1d95"],
-    edge: "#2e1065",
+    stops: ["#c4b5fd", "#8b5cf6", "#4f46e5"],
+    edge: "#4338ca",
   },
   admin: {
-    stops: ["#fda4af", "#f43f5e", "#9f1239"],
-    edge: "#881337",
+    stops: ["#a5b4fc", "#6366f1", "#3730a3"],
+    edge: "#312e81",
   },
   manager: {
-    stops: ["#d9f99d", "#84cc16", "#3f6212"],
-    edge: "#365314",
+    stops: ["#7dd3fc", "#3b82f6", "#4f46e5"],
+    edge: "#3730a3",
   },
   staff: {
-    stops: ["#bae6fd", "#0ea5e9", "#075985"],
-    edge: "#0c4a6e",
+    stops: ["#67e8f9", "#3b82f6", "#4338ca"],
+    edge: "#1e3a8a",
   },
   moderator: {
-    stops: ["#6ee7b7", "#10b981", "#047857"],
-    edge: "#065f46",
+    stops: ["#93c5fd", "#6366f1", "#6d28d9"],
+    edge: "#4c1d95",
   },
   trialstaff: {
-    stops: ["#cbd5e1", "#64748b", "#1e293b"],
-    edge: "#0f172a",
+    stops: ["#cbd5e1", "#818cf8", "#4338ca"],
+    edge: "#312e81",
   },
   verified: {
-    stops: ["#93c5fd", "#3b82f6", "#1d4ed8"],
-    edge: "#1e40af",
+    stops: ["#67e8f9", "#3b82f6", "#4f46e5"],
+    edge: "#3730a3",
   },
   bughunter: {
-    stops: ["#fcd34d", "#f59e0b", "#b45309"],
-    edge: "#78350f",
+    stops: ["#c4b5fd", "#8b5cf6", "#4f46e5"],
+    edge: "#3730a3",
   },
   vip: {
-    stops: ["#f0abfc", "#c026d3", "#6b21a8"],
-    edge: "#701a75",
+    stops: ["#ddd6fe", "#8b5cf6", "#4f46e5"],
+    edge: "#4338ca",
   },
   og: {
-    stops: ["#99f6e4", "#14b8a6", "#115e59"],
-    edge: "#134e4a",
+    stops: ["#67e8f9", "#38bdf8", "#4f46e5"],
+    edge: "#3730a3",
     vertical: true,
   },
   supporter: {
-    stops: ["#fda4af", "#fb7185", "#e11d48"],
-    edge: "#9f1239",
+    stops: ["#e9d5ff", "#a78bfa", "#6366f1"],
+    edge: "#4338ca",
   },
   donator: {
-    stops: ["#fef08a", "#fbbf24", "#b45309"],
-    edge: "#92400e",
+    stops: ["#a5f3fc", "#60a5fa", "#6366f1"],
+    edge: "#3730a3",
   },
   partner: {
-    stops: ["#c7d2fe", "#6366f1", "#3730a3"],
-    edge: "#312e81",
+    stops: ["#bfdbfe", "#818cf8", "#6d28d9"],
+    edge: "#4c1d95",
     vertical: true,
   },
 };
@@ -445,18 +453,20 @@ export function GlobalBadgeIcon({
   badge: GlobalBadgeKey;
   className?: string;
 }) {
+  const instanceId = useId().replace(/[^a-zA-Z0-9_-]/g, "");
+
   if (badge === "founder") {
     return (
       <CrownBadge
         variant="founder"
-        label="Kyro founder"
+        label=""
         size={className ?? "size-[18px]"}
       />
     );
   }
 
   const art = BADGE_ART[badge];
-  const gradientId = `kyroBadge_${badge}`;
+  const gradientId = `kyroBadge_${badge}_${instanceId}`;
   const fill = `url(#${gradientId})`;
   const white = "#ffffff";
 
@@ -482,13 +492,13 @@ export function GlobalBadgeIcon({
         </linearGradient>
       </defs>
 
-      {/* Gem plate: thick round-joined stroke turns the diamond's sharp
-          corners soft while staying one continuous silhouette. */}
+      {/* Shared shield plate keeps every role and achievement in one family. */}
       <path
         d={PLATE}
         fill={fill}
-        stroke={fill}
-        strokeWidth="2.1"
+        stroke={art.stops[0]}
+        strokeOpacity="0.72"
+        strokeWidth="0.9"
         strokeLinejoin="round"
       />
       {/* Inner ring keeps the glyph area crisp on any background. */}
@@ -497,7 +507,7 @@ export function GlobalBadgeIcon({
         fill="none"
         stroke={white}
         strokeOpacity="0.28"
-        strokeWidth="0.8"
+        strokeWidth="0.65"
         strokeLinejoin="round"
       />
 
@@ -778,7 +788,7 @@ export function GlobalBadgeIcon({
         </>
       )}
 
-      {/* Shared gloss: one highlight arc so all ten plates catch the same
+      {/* Shared gloss: one highlight arc so all shields catch the same
           light and read as a single icon family. */}
       <path
         d="M7 8.2a6 6 0 0 1 4.3-3.4"
@@ -805,8 +815,8 @@ export function GlobalBadgeChip({
     <BadgeTip label={meta.label} blurb={meta.blurb}>
       <span
         className={cn(
-          "inline-flex items-center gap-1.5 rounded-[5px] border px-2 py-1 text-xs font-semibold",
-          "shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] transition-shadow hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_2px_6px_rgba(0,0,0,0.12)]",
+          "inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs font-semibold",
+          "shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_4px_12px_rgba(2,6,23,0.18)] transition-colors hover:border-indigo-300/35 hover:bg-[#19233c]",
           meta.chip,
           className,
         )}
