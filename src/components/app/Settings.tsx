@@ -1947,13 +1947,15 @@ function ProfileTab() {
           </p>
           <p className="mb-3 text-xs text-muted-foreground">
             This one shows next to your name in chat and the member list. Your
-            profile card shows all of them. None hides them everywhere.
+            profile card always shows every badge you've earned.
           </p>
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
             {me.badges.map((badge) => {
               const active =
                 (badgeSel === undefined
-                  ? (me.primaryBadge ?? me.badges[0] ?? "none")
+                  ? me.primaryBadge && me.primaryBadge !== "none"
+                    ? me.primaryBadge
+                    : me.badges[0]
                   : badgeSel) === badge;
               return (
                 <button
@@ -1987,44 +1989,6 @@ function ProfileTab() {
                 </button>
               );
             })}
-            {(() => {
-              const active =
-                (badgeSel === undefined
-                  ? (me.primaryBadge ?? me.badges[0] ?? "none")
-                  : badgeSel) === "none";
-              return (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setBadgeSel("none");
-                    void update({ primaryBadge: "none" }).catch((error) => {
-                      setBadgeSel(undefined);
-                      toast.error(
-                        error instanceof Error
-                          ? error.message
-                          : "Could not save that.",
-                      );
-                    });
-                  }}
-                  className={cn(
-                    "relative flex flex-col items-center justify-center gap-1.5 rounded-lg border p-3 text-xs transition-colors",
-                    active
-                      ? "border-primary ring-1 ring-primary/40 bg-primary/10 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
-                      : "border-border/70 bg-surface/40 text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {active && (
-                    <span className="absolute right-1.5 top-1.5 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
-                      ✓
-                    </span>
-                  )}
-                  <span className="flex size-5 items-center justify-center rounded-full border border-dashed border-border">
-                    <X className="size-3" />
-                  </span>
-                  None
-                </button>
-              );
-            })()}
           </div>
         </section>
 

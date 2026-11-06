@@ -612,16 +612,41 @@ export const profile = query({
     const user = await ctx.db.get(userId);
     if (!user) return null;
     const publicUser = await hydrateUser(ctx, user, viewerId);
-    const [mine, theirs] = await Promise.all([
-      ctx.db
-        .query("serverMembers")
-        .withIndex("by_user", (q) => q.eq("userId", viewerId))
-        .collect(),
-      ctx.db
-        .query("serverMembers")
-        .withIndex("by_user", (q) => q.eq("userId", userId))
-        .collect(),
-    ]);
+    const [mine, theirs, myOutgoing, myIncoming, theirOutgoing, theirIncoming] =
+      await Promise.all([
+        ctx.db
+          .query("serverMembers")
+          .withIndex("by_user", (q) => q.eq("userId", viewerId))
+          .collect(),
+        ctx.db
+          .query("serverMembers")
+          .withIndex("by_user", (q) => q.eq("userId", userId))
+          .collect(),
+        ctx.db
+          .query("connections")
+          .withIndex("by_requester", (q) =>
+            q.eq("requesterId", viewerId).eq("status", "accepted"),
+          )
+          .collect(),
+        ctx.db
+          .query("connections")
+          .withIndex("by_addressee", (q) =>
+            q.eq("addresseeId", viewerId).eq("status", "accepted"),
+          )
+          .collect(),
+        ctx.db
+          .query("connections")
+          .withIndex("by_requester", (q) =>
+            q.eq("requesterId", userId).eq("status", "accepted"),
+          )
+          .collect(),
+        ctx.db
+          .query("connections")
+          .withIndex("by_addressee", (q) =>
+            q.eq("addresseeId", userId).eq("status", "accepted"),
+          )
+          .collect(),
+      ]);
     const theirServers = new Map(theirs.map((m) => [m.serverId, m]));
     const mutual: { id: string; name: string }[] = [];
     for (const membership of mine) {
@@ -630,7 +655,44 @@ export const profile = query({
       const doc = await ctx.db.get(membership.serverId);
       if (doc) mutual.push({ id: doc._id, name: doc.name });
     }
-    return { user: publicUser, mutualServers: mutual.slice(0, 8) };
+    const friendIds = (
+      accountId: Id<"users">,
+      outgoing: typeof myOutgoing,
+      incoming: typeof myIncoming,
+    ) =>
+      new Set([
+        ...outgoing.map((connection) =>
+          connection.requesterId === accountId
+            ? connection.addresseeId
+            : connection.requesterId,
+        ),
+        ...incoming.map((connection) =>
+          connection.addresseeId === accountId
+            ? connection.requesterId
+            : connection.addresseeId,
+        ),
+      ]);
+    const myFriends = friendIds(viewerId, myOutgoing, myIncoming);
+    const theirFriends = friendIds(userId, theirOutgoing, theirIncoming);
+    const mutualFriendIds =
+      viewerId === userId
+        ? []
+        : [...myFriends].filter((friendId) => theirFriends.has(friendId));
+    const mutualFriendMap = await hydrateUsers(
+      ctx,
+      mutualFriendIds.slice(0, 24),
+      viewerId,
+    );
+    const mutualFriends = mutualFriendIds
+      .map((friendId) => mutualFriendMap.get(friendId))
+      .filter(
+        (friend): friend is NonNullable<typeof friend> => friend !== undefined,
+      );
+    return {
+      user: publicUser,
+      mutualServers: mutual.slice(0, 24),
+      mutualFriends,
+    };
   },
 });
 

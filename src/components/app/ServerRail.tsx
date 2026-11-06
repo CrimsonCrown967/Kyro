@@ -63,10 +63,10 @@ function RailButton({
   const body = (
     <span
       className={cn(
-        "relative flex size-[52px] items-center justify-center overflow-hidden rounded-[18px] ring-1 ring-white/5 transition-all duration-200",
+        "relative flex size-14 items-center justify-center overflow-hidden rounded-full ring-1 ring-white/5 transition-all duration-200",
         active
-          ? "rounded-[15px] bg-surface text-foreground shadow-lg ring-primary/30"
-          : "bg-surface/65 text-muted-foreground hover:rounded-[15px] hover:bg-surface hover:text-foreground",
+          ? "rounded-[18px] bg-primary text-white shadow-lg shadow-primary/15 ring-primary/40"
+          : "bg-surface/75 text-muted-foreground hover:rounded-[18px] hover:bg-primary hover:text-white",
         className,
       )}
     >
@@ -150,7 +150,7 @@ export function ServerRail({ activeServerId }: { activeServerId?: string }) {
     <>
       <nav
         aria-label="Communities"
-        className="flex w-[88px] shrink-0 flex-col items-center gap-2 overflow-y-auto overflow-x-hidden border-r border-border/50 bg-rail px-2 py-2.5"
+        className="flex w-[88px] shrink-0 flex-col items-center gap-2 overflow-y-auto overflow-x-hidden border-r border-border/60 bg-rail px-2 py-3"
       >
         <RailButton
           label="Direct messages"
@@ -160,7 +160,7 @@ export function ServerRail({ activeServerId }: { activeServerId?: string }) {
           <KyroMark className="size-8" />
         </RailButton>
 
-        <span className="my-1 h-px w-8 bg-border" />
+        <span className="my-1 h-0.5 w-10 rounded-full bg-border" />
 
         {bubbleDms.map((conversation) => {
           const other =

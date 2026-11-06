@@ -1,8 +1,13 @@
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internalMutation } from "./_generated/server";
-import { deleteConversationData, deleteMessageData } from "./cleanup";
-import { configuredFounderId } from "./lib";
+import {
+  deleteConversationData,
+  deleteMessageData,
+  deleteServerData,
+} from "./cleanup";
+import { configuredFounderId, isSyntheticUser } from "./lib";
+import { deleteStorageObjectIfPresent } from "./uploadSecurity";
 
 type GreetingTarget = "jayc" | "adrianeosyne";
 
@@ -130,9 +135,7 @@ export const purgeSyntheticGreetings = internalMutation({
       processedConversations: dryRun ? 0 : batch.length,
       deletedConversations,
       trimmedConversations,
-      removedMessages: dryRun
-        ? 0
-        : removedMessages,
+      removedMessages: dryRun ? 0 : removedMessages,
       wouldRemoveMessages: dryRun
         ? batch.reduce((total, entry) => total + entry.hellos.length, 0)
         : undefined,
@@ -142,6 +145,315 @@ export const purgeSyntheticGreetings = internalMutation({
   },
 });
 
+/**
+ * Permanently remove explicitly supplied seeded accounts and the application
+ * data/auth sessions attached to them. The caller supplies ids so this job
+ * does not scan (and conflict with heartbeats on) the whole users table.
+ *
+ * Every id is checked against the reserved seed-email suffix before any write,
+ * making it impossible to remove a real account with this maintenance job.
+ */
+export const purgeSyntheticAccounts = internalMutation({
+  args: { userIds: v.array(v.id("users")) },
+  handler: async (ctx, { userIds }) => {
+    if (userIds.length === 0 || userIds.length > 25) {
+      throw new Error("Supply between 1 and 25 seeded account ids.");
+    }
+
+    const uniqueIds = [...new Set(userIds)];
+    const users = await Promise.all(
+      uniqueIds.map((userId) => ctx.db.get(userId)),
+    );
+    for (const user of users) {
+      if (user && !isSyntheticUser(user)) {
+        throw new Error(
+          `Refusing to delete non-seeded account ${user.username ?? user._id}.`,
+        );
+      }
+    }
+
+    let removed = 0;
+    let missing = 0;
+    for (const user of users) {
+      if (!user) {
+        missing += 1;
+        continue;
+      }
+      const id = user._id;
+
+      // Synthetic-owned communities and conversations are synthetic data too.
+      const ownedServers = await ctx.db
+        .query("servers")
+        .withIndex("by_owner", (q) => q.eq("ownerId", id))
+        .collect();
+      for (const server of ownedServers) await deleteServerData(ctx, server);
+
+      const conversationRows = await ctx.db
+        .query("conversationMembers")
+        .withIndex("by_user", (q) => q.eq("userId", id))
+        .collect();
+      for (const row of conversationRows) {
+        const conversation = await ctx.db.get(row.conversationId);
+        if (conversation) await deleteConversationData(ctx, conversation);
+      }
+
+      const [
+        memberships,
+        notifications,
+        actorNotifications,
+        reads,
+        outgoingConnections,
+        incomingConnections,
+        outgoingBlocks,
+        incomingBlocks,
+        sessions,
+        accounts,
+        securityRows,
+        passkeys,
+        targetCases,
+        moderatorCases,
+        emailOutbox,
+        verificationCodes,
+        livekitTickets,
+        uploads,
+        ownMessages,
+        threadMessages,
+        forumPosts,
+        forumComments,
+        reportedReports,
+        filedReports,
+        applications,
+        automodEvents,
+        warnings,
+        voiceSessions,
+        notificationSettings,
+        siteBans,
+        adminActions,
+        bugReports,
+      ] = await Promise.all([
+        ctx.db
+          .query("serverMembers")
+          .withIndex("by_user", (q) => q.eq("userId", id))
+          .collect(),
+        ctx.db
+          .query("notifications")
+          .withIndex("by_user", (q) => q.eq("userId", id))
+          .collect(),
+        ctx.db
+          .query("notifications")
+          .withIndex("by_actor", (q) => q.eq("actorId", id))
+          .collect(),
+        ctx.db
+          .query("reads")
+          .withIndex("by_user", (q) => q.eq("userId", id))
+          .collect(),
+        ctx.db
+          .query("connections")
+          .withIndex("by_requester", (q) => q.eq("requesterId", id))
+          .collect(),
+        ctx.db
+          .query("connections")
+          .withIndex("by_addressee", (q) => q.eq("addresseeId", id))
+          .collect(),
+        ctx.db
+          .query("blocks")
+          .withIndex("by_blocker", (q) => q.eq("blockerId", id))
+          .collect(),
+        ctx.db
+          .query("blocks")
+          .withIndex("by_blocked", (q) => q.eq("blockedId", id))
+          .collect(),
+        ctx.db
+          .query("authSessions")
+          .withIndex("userId", (q) => q.eq("userId", id))
+          .collect(),
+        ctx.db
+          .query("authAccounts")
+          .withIndex("userIdAndProvider", (q) => q.eq("userId", id))
+          .collect(),
+        ctx.db
+          .query("accountSecurity")
+          .withIndex("by_user", (q) => q.eq("userId", id))
+          .collect(),
+        ctx.db
+          .query("passkeyCredentials")
+          .withIndex("by_user", (q) => q.eq("userId", id))
+          .collect(),
+        ctx.db
+          .query("moderationCases")
+          .withIndex("by_user", (q) => q.eq("userId", id))
+          .collect(),
+        ctx.db
+          .query("moderationCases")
+          .withIndex("by_moderator", (q) => q.eq("moderatorId", id))
+          .collect(),
+        ctx.db
+          .query("emailOutbox")
+          .withIndex("by_user", (q) => q.eq("userId", id))
+          .collect(),
+        ctx.db
+          .query("emailVerificationCodes")
+          .withIndex("by_user", (q) => q.eq("userId", id))
+          .collect(),
+        ctx.db
+          .query("livekitTickets")
+          .withIndex("by_user", (q) => q.eq("userId", id))
+          .collect(),
+        ctx.db
+          .query("uploads")
+          .withIndex("by_owner", (q) => q.eq("ownerId", id))
+          .collect(),
+        ctx.db
+          .query("messages")
+          .withIndex("by_author", (q) => q.eq("authorId", id))
+          .collect(),
+        ctx.db
+          .query("threadMessages")
+          .withIndex("by_author", (q) => q.eq("authorId", id))
+          .collect(),
+        ctx.db
+          .query("forumPosts")
+          .withIndex("by_author", (q) => q.eq("authorId", id))
+          .collect(),
+        ctx.db
+          .query("forumComments")
+          .withIndex("by_author", (q) => q.eq("authorId", id))
+          .collect(),
+        ctx.db
+          .query("reports")
+          .withIndex("by_reported", (q) => q.eq("reportedUserId", id))
+          .collect(),
+        ctx.db
+          .query("reports")
+          .withIndex("by_reporter", (q) => q.eq("reporterId", id))
+          .collect(),
+        ctx.db
+          .query("joinApplications")
+          .withIndex("by_user_server", (q) => q.eq("userId", id))
+          .collect(),
+        ctx.db
+          .query("automodEvents")
+          .withIndex("by_user", (q) => q.eq("userId", id))
+          .collect(),
+        ctx.db
+          .query("warnings")
+          .withIndex("by_user", (q) => q.eq("userId", id))
+          .collect(),
+        ctx.db
+          .query("voiceSessions")
+          .withIndex("by_user", (q) => q.eq("userId", id))
+          .collect(),
+        ctx.db
+          .query("channelNotificationSettings")
+          .withIndex("by_user_channel", (q) => q.eq("userId", id))
+          .collect(),
+        ctx.db
+          .query("siteBans")
+          .withIndex("by_user", (q) => q.eq("userId", id))
+          .collect(),
+        ctx.db
+          .query("adminActions")
+          .withIndex("by_actor", (q) => q.eq("actorId", id))
+          .collect(),
+        ctx.db
+          .query("bugReports")
+          .withIndex("by_reporter", (q) => q.eq("reporterId", id))
+          .collect(),
+      ]);
+
+      for (const message of ownMessages) await deleteMessageData(ctx, message);
+      for (const post of forumPosts) {
+        const comments = await ctx.db
+          .query("forumComments")
+          .withIndex("by_post", (q) => q.eq("postId", post._id))
+          .collect();
+        for (const comment of comments) await ctx.db.delete(comment._id);
+        await ctx.db.delete(post._id);
+      }
+
+      const directRows = [
+        ...memberships,
+        ...notifications,
+        ...actorNotifications,
+        ...reads,
+        ...outgoingConnections,
+        ...incomingConnections,
+        ...outgoingBlocks,
+        ...incomingBlocks,
+        ...securityRows,
+        ...passkeys,
+        ...targetCases,
+        ...moderatorCases,
+        ...emailOutbox,
+        ...verificationCodes,
+        ...livekitTickets,
+        ...threadMessages,
+        ...forumComments,
+        ...reportedReports,
+        ...filedReports,
+        ...applications,
+        ...automodEvents,
+        ...warnings,
+        ...voiceSessions,
+        ...notificationSettings,
+        ...siteBans,
+        ...adminActions,
+        ...bugReports,
+      ];
+      const directIds = new Set(directRows.map((row) => row._id));
+      for (const rowId of directIds) {
+        const row = await ctx.db.get(rowId);
+        if (row) await ctx.db.delete(rowId);
+      }
+
+      for (const session of sessions) {
+        const tokens = await ctx.db
+          .query("authRefreshTokens")
+          .withIndex("sessionId", (q) => q.eq("sessionId", session._id))
+          .collect();
+        for (const token of tokens) await ctx.db.delete(token._id);
+        await ctx.db.delete(session._id);
+      }
+      for (const account of accounts) await ctx.db.delete(account._id);
+
+      for (const upload of uploads) {
+        await deleteStorageObjectIfPresent(ctx, upload.storageId);
+        const uploadRow = await ctx.db.get(upload._id);
+        if (uploadRow) await ctx.db.delete(upload._id);
+      }
+
+      if (user.email) {
+        const [verificationRequests, resetCodes, resetRequests] =
+          await Promise.all([
+            ctx.db
+              .query("emailVerificationRequests")
+              .withIndex("by_email", (q) => q.eq("email", user.email!))
+              .collect(),
+            ctx.db
+              .query("passwordResetCodes")
+              .withIndex("by_email", (q) => q.eq("email", user.email!))
+              .collect(),
+            ctx.db
+              .query("passwordResetRequests")
+              .withIndex("by_email", (q) => q.eq("email", user.email!))
+              .collect(),
+          ]);
+        for (const row of [
+          ...verificationRequests,
+          ...resetCodes,
+          ...resetRequests,
+        ]) {
+          await ctx.db.delete(row._id);
+        }
+      }
+
+      await ctx.db.delete(id);
+      removed += 1;
+    }
+
+    return { requested: uniqueIds.length, removed, missing };
+  },
+});
 
 /** Idempotent one-off used to keep the Kyro service identity official. */
 export const markOfficialAccounts = internalMutation({

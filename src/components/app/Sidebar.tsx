@@ -27,6 +27,7 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { UserAvatar } from "@/components/app/UserAvatar";
 import { UserBar } from "@/components/app/UserBar";
 import { StyledDisplayName } from "@/components/app/StyledDisplayName";
+import { InlineBadge, OfficialBadge } from "@/components/app/GlobalBadges";
 import { CreateChannelDialog, InviteDialog } from "@/components/app/dialogs";
 import { Button } from "@/components/ui/button";
 import {
@@ -56,7 +57,7 @@ export function Sidebar({
   onOpenSettings?: () => void;
 }) {
   return (
-    <div className="flex w-72 shrink-0 flex-col border-r border-border/70 bg-sidebar shadow-[6px_0_24px_rgba(0,0,0,.08)]">
+    <div className="flex w-[calc(92vw-88px)] max-w-[21rem] shrink-0 flex-col border-r border-border/70 bg-sidebar md:w-[21rem]">
       <div className="min-h-0 flex-1 overflow-y-auto">
         {activeServerId ? (
           <ServerSection serverId={activeServerId} />
@@ -169,12 +170,34 @@ function ServerSection({ serverId }: { serverId: string }) {
 
   return (
     <>
-      <div className="sticky top-0 z-10 border-b border-border/70 bg-sidebar/90 backdrop-blur-xl">
+      <div
+        className={cn(
+          "sticky top-0 z-10 overflow-hidden border-b border-border/70 bg-sidebar",
+          server.bannerUrl ? "h-48 bg-cover bg-center" : "h-14",
+        )}
+        style={
+          server.bannerUrl
+            ? {
+                backgroundImage: `url(${JSON.stringify(server.bannerUrl).slice(1, -1)})`,
+              }
+            : undefined
+        }
+      >
+        {server.bannerUrl ? (
+          <span className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/65 via-black/5 to-sidebar/95" />
+        ) : null}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="flex h-14 w-full items-center justify-between gap-2 px-4 text-left text-base font-bold hover:bg-sidebar-accent/60">
-              <span className="truncate tracking-tight">{server.name}</span>
-              <span className="text-xs text-muted-foreground">▾</span>
+            <button className="relative z-10 flex h-14 w-full items-center justify-between gap-2 px-4 text-left text-base font-bold text-white drop-shadow hover:bg-black/15">
+              <span className="flex min-w-0 items-center gap-2 truncate tracking-tight">
+                <span className="truncate">{server.name}</span>
+                {server.isPlatformHome ? (
+                  <span className="inline-flex size-4 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] text-white ring-2 ring-white/20">
+                    ✓
+                  </span>
+                ) : null}
+              </span>
+              <span className="text-sm text-white/75">⌄</span>
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-56">
@@ -295,27 +318,7 @@ function ServerSection({ serverId }: { serverId: string }) {
         </DropdownMenu>
       </div>
 
-      {server.bannerUrl && (
-        <div className="relative h-24 overflow-hidden border-b border-border/60">
-          <img
-            src={server.bannerUrl}
-            alt=""
-            className="size-full object-cover"
-          />
-          <span className="absolute inset-0 bg-gradient-to-t from-sidebar via-transparent to-transparent" />
-        </div>
-      )}
-
-      <div className="px-3 py-3">
-        {canInvite && (
-          <button
-            type="button"
-            onClick={() => setInviteOpen(true)}
-            className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl bg-primary/15 px-3 py-2.5 text-sm font-semibold text-primary ring-1 ring-primary/20 transition-colors hover:bg-primary/25"
-          >
-            <UserPlus className="size-4" /> Invite people
-          </button>
-        )}
+      <div className="px-2.5 py-4">
         {groups.map((group) => (
           <div key={group.id || "loose"} className="mb-4 last:mb-0">
             {group.id !== "" && (
@@ -364,10 +367,10 @@ function ServerSection({ serverId }: { serverId: string }) {
                     to={`/dashboard/s/${serverId}/${isVoice ? "v" : isForum ? "f" : "c"}/${channel.id}`}
                     title={channel.topic ?? channel.name}
                     className={cn(
-                      "mb-1 flex items-center gap-2 rounded-lg border-l-2 px-2.5 py-2 text-sm transition-colors",
+                      "mb-0.5 flex min-h-10 items-center gap-2 rounded-md px-2.5 py-2 text-[15px] transition-colors",
                       active
-                        ? "border-primary bg-primary/15 font-semibold text-foreground shadow-sm"
-                        : "border-transparent text-muted-foreground hover:bg-sidebar-accent/70 hover:text-foreground",
+                        ? "bg-sidebar-accent font-semibold text-foreground"
+                        : "text-muted-foreground hover:bg-sidebar-accent/65 hover:text-foreground",
                     )}
                   >
                     {isVoice ? (
@@ -701,11 +704,20 @@ function HomeSection() {
               />
               <span className="min-w-0 flex-1">
                 {conversation.type === "dm" && other ? (
-                  <StyledDisplayName
-                    user={other}
-                    name={label}
-                    className="block truncate"
-                  />
+                  <span className="flex items-center gap-1.5">
+                    <StyledDisplayName
+                      user={other}
+                      name={label}
+                      className="truncate"
+                    />
+                    {other.official ? <OfficialBadge compact /> : null}
+                    {other.badges.length > 0 ? (
+                      <InlineBadge
+                        badges={other.badges}
+                        primaryBadge={other.primaryBadge}
+                      />
+                    ) : null}
+                  </span>
                 ) : (
                   <span className="block truncate font-semibold">{label}</span>
                 )}

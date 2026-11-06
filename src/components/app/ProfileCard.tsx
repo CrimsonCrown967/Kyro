@@ -86,6 +86,9 @@ export function ProfileCard() {
   const restoreAdminBadge = useMutation(api.admin.restoreMyAdminBadge);
   const warn = useMutation(api.warnings.warn);
   const [warnReason, setWarnReason] = useState("");
+  const [profileTab, setProfileTab] = useState<
+    "comments" | "friends" | "communities"
+  >("comments");
 
   const close = (open: boolean) => {
     if (open) return;
@@ -174,7 +177,7 @@ export function ProfileCard() {
           // DialogContent is already `fixed`; adding `relative` here would
           // override that Tailwind position class and push the profile toward
           // the bottom of the portal instead of centering it.
-          "isolate flex max-h-[92vh] w-[calc(100vw-1.5rem)] flex-col gap-0 overflow-hidden rounded-2xl border-border/70 bg-background p-0 sm:max-w-[36rem]",
+          "isolate flex h-[min(90vh,54rem)] max-h-[92vh] w-[calc(100vw-1.5rem)] flex-col gap-0 overflow-hidden rounded-xl border-primary/70 bg-background p-0 sm:max-w-[80rem]",
           // Unmount instantly on close so the next member-sidebar click isn't
           // swallowed by the fading backdrop.
           "data-[state=closed]:duration-0",
@@ -184,384 +187,401 @@ export function ProfileCard() {
         )}
       >
         <ProfileDecorationLayer decorationId={user?.profileDecoration} />
-        <div className="relative z-10 min-h-0 flex-1 overflow-y-auto">
+        <div className="relative z-10 min-h-0 flex-1 overflow-hidden">
           {user ? (
-            <>
-              {/* Banner is the top edge of the card — the avatar overlaps it. */}
-              <div className="relative h-44 w-full overflow-hidden bg-zinc-950 sm:h-52">
-                {user.bannerUrl ? (
-                  <img
-                    src={user.bannerUrl}
-                    alt=""
-                    className="absolute inset-0 size-full object-cover"
-                  />
-                ) : profileTheme ? (
-                  <div
-                    aria-hidden
-                    className={cn(
-                      "absolute inset-0 bg-gradient-to-br",
-                      profileTheme.gradient,
-                    )}
-                  />
-                ) : (
-                  <div
-                    aria-hidden
-                    className="absolute inset-0 bg-[radial-gradient(circle_at_25%_15%,#2b3446_0%,#11151d_55%,#05070a_100%)]"
-                  />
-                )}
-                {!user.bannerUrl && (
-                  <span
-                    aria-hidden
-                    className="absolute inset-0 flex items-center justify-center px-6 text-center text-2xl font-black uppercase leading-tight tracking-[0.18em] text-white/15 sm:text-3xl"
-                  >
-                    {user.name}
-                  </span>
-                )}
-                <span
-                  aria-hidden
-                  className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/60 to-transparent"
-                />
-              </div>
-
-              <div className="relative px-5 pb-5">
-                <div className="-mt-14 sm:-mt-16">
-                  <span className="inline-flex rounded-full bg-background p-1.5 shadow-lg ring-1 ring-border/70">
-                    <UserAvatar user={user} size="2xl" />
-                  </span>
-                </div>
-
-                <DialogHeader className="mt-3 space-y-1 text-left">
-                  <DialogTitle className="flex flex-wrap items-center gap-x-2 gap-y-1 text-2xl font-bold leading-tight sm:text-3xl">
-                    <StyledDisplayName user={user} className="break-words" />
-                    {user.official && <OfficialBadge />}
-                    <InlineBadge
-                      badges={user.badges}
-                      primaryBadge={user.primaryBadge}
-                      size="size-4"
+            <div className="grid h-full min-h-0 md:grid-cols-[31rem_minmax(0,1fr)]">
+              <div className="min-h-0 overflow-y-auto border-r border-border/70 bg-background">
+                {/* Banner is the top edge of the card — the avatar overlaps it. */}
+                <div className="relative h-40 w-full overflow-hidden bg-zinc-950 sm:h-44">
+                  {user.bannerUrl ? (
+                    <img
+                      src={user.bannerUrl}
+                      alt=""
+                      className="absolute inset-0 size-full object-cover"
                     />
-                    {user.badges.length > 1 && (
-                      <span
-                        title={`${user.badges.length} badges`}
-                        className="inline-flex size-5 items-center justify-center rounded-full bg-surface text-[10px] font-bold text-muted-foreground ring-1 ring-border/70"
-                      >
-                        {user.badges.length}
-                      </span>
-                    )}
-                  </DialogTitle>
-                  <DialogDescription className="sr-only">
-                    {user.name}'s profile
-                  </DialogDescription>
-                </DialogHeader>
-
-                <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-sm text-muted-foreground">
-                  <span className="font-medium text-foreground/90">
-                    @{user.username ?? "no username yet"}
-                  </span>
-                  {user.pronouns && (
-                    <>
-                      <span aria-hidden className="text-border">
-                        |
-                      </span>
-                      <span>{user.pronouns}</span>
-                    </>
-                  )}
-                  {user.serverTag && (
-                    <ServerTagChip
-                      tag={user.serverTag}
-                      ownerName={user.name}
-                      className="text-[10px]"
+                  ) : profileTheme ? (
+                    <div
+                      aria-hidden
+                      className={cn(
+                        "absolute inset-0 bg-gradient-to-br",
+                        profileTheme.gradient,
+                      )}
+                    />
+                  ) : (
+                    <div
+                      aria-hidden
+                      className="absolute inset-0 bg-[radial-gradient(circle_at_25%_15%,#2b3446_0%,#11151d_55%,#05070a_100%)]"
                     />
                   )}
-                </div>
-
-                <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                  <PresenceDot
-                    presence={user.presence}
-                    size="xs"
-                    ringClassName=""
-                  />
-                  <span>{user.customStatus || presenceMeta?.label}</span>
-                  <DeviceBadge device={user.device} />
-                  {user.lastSeen != null && (
-                    <span className="text-muted-foreground/80">
-                      · last seen {formatRelative(user.lastSeen)}
+                  {!user.bannerUrl && (
+                    <span
+                      aria-hidden
+                      className="absolute inset-0 flex items-center justify-center px-6 text-center text-2xl font-black uppercase leading-tight tracking-[0.18em] text-white/15 sm:text-3xl"
+                    >
+                      {user.name}
                     </span>
                   )}
+                  <span
+                    aria-hidden
+                    className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/60 to-transparent"
+                  />
                 </div>
 
-                <div className="mt-4 space-y-2.5">
-                  {/* Profile style: the frame and theme this member wears. */}
-                  {(frame || profileTheme) && (
-                    <ProfileSection
-                      label="Profile style"
-                      icon={<Sparkles className="size-3.5" />}
-                    >
-                      <div className="grid grid-cols-2 gap-2">
-                        {frame && (
-                          <div className="flex flex-col items-center gap-2 rounded-lg border border-border/60 bg-panel/60 p-3">
-                            <span
-                              className={cn(
-                                "flex size-11 items-center justify-center rounded-full bg-gradient-to-br text-white shadow-inner",
-                                frame.gradient,
-                              )}
-                            >
-                              <Sparkles className="size-4" />
-                            </span>
-                            <span className="text-center text-[11px] font-medium leading-tight">
-                              {frame.label}
-                            </span>
-                          </div>
-                        )}
-                        {profileTheme && (
-                          <div className="flex flex-col items-center gap-2 rounded-lg border border-border/60 bg-panel/60 p-3">
-                            <span
-                              className={cn(
-                                "size-11 rounded-full bg-gradient-to-br",
-                                profileTheme.gradient,
-                              )}
-                            />
-                            <span className="text-center text-[11px] font-medium leading-tight">
-                              {profileTheme.label}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </ProfileSection>
-                  )}
+                <div className="relative px-5 pb-5">
+                  <div className="-mt-14 sm:-mt-16">
+                    <span className="inline-flex rounded-full bg-background p-1.5 shadow-lg ring-1 ring-border/70">
+                      <UserAvatar user={user} size="2xl" />
+                    </span>
+                  </div>
 
-                  <ProfileSection label="About me">
-                    <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/90">
-                      {user.bio || (
-                        <span className="text-muted-foreground">
-                          Nothing here yet.
+                  <DialogHeader className="mt-3 space-y-1 text-left">
+                    <DialogTitle className="flex flex-wrap items-center gap-x-2 gap-y-1 text-2xl font-bold leading-tight sm:text-3xl">
+                      <StyledDisplayName user={user} className="break-words" />
+                      {user.official && <OfficialBadge />}
+                      <InlineBadge
+                        badges={user.badges}
+                        primaryBadge={user.primaryBadge}
+                        size="size-4"
+                      />
+                      {user.badges.length > 1 && (
+                        <span
+                          title={`${user.badges.length} badges`}
+                          className="inline-flex size-5 items-center justify-center rounded-full bg-surface text-[10px] font-bold text-muted-foreground ring-1 ring-border/70"
+                        >
+                          {user.badges.length}
                         </span>
                       )}
-                    </p>
-                  </ProfileSection>
+                    </DialogTitle>
+                    <DialogDescription className="sr-only">
+                      {user.name}'s profile
+                    </DialogDescription>
+                  </DialogHeader>
 
-                  {user.links.length > 0 && (
-                    <ProfileSection
-                      label="Links"
-                      icon={<Link2 className="size-3.5" />}
-                    >
-                      <ul className="space-y-1">
-                        {user.links.map((link) => (
-                          <li key={`${link.label}:${link.url}`}>
-                            <a
-                              href={link.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="group flex items-center gap-2 rounded-md px-1 py-1.5 text-sm transition-colors hover:bg-panel"
-                            >
-                              <Link2 className="size-3.5 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
-                              <span className="min-w-0 flex-1 truncate font-medium">
-                                {link.label}
-                              </span>
-                              <span className="max-w-44 shrink-0 truncate text-xs text-muted-foreground">
-                                {link.url.replace(/^https?:\/\//, "")}
-                              </span>
-                            </a>
-                          </li>
-                        ))}
-                      </ul>
-                    </ProfileSection>
-                  )}
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-sm text-muted-foreground">
+                    <span className="font-medium text-foreground/90">
+                      @{user.username ?? "no username yet"}
+                    </span>
+                    {user.pronouns && (
+                      <>
+                        <span aria-hidden className="text-border">
+                          |
+                        </span>
+                        <span>{user.pronouns}</span>
+                      </>
+                    )}
+                    {user.serverTag && (
+                      <ServerTagChip
+                        tag={user.serverTag}
+                        ownerName={user.name}
+                        className="text-[10px]"
+                      />
+                    )}
+                  </div>
 
-                  {user.memberSince != null && (
-                    <ProfileSection
-                      label="Kyro since"
-                      icon={<Clock className="size-3.5" />}
-                    >
-                      <p className="text-sm font-medium">
-                        {new Date(user.memberSince).toLocaleDateString(
-                          undefined,
-                          {
-                            day: "numeric",
-                            month: "long",
-                            year: "numeric",
-                          },
+                  <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                    <PresenceDot
+                      presence={user.presence}
+                      size="xs"
+                      ringClassName=""
+                    />
+                    <span>{user.customStatus || presenceMeta?.label}</span>
+                    <DeviceBadge device={user.device} />
+                    {user.lastSeen != null && (
+                      <span className="text-muted-foreground/80">
+                        · last seen {formatRelative(user.lastSeen)}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="mt-4 space-y-2.5">
+                    {/* Profile style: the frame and theme this member wears. */}
+                    {(frame || profileTheme) && (
+                      <ProfileSection
+                        label="Profile style"
+                        icon={<Sparkles className="size-3.5" />}
+                      >
+                        <div className="grid grid-cols-2 gap-2">
+                          {frame && (
+                            <div className="flex flex-col items-center gap-2 rounded-lg border border-border/60 bg-panel/60 p-3">
+                              <span
+                                className={cn(
+                                  "flex size-11 items-center justify-center rounded-full bg-gradient-to-br text-white shadow-inner",
+                                  frame.gradient,
+                                )}
+                              >
+                                <Sparkles className="size-4" />
+                              </span>
+                              <span className="text-center text-[11px] font-medium leading-tight">
+                                {frame.label}
+                              </span>
+                            </div>
+                          )}
+                          {profileTheme && (
+                            <div className="flex flex-col items-center gap-2 rounded-lg border border-border/60 bg-panel/60 p-3">
+                              <span
+                                className={cn(
+                                  "size-11 rounded-full bg-gradient-to-br",
+                                  profileTheme.gradient,
+                                )}
+                              />
+                              <span className="text-center text-[11px] font-medium leading-tight">
+                                {profileTheme.label}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </ProfileSection>
+                    )}
+
+                    <ProfileSection label="About me">
+                      <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/90">
+                        {user.bio || (
+                          <span className="text-muted-foreground">
+                            Nothing here yet.
+                          </span>
                         )}
                       </p>
                     </ProfileSection>
-                  )}
 
-                  {profile && profile.mutualServers.length > 0 && (
-                    <ProfileSection
-                      label={`Mutual communities · ${profile.mutualServers.length}`}
-                      icon={<Users className="size-3.5" />}
-                    >
-                      <div className="flex flex-wrap gap-1.5">
-                        {profile.mutualServers.map((server) => (
-                          <button
-                            key={server.id}
-                            type="button"
-                            onClick={() => {
-                              close(false);
-                              navigate(`/dashboard/s/${server.id}`);
-                            }}
-                            className="rounded-md border border-border/70 bg-panel px-2 py-1 text-xs font-medium transition-colors hover:border-primary/50 hover:text-primary"
-                          >
-                            {server.name}
-                          </button>
-                        ))}
-                      </div>
-                    </ProfileSection>
-                  )}
-
-                  {/* Dedicated home for platform-wide badges — separate from
-                      community roles, which live in each server. */}
-                  <ProfileSection
-                    label="Global badges"
-                    icon={<Sparkles className="size-3.5" />}
-                  >
-                    <GlobalBadges badges={user.badges} />
-                    {isSelf && me?.isFounder && (
-                      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border/60 pt-2.5">
-                        <p className="min-w-0 flex-1 text-[11px] text-muted-foreground">
-                          Founder only: your Admin badge can be hidden from this
-                          profile. Staff powers stay active either way.
-                        </p>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={busy}
-                          onClick={() => {
-                            const holdsAdmin = user.badges.includes("admin");
-                            void run(
-                              holdsAdmin
-                                ? removeAdminBadge({})
-                                : restoreAdminBadge({}),
-                              holdsAdmin
-                                ? "Admin badge hidden from your profile."
-                                : "Admin badge restored.",
-                            );
-                          }}
-                        >
-                          {user.badges.includes("admin")
-                            ? "Hide Admin badge"
-                            : "Restore Admin badge"}
-                        </Button>
-                      </div>
+                    {user.links.length > 0 && (
+                      <ProfileSection
+                        label="Links"
+                        icon={<Link2 className="size-3.5" />}
+                      >
+                        <ul className="space-y-1">
+                          {user.links.map((link) => (
+                            <li key={`${link.label}:${link.url}`}>
+                              <a
+                                href={link.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="group flex items-center gap-2 rounded-md px-1 py-1.5 text-sm transition-colors hover:bg-panel"
+                              >
+                                <Link2 className="size-3.5 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
+                                <span className="min-w-0 flex-1 truncate font-medium">
+                                  {link.label}
+                                </span>
+                                <span className="max-w-44 shrink-0 truncate text-xs text-muted-foreground">
+                                  {link.url.replace(/^https?:\/\//, "")}
+                                </span>
+                              </a>
+                            </li>
+                          ))}
+                        </ul>
+                      </ProfileSection>
                     )}
 
-                    {canManageBadges && (
-                      <div className="mt-3 border-t border-border/60 pt-3">
-                        <p className="text-[11px] text-muted-foreground">
-                          You're an admin — tap a badge to grant or revoke it.
+                    {user.memberSince != null && (
+                      <ProfileSection
+                        label="Kyro since"
+                        icon={<Clock className="size-3.5" />}
+                      >
+                        <p className="text-sm font-medium">
+                          {new Date(user.memberSince).toLocaleDateString(
+                            undefined,
+                            {
+                              day: "numeric",
+                              month: "long",
+                              year: "numeric",
+                            },
+                          )}
                         </p>
-                        <div className="mt-1.5 flex flex-wrap gap-1.5">
-                          {GRANTABLE_BADGES.map((badge) => {
-                            const granted = user.badges.includes(badge);
-                            // Badge id → setBadges argument name (bughunter → bugHunter).
-                            const field:
-                              | "coFounder"
-                              | "admin"
-                              | "manager"
-                              | "staff"
-                              | "trialStaff"
-                              | "moderator"
-                              | "verified"
-                              | "bugHunter"
-                              | "vip"
-                              | "og"
-                              | "supporter"
-                              | "donator"
-                              | "partner" =
-                              badge === "bughunter"
-                                ? "bugHunter"
-                                : badge === "cofounder"
-                                  ? "coFounder"
-                                  : badge === "trialstaff"
-                                    ? "trialStaff"
-                                    : badge;
-                            return (
-                              <button
-                                key={badge}
-                                type="button"
-                                disabled={busy}
-                                className={cn(
-                                  "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold tracking-wide transition-opacity",
-                                  "shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]",
-                                  granted
-                                    ? GLOBAL_BADGE_META[badge].chip
-                                    : "border-border/70 bg-surface/40 text-muted-foreground hover:text-foreground",
-                                  busy ? "opacity-60" : "",
-                                )}
-                                onClick={() => {
-                                  void run(
-                                    setBadges({
-                                      userId: userId as Id<"users">,
-                                      [field]: !granted,
-                                    }),
-                                    granted
-                                      ? `${GLOBAL_BADGE_META[badge].label} badge removed.`
-                                      : `${GLOBAL_BADGE_META[badge].label} badge granted.`,
-                                  );
-                                }}
-                              >
-                                <GlobalBadgeIcon badge={badge} />
-                                {GLOBAL_BADGE_META[badge].label}
-                                <span
-                                  aria-hidden="true"
-                                  className="text-[10px]"
-                                >
-                                  {granted ? "✓ grant" : "+ grant"}
-                                </span>
-                              </button>
-                            );
-                          })}
+                      </ProfileSection>
+                    )}
+
+                    {profile && profile.mutualServers.length > 0 && (
+                      <ProfileSection
+                        label={`Mutual communities · ${profile.mutualServers.length}`}
+                        icon={<Users className="size-3.5" />}
+                      >
+                        <div className="flex flex-wrap gap-1.5">
+                          {profile.mutualServers.map((server) => (
+                            <button
+                              key={server.id}
+                              type="button"
+                              onClick={() => {
+                                close(false);
+                                navigate(`/dashboard/s/${server.id}`);
+                              }}
+                              className="rounded-md border border-border/70 bg-panel px-2 py-1 text-xs font-medium transition-colors hover:border-primary/50 hover:text-primary"
+                            >
+                              {server.name}
+                            </button>
+                          ))}
                         </div>
-                        <div className="mt-2 flex items-center gap-2">
-                          <Input
-                            value={warnReason}
-                            onChange={(event) =>
-                              setWarnReason(event.target.value)
-                            }
-                            placeholder="Warning reason…"
-                            maxLength={300}
-                            className="h-8 flex-1 text-xs"
-                            aria-label="Warning reason"
-                          />
+                      </ProfileSection>
+                    )}
+
+                    {/* Dedicated home for platform-wide badges — separate from
+                      community roles, which live in each server. */}
+                    <ProfileSection
+                      label="Global badges"
+                      icon={<Sparkles className="size-3.5" />}
+                    >
+                      <GlobalBadges badges={user.badges} />
+                      {isSelf && me?.isFounder && (
+                        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border/60 pt-2.5">
+                          <p className="min-w-0 flex-1 text-[11px] text-muted-foreground">
+                            Founder only: your Admin badge can be hidden from
+                            this profile. Staff powers stay active either way.
+                          </p>
                           <Button
                             size="sm"
-                            variant="destructive"
-                            disabled={busy || warnReason.trim().length < 3}
+                            variant="outline"
+                            disabled={busy}
                             onClick={() => {
+                              const holdsAdmin = user.badges.includes("admin");
                               void run(
-                                warn({
-                                  userId: userId as Id<"users">,
-                                  reason: warnReason.trim(),
-                                }).then(() => setWarnReason("")),
-                                "Warning issued — it counts for 3 days.",
+                                holdsAdmin
+                                  ? removeAdminBadge({})
+                                  : restoreAdminBadge({}),
+                                holdsAdmin
+                                  ? "Admin badge hidden from your profile."
+                                  : "Admin badge restored.",
                               );
                             }}
                           >
-                            Warn
+                            {user.badges.includes("admin")
+                              ? "Hide Admin badge"
+                              : "Restore Admin badge"}
                           </Button>
                         </div>
-                      </div>
-                    )}
-                  </ProfileSection>
+                      )}
 
-                  <div className="flex items-center justify-end gap-1.5 pt-0.5 text-[10px] font-mono text-muted-foreground/60">
-                    <span className="truncate">ID {user.id}</span>
-                    <button
-                      type="button"
-                      aria-label="Copy user ID"
-                      className="rounded p-1 transition-colors hover:bg-panel hover:text-foreground"
-                      onClick={() => {
-                        void navigator.clipboard
-                          .writeText(user.id)
-                          .then(() => toast.success("User ID copied."))
-                          .catch(() => toast.error("Couldn't copy the ID."));
-                      }}
-                    >
-                      <Copy className="size-3" />
-                    </button>
+                      {canManageBadges && (
+                        <div className="mt-3 border-t border-border/60 pt-3">
+                          <p className="text-[11px] text-muted-foreground">
+                            You're an admin — tap a badge to grant or revoke it.
+                          </p>
+                          <div className="mt-1.5 flex flex-wrap gap-1.5">
+                            {GRANTABLE_BADGES.map((badge) => {
+                              const granted = user.badges.includes(badge);
+                              // Badge id → setBadges argument name (bughunter → bugHunter).
+                              const field:
+                                | "coFounder"
+                                | "admin"
+                                | "manager"
+                                | "staff"
+                                | "trialStaff"
+                                | "moderator"
+                                | "verified"
+                                | "bugHunter"
+                                | "vip"
+                                | "og"
+                                | "supporter"
+                                | "donator"
+                                | "partner" =
+                                badge === "bughunter"
+                                  ? "bugHunter"
+                                  : badge === "cofounder"
+                                    ? "coFounder"
+                                    : badge === "trialstaff"
+                                      ? "trialStaff"
+                                      : badge;
+                              return (
+                                <button
+                                  key={badge}
+                                  type="button"
+                                  disabled={busy}
+                                  className={cn(
+                                    "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold tracking-wide transition-opacity",
+                                    "shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]",
+                                    granted
+                                      ? GLOBAL_BADGE_META[badge].chip
+                                      : "border-border/70 bg-surface/40 text-muted-foreground hover:text-foreground",
+                                    busy ? "opacity-60" : "",
+                                  )}
+                                  onClick={() => {
+                                    void run(
+                                      setBadges({
+                                        userId: userId as Id<"users">,
+                                        [field]: !granted,
+                                      }),
+                                      granted
+                                        ? `${GLOBAL_BADGE_META[badge].label} badge removed.`
+                                        : `${GLOBAL_BADGE_META[badge].label} badge granted.`,
+                                    );
+                                  }}
+                                >
+                                  <GlobalBadgeIcon badge={badge} />
+                                  {GLOBAL_BADGE_META[badge].label}
+                                  <span
+                                    aria-hidden="true"
+                                    className="text-[10px]"
+                                  >
+                                    {granted ? "✓ grant" : "+ grant"}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <div className="mt-2 flex items-center gap-2">
+                            <Input
+                              value={warnReason}
+                              onChange={(event) =>
+                                setWarnReason(event.target.value)
+                              }
+                              placeholder="Warning reason…"
+                              maxLength={300}
+                              className="h-8 flex-1 text-xs"
+                              aria-label="Warning reason"
+                            />
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              disabled={busy || warnReason.trim().length < 3}
+                              onClick={() => {
+                                void run(
+                                  warn({
+                                    userId: userId as Id<"users">,
+                                    reason: warnReason.trim(),
+                                  }).then(() => setWarnReason("")),
+                                  "Warning issued — it counts for 3 days.",
+                                );
+                              }}
+                            >
+                              Warn
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </ProfileSection>
+
+                    <div className="flex items-center justify-end gap-1.5 pt-0.5 text-[10px] font-mono text-muted-foreground/60">
+                      <span className="truncate">ID {user.id}</span>
+                      <button
+                        type="button"
+                        aria-label="Copy user ID"
+                        className="rounded p-1 transition-colors hover:bg-panel hover:text-foreground"
+                        onClick={() => {
+                          void navigator.clipboard
+                            .writeText(user.id)
+                            .then(() => toast.success("User ID copied."))
+                            .catch(() => toast.error("Couldn't copy the ID."));
+                        }}
+                      >
+                        <Copy className="size-3" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
-            </>
+              <ProfileContextPanel
+                activeTab={profileTab}
+                onTabChange={setProfileTab}
+                mutualFriends={profile?.mutualFriends ?? []}
+                mutualServers={profile?.mutualServers ?? []}
+                onOpenUser={(nextUserId) => {
+                  const next = new URLSearchParams(params);
+                  next.set("user", nextUserId);
+                  setParams(next, { replace: true });
+                }}
+                onOpenServer={(serverId) => {
+                  close(false);
+                  navigate(`/dashboard/s/${serverId}`);
+                }}
+              />
+            </div>
           ) : (
             <div className="space-y-4 p-6">
               <DialogHeader className="space-y-1 text-left">
@@ -732,6 +752,159 @@ export function ProfileCard() {
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+type ProfileContextTab = "comments" | "friends" | "communities";
+
+type MutualFriend = {
+  id: string;
+  name: string;
+  username: string | null;
+  avatarUrl: string | null;
+  presence: "online" | "idle" | "dnd" | "invisible" | "offline";
+  badges: (keyof typeof GLOBAL_BADGE_META)[];
+  primaryBadge?: string | null;
+  displayNameFont?: string | null;
+  displayNameColorMode?: "none" | "solid" | "gradient" | null;
+  displayNameColor?: string | null;
+  displayNameColor2?: string | null;
+};
+
+/** Wide profile context pane, matching the reference's tabbed social panel. */
+function ProfileContextPanel({
+  activeTab,
+  onTabChange,
+  mutualFriends,
+  mutualServers,
+  onOpenUser,
+  onOpenServer,
+}: {
+  activeTab: ProfileContextTab;
+  onTabChange: (tab: ProfileContextTab) => void;
+  mutualFriends: MutualFriend[];
+  mutualServers: { id: string; name: string }[];
+  onOpenUser: (userId: string) => void;
+  onOpenServer: (serverId: string) => void;
+}) {
+  const tabs: { id: ProfileContextTab; label: string; count?: number }[] = [
+    { id: "comments", label: "Comments" },
+    { id: "friends", label: "Mutual friends", count: mutualFriends.length },
+    {
+      id: "communities",
+      label: "Mutual communities",
+      count: mutualServers.length,
+    },
+  ];
+
+  return (
+    <aside className="hidden min-h-0 flex-col bg-panel/95 md:flex">
+      <nav className="flex h-[4.5rem] shrink-0 items-end gap-7 border-b border-border/70 px-10">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => onTabChange(tab.id)}
+            className={cn(
+              "relative h-full whitespace-nowrap pt-1 text-sm font-semibold transition-colors",
+              activeTab === tab.id
+                ? "text-foreground"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <span className="flex h-full items-center">
+              {tab.label}
+              {tab.count !== undefined ? ` (${tab.count})` : ""}
+            </span>
+            {activeTab === tab.id ? (
+              <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-primary" />
+            ) : null}
+          </button>
+        ))}
+      </nav>
+
+      <div className="min-h-0 flex-1 overflow-y-auto p-10">
+        {activeTab === "comments" ? (
+          <div className="flex min-h-72 flex-col items-center justify-center text-center">
+            <span className="flex size-12 items-center justify-center rounded-full bg-surface text-muted-foreground">
+              <MessageCircle className="size-5" />
+            </span>
+            <p className="mt-4 text-sm font-semibold">No comments yet</p>
+            <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+              Profile comments will appear here when this feature is enabled.
+            </p>
+          </div>
+        ) : null}
+
+        {activeTab === "friends" ? (
+          mutualFriends.length > 0 ? (
+            <div className="grid gap-2 sm:grid-cols-2">
+              {mutualFriends.map((friend) => (
+                <button
+                  key={friend.id}
+                  type="button"
+                  onClick={() => onOpenUser(friend.id)}
+                  className="flex items-center gap-3 rounded-lg border border-border/70 bg-background/55 p-3 text-left transition-colors hover:border-primary/45 hover:bg-surface/65"
+                >
+                  <UserAvatar user={friend} size="md" />
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-1.5">
+                      <StyledDisplayName
+                        user={friend}
+                        className="truncate text-sm"
+                      />
+                      {friend.badges.length > 0 ? (
+                        <InlineBadge
+                          badges={friend.badges}
+                          primaryBadge={friend.primaryBadge}
+                        />
+                      ) : null}
+                    </span>
+                    <span className="block truncate text-xs text-muted-foreground">
+                      @{friend.username ?? "no username"}
+                    </span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <ContextEmpty text="No mutual friends." />
+          )
+        ) : null}
+
+        {activeTab === "communities" ? (
+          mutualServers.length > 0 ? (
+            <div className="grid gap-2 sm:grid-cols-2">
+              {mutualServers.map((server) => (
+                <button
+                  key={server.id}
+                  type="button"
+                  onClick={() => onOpenServer(server.id)}
+                  className="flex items-center gap-3 rounded-lg border border-border/70 bg-background/55 p-3 text-left transition-colors hover:border-primary/45 hover:bg-surface/65"
+                >
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-sm font-bold text-primary">
+                    {server.name.slice(0, 2).toUpperCase()}
+                  </span>
+                  <span className="truncate text-sm font-semibold">
+                    {server.name}
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <ContextEmpty text="No mutual communities." />
+          )
+        ) : null}
+      </div>
+    </aside>
+  );
+}
+
+function ContextEmpty({ text }: { text: string }) {
+  return (
+    <p className="flex min-h-72 items-center justify-center text-sm text-muted-foreground">
+      {text}
+    </p>
   );
 }
 

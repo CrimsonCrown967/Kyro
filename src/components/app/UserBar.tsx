@@ -1,6 +1,8 @@
 import { useMutation, useQuery } from "convex/react";
 import {
+  Copy,
   LogOut,
+  Pencil,
   Settings,
   ShieldCheck,
   User,
@@ -12,7 +14,11 @@ import { api } from "@/convex/_generated/api";
 import { DeviceBadge, UserAvatar } from "@/components/app/UserAvatar";
 import { ServerTagChip } from "@/components/app/ServerTag";
 import { CrownBadge } from "@/components/app/CrownBadge";
-import { InlineBadge, OfficialBadge } from "@/components/app/GlobalBadges";
+import {
+  GlobalBadges,
+  InlineBadge,
+  OfficialBadge,
+} from "@/components/app/GlobalBadges";
 import { StyledDisplayName } from "@/components/app/StyledDisplayName";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -100,7 +106,7 @@ export function UserBar({ onOpenSettings }: { onOpenSettings?: () => void }) {
   };
 
   return (
-    <div className="m-2 mt-1 rounded-2xl border border-border/70 bg-panel/75 p-2 shadow-[0_10px_28px_rgba(0,0,0,.18)] backdrop-blur-xl">
+    <div className="border-t border-border/70 bg-panel p-2">
       {/* Non-modal so closing the status menu never leaves an invisible
           pointer-events guard behind — that guard is what forced a second
           click before the chat box accepted focus. */}
@@ -138,13 +144,62 @@ export function UserBar({ onOpenSettings }: { onOpenSettings?: () => void }) {
         <DropdownMenuContent
           align="start"
           side="top"
-          className="w-72"
+          sideOffset={10}
+          className="w-[min(20.5rem,calc(100vw-1rem))] overflow-hidden border-primary/50 bg-popover p-0 shadow-[0_22px_70px_rgba(0,0,0,.55)] ring-1 ring-primary/35"
           onCloseAutoFocus={(event) => event.preventDefault()}
           // Keep keystrokes inside the draft field from driving menu typeahead
           // or stealing focus away mid-sentence.
           onKeyDown={(event) => event.stopPropagation()}
         >
-          <DropdownMenuLabel className="flex items-center justify-between text-xs text-muted-foreground">
+          <div className="relative h-24 overflow-hidden bg-[linear-gradient(135deg,#111827,#27378f_62%,#4f5dff)]">
+            {me.bannerUrl ? (
+              <img
+                src={me.bannerUrl}
+                alt=""
+                className="absolute inset-0 size-full object-cover"
+              />
+            ) : null}
+            <span className="absolute inset-0 bg-gradient-to-t from-black/55 to-transparent" />
+          </div>
+          <div className="relative px-4 pb-3">
+            <button
+              type="button"
+              aria-label="View my profile"
+              onClick={() => {
+                const next = new URLSearchParams(params);
+                next.set("user", me.id);
+                setParams(next, { replace: false });
+              }}
+              className="-mt-9 block rounded-full bg-popover p-1 ring-1 ring-border"
+            >
+              <UserAvatar user={me} size="lg" />
+            </button>
+            <div className="mt-2 flex min-w-0 items-center gap-1.5">
+              <StyledDisplayName user={me} className="truncate text-xl" />
+              {me.official ? <OfficialBadge compact /> : null}
+              {me.badges.length > 0 ? (
+                <InlineBadge
+                  badges={me.badges}
+                  primaryBadge={me.primaryBadge}
+                  size="size-[18px]"
+                />
+              ) : null}
+            </div>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              @{me.username ?? "new"}
+              {me.pronouns ? ` · ${me.pronouns}` : ""}
+            </p>
+            {me.bio ? (
+              <p className="mt-3 line-clamp-3 whitespace-pre-wrap text-sm leading-relaxed text-foreground/85">
+                {me.bio}
+              </p>
+            ) : null}
+            {me.badges.length > 0 ? (
+              <GlobalBadges badges={me.badges} className="mt-3 gap-1.5" />
+            ) : null}
+          </div>
+          <DropdownMenuSeparator className="mx-0" />
+          <DropdownMenuLabel className="flex items-center justify-between px-3 text-xs text-muted-foreground">
             Set status
             <span className="font-normal normal-case text-muted-foreground/70">
               {me.presence === "invisible" ? "Hidden" : "Visible"}
@@ -254,6 +309,16 @@ export function UserBar({ onOpenSettings }: { onOpenSettings?: () => void }) {
           <DropdownMenuSeparator />
           <DropdownMenuItem
             onClick={() => {
+              void navigator.clipboard
+                .writeText(me.id)
+                .then(() => toast.success("User ID copied."))
+                .catch(() => toast.error("Could not copy your user ID."));
+            }}
+          >
+            <Copy className="size-4" /> Copy user ID
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => {
               const next = new URLSearchParams(params);
               next.set("user", me.id);
               setParams(next, { replace: false });
@@ -262,7 +327,7 @@ export function UserBar({ onOpenSettings }: { onOpenSettings?: () => void }) {
             <User className="size-4" /> View my profile
           </DropdownMenuItem>
           <DropdownMenuItem onClick={onOpenSettings}>
-            <Settings className="size-4" /> User settings
+            <Pencil className="size-4" /> Edit profile
           </DropdownMenuItem>
           {isStaff && (
             <DropdownMenuItem

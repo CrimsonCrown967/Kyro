@@ -22,13 +22,23 @@ export function WorkspaceActions({
     "relative rounded-lg p-2 text-muted-foreground transition-colors hover:bg-surface hover:text-foreground";
 
   return (
-    <div className={cn("flex items-center gap-1", className)}>
+    <div className={cn("flex items-center gap-1.5", className)}>
       <button
         type="button"
         aria-label="Search Kyro"
         title="Search Kyro"
         onClick={() => setSearchOpen(!searchOpen)}
-        className={button}
+        className="hidden h-9 w-44 items-center gap-2 rounded-md border border-border/60 bg-rail/65 px-3 text-left text-sm text-muted-foreground transition-colors hover:border-border hover:text-foreground xl:flex"
+      >
+        <span className="min-w-0 flex-1 truncate">Search…</span>
+        <Search className="size-4 shrink-0" />
+      </button>
+      <button
+        type="button"
+        aria-label="Search Kyro"
+        title="Search Kyro"
+        onClick={() => setSearchOpen(!searchOpen)}
+        className={cn(button, "xl:hidden")}
       >
         <Search className="size-5" />
       </button>

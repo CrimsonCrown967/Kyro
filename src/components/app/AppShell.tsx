@@ -165,13 +165,6 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="kyro-app-shell flex h-dvh w-full flex-col overflow-hidden bg-background text-foreground">
-      <div className="relative hidden h-9 shrink-0 items-center justify-center border-b border-white/10 bg-[linear-gradient(100deg,color-mix(in_oklab,var(--primary)_82%,#111827),color-mix(in_oklab,var(--brand)_68%,#431407))] text-white shadow-sm md:flex">
-        <span className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_-80%,rgba(255,255,255,.28),transparent_60%)]" />
-        <span className="relative flex items-center gap-2 text-xs font-bold tracking-wide">
-          <KyroMark className="size-4" /> Kyro
-        </span>
-      </div>
-
       <div className="flex min-h-0 flex-1">
         <div className="hidden md:flex">{rail}</div>
         <div className="hidden md:flex">{sidebar}</div>

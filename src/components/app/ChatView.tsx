@@ -122,12 +122,12 @@ function ChatSurface({
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-background">
-      <div className="flex h-14 shrink-0 items-center gap-3 border-b border-border/70 bg-panel/90 px-4 shadow-sm backdrop-blur-xl">
-        <span className="flex size-8 items-center justify-center rounded-lg bg-surface text-muted-foreground ring-1 ring-border/60">
+      <div className="flex h-[3.75rem] shrink-0 items-center gap-2.5 border-b border-border/70 bg-panel px-4 shadow-sm">
+        <span className="flex size-7 items-center justify-center text-muted-foreground">
           {icon}
         </span>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-base font-bold tracking-tight">
+          <p className="truncate text-base font-bold tracking-tight text-foreground">
             {titleUser ? (
               <StyledDisplayName user={titleUser} name={title} />
             ) : (

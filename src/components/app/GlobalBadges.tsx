@@ -220,8 +220,8 @@ export function topGlobalBadge(
  * Inline badge next to a name, styled exactly like the founder crown.
  * Shows the badge the user picked in Settings → Profile → Badge (when they
  * hold it), else their highest one (founder → co-founder → admin → manager →
- * staff → moderator → trial staff → …). `primaryBadge="none"` hides inline
- * badges everywhere — the profile card still shows the full shelf.
+ * staff → moderator → trial staff → …). Badges stay visible throughout the
+ * interface; selecting "none" simply falls back to the highest held badge.
  */
 export function InlineBadge({
   badges,
@@ -234,7 +234,6 @@ export function InlineBadge({
   /** Matches CrownBadge's default inline size. */
   size?: string;
 }) {
-  if (primaryBadge === "none") return null;
   const chosen =
     primaryBadge && primaryBadge !== "none" && badges.includes(primaryBadge)
       ? (primaryBadge as GlobalBadgeKey)
@@ -688,7 +687,7 @@ export function GlobalBadgeChip({
     <BadgeTip label={meta.label} blurb={meta.blurb}>
       <span
         className={cn(
-          "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold tracking-wide",
+          "inline-flex items-center gap-1.5 rounded-[5px] border px-2 py-1 text-xs font-semibold",
           "shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] transition-shadow hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_2px_6px_rgba(0,0,0,0.12)]",
           meta.chip,
           className,

@@ -4,7 +4,11 @@ import { useNavigate, useSearchParams } from "react-router";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { ProfileDecorationLayer } from "@/components/app/DecorationArt";
-import { GlobalBadges, OfficialBadge } from "@/components/app/GlobalBadges";
+import {
+  GlobalBadges,
+  InlineBadge,
+  OfficialBadge,
+} from "@/components/app/GlobalBadges";
 import { ServerTagChip } from "@/components/app/ServerTag";
 import { StyledDisplayName } from "@/components/app/StyledDisplayName";
 import { PresenceDot, UserAvatar } from "@/components/app/UserAvatar";
@@ -64,7 +68,7 @@ export function UserPreviewPanel() {
         className="fixed inset-0 z-40 bg-black/40 lg:hidden"
       />
       <aside
-        className="user-preview-enter fixed bottom-0 right-0 top-0 z-40 flex w-[min(23rem,92vw)] flex-col overflow-hidden border-l border-border/70 bg-background shadow-[-20px_0_50px_rgba(0,0,0,.3)] md:top-9"
+        className="user-preview-enter fixed inset-x-3 bottom-3 z-40 flex max-h-[calc(100dvh-1.5rem)] flex-col overflow-hidden rounded-xl border border-primary/70 bg-popover shadow-[0_26px_80px_rgba(0,0,0,.58)] md:inset-x-auto md:bottom-auto md:right-4 md:top-[4.5rem] md:w-[23rem] lg:right-[21.5rem]"
         style={
           theme
             ? {
@@ -85,7 +89,7 @@ export function UserPreviewPanel() {
 
         {user ? (
           <>
-            <div className="relative z-10 h-44 shrink-0 overflow-hidden bg-zinc-950">
+            <div className="relative z-10 h-36 shrink-0 overflow-hidden bg-zinc-950">
               {user.bannerUrl ? (
                 <img
                   src={user.bannerUrl}
@@ -102,11 +106,20 @@ export function UserPreviewPanel() {
               <span className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/65 to-transparent" />
             </div>
 
-            <div className="relative z-10 -mt-12 flex min-h-0 flex-1 flex-col px-5 pb-5">
-              <UserAvatar user={user} size="xl" />
+            <div className="relative z-10 -mt-11 flex min-h-0 flex-1 flex-col px-5 pb-5">
+              <span className="w-fit rounded-full bg-popover p-1 ring-1 ring-border">
+                <UserAvatar user={user} size="xl" />
+              </span>
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <StyledDisplayName user={user} className="text-2xl" />
                 {user.official && <OfficialBadge />}
+                {user.badges.length > 0 ? (
+                  <InlineBadge
+                    badges={user.badges}
+                    primaryBadge={user.primaryBadge}
+                    size="size-5"
+                  />
+                ) : null}
                 {user.serverTag && (
                   <ServerTagChip tag={user.serverTag} ownerName={user.name} />
                 )}
@@ -185,9 +198,17 @@ export function UserPreviewPanel() {
                   </section>
                 )}
 
-                {user.badges.length > 0 && (
-                  <GlobalBadges badges={user.badges} />
-                )}
+                {user.badges.length > 0 ? (
+                  <section className="rounded-lg border border-border/70 bg-panel/65 p-3">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                      Badges
+                    </p>
+                    <GlobalBadges
+                      badges={user.badges}
+                      className="mt-2 gap-1.5"
+                    />
+                  </section>
+                ) : null}
               </div>
 
               <div className="mt-4 grid gap-2">
