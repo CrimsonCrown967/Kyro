@@ -143,12 +143,6 @@ export function UserBar({ onOpenSettings }: { onOpenSettings?: () => void }) {
               />
             ) : null}
             <span className="absolute inset-0 bg-gradient-to-t from-black/55 to-transparent" />
-            <BadgeTray
-              badges={me.badges}
-              primaryBadge={me.primaryBadge}
-              official={me.official}
-              className="absolute right-3 top-3 z-10"
-            />
           </div>
           <div className="relative px-4 pb-3">
             <button
@@ -163,8 +157,14 @@ export function UserBar({ onOpenSettings }: { onOpenSettings?: () => void }) {
             >
               <UserAvatar user={me} size="lg" />
             </button>
-            <div className="mt-2 flex min-w-0 items-center gap-1.5">
+            <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
               <StyledDisplayName user={me} className="truncate text-xl" />
+              <BadgeTray
+                badges={me.badges}
+                primaryBadge={me.primaryBadge}
+                official={me.official}
+                className="shrink-0"
+              />
             </div>
             <p className="mt-0.5 text-sm text-muted-foreground">
               @{me.username ?? "new"}

@@ -1,11 +1,16 @@
 import { CrownBadge } from "@/components/app/CrownBadge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { ReactNode } from "react";
 
 /**
- * Hover/focus tooltip explaining a badge — a small dark panel above the
- * icon with the badge's name and blurb, styled like the profile popup's
- * badge tips. Pure CSS: no portal, no delay.
+ * Hover/focus tooltip explaining a badge. Rendered through a portal with
+ * collision handling, so the full name and blurb stay readable even when the
+ * badge sits inside a card that clips its overflow.
  */
 export function BadgeTip({
   label,
@@ -17,24 +22,29 @@ export function BadgeTip({
   children: ReactNode;
 }) {
   return (
-    <span
-      tabIndex={0}
-      aria-label={`${label}${blurb ? `: ${blurb}` : ""}`}
-      className="group/tip relative inline-flex shrink-0 items-center align-middle outline-none"
-    >
-      {children}
-      <span
-        role="tooltip"
-        className="pointer-events-none absolute bottom-full left-1/2 z-40 mb-2 w-max max-w-44 -translate-x-1/2 scale-95 rounded-lg bg-zinc-900 px-3.5 py-2 text-center opacity-0 shadow-[0_10px_30px_rgba(0,0,0,0.45)] ring-1 ring-white/10 transition-all duration-150 group-hover/tip:scale-100 group-hover/tip:opacity-100 group-focus-within/tip:scale-100 group-focus-within/tip:opacity-100"
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          tabIndex={0}
+          aria-label={`${label}${blurb ? `: ${blurb}` : ""}`}
+          className="inline-flex shrink-0 items-center rounded-full align-middle outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+        >
+          {children}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent
+        side="top"
+        sideOffset={8}
+        className="z-[100] w-max max-w-60 rounded-lg border-0 bg-zinc-900 px-3.5 py-2 text-center text-zinc-50 shadow-[0_10px_30px_rgba(0,0,0,0.45)] ring-1 ring-white/10 [&>svg]:hidden"
       >
-        <span className="block text-sm font-bold text-zinc-50">{label}</span>
+        <span className="block text-sm font-bold">{label}</span>
         {blurb ? (
           <span className="mt-0.5 block text-xs font-medium leading-snug text-zinc-300">
             {blurb}
           </span>
         ) : null}
-      </span>
-    </span>
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
