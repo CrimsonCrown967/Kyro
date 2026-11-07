@@ -17,7 +17,6 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { UserAvatar } from "@/components/app/UserAvatar";
 import { StyledDisplayName } from "@/components/app/StyledDisplayName";
-import { InlineBadge, OfficialBadge } from "@/components/app/GlobalBadges";
 import { WorkspaceActions } from "@/components/app/WorkspaceActions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -394,13 +393,6 @@ function UserList({
             <span className="min-w-0">
               <span className="flex items-center gap-1.5">
                 <StyledDisplayName user={user} className="truncate text-sm" />
-                {user.official ? <OfficialBadge compact /> : null}
-                {user.badges && user.badges.length > 0 ? (
-                  <InlineBadge
-                    badges={user.badges}
-                    primaryBadge={user.primaryBadge}
-                  />
-                ) : null}
                 {user.username && (
                   <span className="truncate text-xs text-muted-foreground">
                     @{user.username}

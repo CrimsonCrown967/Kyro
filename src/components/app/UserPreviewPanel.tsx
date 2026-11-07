@@ -4,11 +4,7 @@ import { useNavigate, useSearchParams } from "react-router";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { ProfileDecorationLayer } from "@/components/app/DecorationArt";
-import {
-  GlobalBadges,
-  InlineBadge,
-  OfficialBadge,
-} from "@/components/app/GlobalBadges";
+import { BadgeTray, CommunityRoleChips } from "@/components/app/GlobalBadges";
 import { ServerTagChip } from "@/components/app/ServerTag";
 import { StyledDisplayName } from "@/components/app/StyledDisplayName";
 import { PresenceDot, UserAvatar } from "@/components/app/UserAvatar";
@@ -20,9 +16,15 @@ export function UserPreviewPanel() {
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   const userId = params.get("previewUser");
+  const serverId = params.get("previewServer");
   const profile = useQuery(
     api.users.profile,
-    userId ? { userId: userId as Id<"users"> } : "skip",
+    userId
+      ? {
+          userId: userId as Id<"users">,
+          ...(serverId ? { serverId: serverId as Id<"servers"> } : {}),
+        }
+      : "skip",
   );
   const me = useQuery(api.users.me);
   const createDirect = useMutation(api.conversations.createDirect);
@@ -32,13 +34,16 @@ export function UserPreviewPanel() {
   const close = () => {
     const next = new URLSearchParams(params);
     next.delete("previewUser");
+    next.delete("previewServer");
     setParams(next, { replace: true });
   };
 
   const openFull = () => {
     const next = new URLSearchParams(params);
     next.delete("previewUser");
+    next.delete("previewServer");
     next.set("user", userId);
+    if (serverId) next.set("profileServer", serverId);
     setParams(next, { replace: true });
   };
 
@@ -110,16 +115,14 @@ export function UserPreviewPanel() {
               <span className="w-fit rounded-full bg-popover p-1 ring-1 ring-border">
                 <UserAvatar user={user} size="xl" />
               </span>
+              <BadgeTray
+                badges={user.badges}
+                primaryBadge={user.primaryBadge}
+                official={user.official}
+                className="absolute right-0 top-14 z-20"
+              />
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <StyledDisplayName user={user} className="text-2xl" />
-                {user.official && <OfficialBadge />}
-                {user.badges.length > 0 ? (
-                  <InlineBadge
-                    badges={user.badges}
-                    primaryBadge={user.primaryBadge}
-                    size="size-5"
-                  />
-                ) : null}
                 {user.serverTag && (
                   <ServerTagChip tag={user.serverTag} ownerName={user.name} />
                 )}
@@ -146,23 +149,45 @@ export function UserPreviewPanel() {
                   </section>
                 )}
 
-                <section className="rounded-xl border border-border/70 bg-panel/65 p-3">
+                <section className="p-1">
                   <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                    Kyro since
+                    Member since
                   </p>
-                  <p className="mt-1 text-sm font-medium">
-                    {user.memberSince
-                      ? new Date(user.memberSince).toLocaleDateString(
+                  <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm font-medium">
+                    <span>
+                      {user.memberSince
+                        ? new Date(user.memberSince).toLocaleDateString(
+                            undefined,
+                            {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            },
+                          )
+                        : "Unknown"}
+                    </span>
+                    {profile.serverJoinedAt ? (
+                      <span>
+                        {new Date(profile.serverJoinedAt).toLocaleDateString(
                           undefined,
-                          {
-                            month: "short",
-                            day: "numeric",
-                            year: "numeric",
-                          },
-                        )
-                      : "Unknown"}
-                  </p>
+                          { month: "short", day: "numeric", year: "numeric" },
+                        )}
+                      </span>
+                    ) : null}
+                  </div>
                 </section>
+
+                {profile.serverRoles.length > 0 ? (
+                  <section className="p-1">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                      Roles
+                    </p>
+                    <CommunityRoleChips
+                      roles={profile.serverRoles}
+                      className="mt-2"
+                    />
+                  </section>
+                ) : null}
 
                 {profile.mutualServers.length > 0 && (
                   <section className="rounded-xl border border-border/70 bg-panel/65 p-3">
@@ -197,18 +222,6 @@ export function UserPreviewPanel() {
                     </div>
                   </section>
                 )}
-
-                {user.badges.length > 0 ? (
-                  <section className="rounded-lg border border-border/70 bg-panel/65 p-3">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                      Badges
-                    </p>
-                    <GlobalBadges
-                      badges={user.badges}
-                      className="mt-2 gap-1.5"
-                    />
-                  </section>
-                ) : null}
               </div>
 
               <div className="mt-4 grid gap-2">

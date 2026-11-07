@@ -112,53 +112,53 @@
 
 .dark {
   color-scheme: dark;
-  --base-background: #171820;
+  --base-background: #313338;
   --background: var(--base-background);
   --foreground: #f2f3f5;
-  --base-card: #1d1e26;
+  --base-card: #2b2d31;
   --card: var(--base-card);
   --card-foreground: #f2f3f5;
-  --base-popover: #202129;
+  --base-popover: #232428;
   --popover: var(--base-popover);
   --popover-foreground: #f2f3f5;
-  --primary: #4f5dff;
+  --primary: #5865f2;
   --primary-foreground: #ffffff;
-  --base-secondary: #262730;
+  --base-secondary: #383a40;
   --secondary: var(--base-secondary);
   --secondary-foreground: #f2f3f5;
-  --base-muted: #25262f;
+  --base-muted: #383a40;
   --muted: var(--base-muted);
-  --muted-foreground: #9497a5;
-  --base-accent: #2a2b34;
+  --muted-foreground: #b5bac1;
+  --base-accent: #404249;
   --accent: var(--base-accent);
   --accent-foreground: #f2f3f5;
-  --destructive: #ef4444;
-  --border: rgba(255, 255, 255, 0.09);
-  --input: rgba(255, 255, 255, 0.12);
-  --ring: rgba(79, 93, 255, 0.68);
-  --chart-1: #4f5dff;
+  --destructive: #f23f42;
+  --border: rgba(255, 255, 255, 0.075);
+  --input: rgba(0, 0, 0, 0.32);
+  --ring: rgba(88, 101, 242, 0.72);
+  --chart-1: #5865f2;
   --chart-2: #67e8f9;
   --chart-3: #22c55e;
   --chart-4: #f59e0b;
   --chart-5: #ec4899;
-  --base-sidebar: #14151c;
+  --base-sidebar: #2b2d31;
   --sidebar: var(--base-sidebar);
   --sidebar-foreground: #f2f3f5;
-  --sidebar-primary: #4f5dff;
+  --sidebar-primary: #5865f2;
   --sidebar-primary-foreground: #ffffff;
-  --base-sidebar-accent: #292a32;
+  --base-sidebar-accent: #404249;
   --sidebar-accent: var(--base-sidebar-accent);
   --sidebar-accent-foreground: #f2f3f5;
   --sidebar-border: rgba(255, 255, 255, 0.08);
-  --sidebar-ring: rgba(79, 93, 255, 0.68);
+  --sidebar-ring: rgba(88, 101, 242, 0.72);
 
-  --base-rail: #0e0f14;
-  --base-panel: #15161d;
-  --base-surface: #292a32;
+  --base-rail: #1e1f22;
+  --base-panel: #2b2d31;
+  --base-surface: #404249;
   --rail: var(--base-rail);
   --panel: var(--base-panel);
   --surface: var(--base-surface);
-  --brand: #4f5dff;
+  --brand: #5865f2;
   --cyan: #67e8f9;
   --success: #22c55e;
   --warning: #f59e0b;
@@ -405,7 +405,7 @@ html[data-tint] {
   }
   .kyro-app-shell {
     position: relative;
-    border-top: 2px solid color-mix(in oklab, var(--primary) 78%, transparent);
+    border-top: 4px solid #3f1952;
   }
   .kyro-app-shell::after {
     content: "";

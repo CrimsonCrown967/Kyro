@@ -606,8 +606,11 @@ export const updatePrivacy = mutation({
 
 /** Public profile for popovers and profile pages. */
 export const profile = query({
-  args: { userId: v.id("users") },
-  handler: async (ctx, { userId }) => {
+  args: {
+    userId: v.id("users"),
+    serverId: v.optional(v.id("servers")),
+  },
+  handler: async (ctx, { userId, serverId }) => {
     const { id: viewerId } = await requireUser(ctx);
     const user = await ctx.db.get(userId);
     if (!user) return null;
@@ -688,10 +691,36 @@ export const profile = query({
       .filter(
         (friend): friend is NonNullable<typeof friend> => friend !== undefined,
       );
+    const viewerServerMembership = serverId
+      ? mine.find((membership) => membership.serverId === serverId)
+      : undefined;
+    const profileServerMembership = serverId
+      ? theirs.find((membership) => membership.serverId === serverId)
+      : undefined;
+    let serverRoles: { id: string; name: string; color: string | null }[] = [];
+    let serverJoinedAt: number | null = null;
+    if (serverId && viewerServerMembership && profileServerMembership) {
+      const roleDocs = await ctx.db
+        .query("serverRoles")
+        .withIndex("by_server", (q) => q.eq("serverId", serverId))
+        .collect();
+      const held = new Set(profileServerMembership.roleIds);
+      serverRoles = roleDocs
+        .filter((role) => held.has(role._id) && !role.isDefault)
+        .sort((a, b) => b.position - a.position)
+        .map((role) => ({
+          id: role._id as string,
+          name: role.name,
+          color: role.color ?? null,
+        }));
+      serverJoinedAt = profileServerMembership.joinedAt;
+    }
     return {
       user: publicUser,
       mutualServers: mutual.slice(0, 24),
       mutualFriends,
+      serverRoles,
+      serverJoinedAt,
     };
   },
 });

@@ -13,12 +13,7 @@ import {
 import { api } from "@/convex/_generated/api";
 import { DeviceBadge, UserAvatar } from "@/components/app/UserAvatar";
 import { ServerTagChip } from "@/components/app/ServerTag";
-import { CrownBadge } from "@/components/app/CrownBadge";
-import {
-  GlobalBadges,
-  InlineBadge,
-  OfficialBadge,
-} from "@/components/app/GlobalBadges";
+import { BadgeTray } from "@/components/app/GlobalBadges";
 import { StyledDisplayName } from "@/components/app/StyledDisplayName";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -75,7 +70,6 @@ const STATUS_OPTIONS: {
  */
 export function UserBar({ onOpenSettings }: { onOpenSettings?: () => void }) {
   const me = useQuery(api.users.me);
-  const servers = useQuery(api.servers.listMine);
   const updateProfile = useMutation(api.users.updateProfile);
   const setPresence = useMutation(api.users.setPresence);
   const { signOut } = useAuth();
@@ -89,8 +83,6 @@ export function UserBar({ onOpenSettings }: { onOpenSettings?: () => void }) {
 
   const isStaff =
     me.role === "admin" || me.isFounder || me.badges.includes("moderator");
-
-  const ownsServer = (servers ?? []).some((server) => server.isOwner);
 
   const saveStatus = async () => {
     try {
@@ -120,15 +112,6 @@ export function UserBar({ onOpenSettings }: { onOpenSettings?: () => void }) {
                   user={me}
                   className="truncate text-sm leading-tight"
                 />
-                {me.official && <OfficialBadge compact />}
-                {me.badges.length > 0 ? (
-                  <InlineBadge
-                    badges={me.badges}
-                    primaryBadge={me.primaryBadge}
-                  />
-                ) : ownsServer ? (
-                  <CrownBadge label="Server owner" />
-                ) : null}
                 {me.serverTag && (
                   <ServerTagChip tag={me.serverTag} ownerName={me.name} />
                 )}
@@ -160,6 +143,12 @@ export function UserBar({ onOpenSettings }: { onOpenSettings?: () => void }) {
               />
             ) : null}
             <span className="absolute inset-0 bg-gradient-to-t from-black/55 to-transparent" />
+            <BadgeTray
+              badges={me.badges}
+              primaryBadge={me.primaryBadge}
+              official={me.official}
+              className="absolute right-3 top-3 z-10"
+            />
           </div>
           <div className="relative px-4 pb-3">
             <button
@@ -176,14 +165,6 @@ export function UserBar({ onOpenSettings }: { onOpenSettings?: () => void }) {
             </button>
             <div className="mt-2 flex min-w-0 items-center gap-1.5">
               <StyledDisplayName user={me} className="truncate text-xl" />
-              {me.official ? <OfficialBadge compact /> : null}
-              {me.badges.length > 0 ? (
-                <InlineBadge
-                  badges={me.badges}
-                  primaryBadge={me.primaryBadge}
-                  size="size-[18px]"
-                />
-              ) : null}
             </div>
             <p className="mt-0.5 text-sm text-muted-foreground">
               @{me.username ?? "new"}
@@ -193,9 +174,6 @@ export function UserBar({ onOpenSettings }: { onOpenSettings?: () => void }) {
               <p className="mt-3 line-clamp-3 whitespace-pre-wrap text-sm leading-relaxed text-foreground/85">
                 {me.bio}
               </p>
-            ) : null}
-            {me.badges.length > 0 ? (
-              <GlobalBadges badges={me.badges} className="mt-3 gap-1.5" />
             ) : null}
           </div>
           <DropdownMenuSeparator className="mx-0" />

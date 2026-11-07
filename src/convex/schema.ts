@@ -244,6 +244,8 @@ const schema = defineSchema(
       applicationQuestions: v.optional(v.array(v.string())),
       /** Immutable marker for the official platform community. */
       isPlatformHome: v.optional(v.boolean()),
+      /** Staff-approved community shown with the verified seal. */
+      verified: v.optional(v.boolean()),
       createdAt: v.number(),
       updatedAt: v.optional(v.number()),
     })

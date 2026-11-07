@@ -251,6 +251,114 @@ export function InlineBadge({
 }
 
 /**
+ * Profile-only badge shelf. Every badge is icon-only and lives together in
+ * the top-right tray, matching the supplied reference instead of being mixed
+ * into display names or community roles.
+ */
+export function BadgeTray({
+  badges,
+  primaryBadge,
+  official = false,
+  className,
+}: {
+  badges: readonly string[];
+  /** Chosen badge that leads the tray; every other held badge still shows. */
+  primaryBadge?: string | null;
+  official?: boolean;
+  className?: string;
+}) {
+  const ordered = BADGE_PRIORITY.filter((badge) => badges.includes(badge));
+  const lead =
+    primaryBadge &&
+    primaryBadge !== "none" &&
+    ordered.includes(primaryBadge as GlobalBadgeKey)
+      ? (primaryBadge as GlobalBadgeKey)
+      : null;
+  const display = lead
+    ? [lead, ...ordered.filter((badge) => badge !== lead)]
+    : ordered;
+  if (!official && display.length === 0) return null;
+
+  return (
+    <div
+      className={cn(
+        "inline-flex max-w-52 flex-wrap items-center justify-end gap-1 rounded-lg border border-white/10 bg-[#111214]/95 px-2 py-1.5 shadow-[0_8px_24px_rgba(0,0,0,.35)]",
+        className,
+      )}
+      aria-label="Profile badges"
+    >
+      {official ? (
+        <BadgeTip
+          label="Official Kyro account"
+          blurb="This identity is operated by Kyro."
+        >
+          <svg
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+            className="size-6 drop-shadow-[0_1px_2px_rgba(0,0,0,.45)]"
+          >
+            <path
+              fill="#5865f2"
+              d="M12 2.2 20 5.3v5.55c0 5.1-3.05 8.83-8 10.95-4.95-2.12-8-5.85-8-10.95V5.3L12 2.2Z"
+            />
+            <path
+              fill="none"
+              stroke="white"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2.15"
+              d="m8.2 11.9 2.35 2.25 5.2-5.25"
+            />
+          </svg>
+        </BadgeTip>
+      ) : null}
+      {display.map((badge) => {
+        const meta = GLOBAL_BADGE_META[badge];
+        return (
+          <BadgeTip key={badge} label={meta.label} blurb={meta.blurb}>
+            <GlobalBadgeIcon badge={badge} className="size-6" />
+          </BadgeTip>
+        );
+      })}
+    </div>
+  );
+}
+
+export type CommunityRole = {
+  id: string;
+  name: string;
+  color: string | null;
+};
+
+/** Server roles remain labelled chips under Roles, separate from badges. */
+export function CommunityRoleChips({
+  roles,
+  className,
+}: {
+  roles: readonly CommunityRole[];
+  className?: string;
+}) {
+  if (roles.length === 0) return null;
+  return (
+    <div className={cn("flex flex-wrap gap-1.5", className)}>
+      {roles.map((role) => (
+        <span
+          key={role.id}
+          className="inline-flex items-center gap-1.5 rounded-[4px] border border-white/15 bg-black/10 px-2 py-1 text-xs font-medium text-foreground"
+        >
+          <span
+            aria-hidden="true"
+            className="size-3 rounded-full"
+            style={{ backgroundColor: role.color ?? "#5865f2" }}
+          />
+          {role.name}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/**
  * The shared "gem plate" silhouette every badge glyph sits on: a diamond
  * rotated 45° whose join rounding is faked with a thick round-joined stroke
  * of the gradient itself. One shape for the whole family keeps ten badges

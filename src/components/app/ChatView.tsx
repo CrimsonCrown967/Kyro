@@ -30,6 +30,7 @@ import { useUiStore } from "@/lib/store";
 type SurfaceProps = {
   containerType: "channel" | "conversation";
   containerId: string;
+  serverId?: string;
   title: string;
   titleUser?: {
     name: string;
@@ -45,8 +46,6 @@ type SurfaceProps = {
   canManageMessages: boolean;
   disabledReason?: string | null;
   roleColors?: Record<string, string>;
-  /** Owner of the server (channel surfaces only) — their crown badge. */
-  serverOwnerId?: string;
   /** Rendered to the right of the conversation header. */
   headerAction?: ReactNode;
   /** People offered after typing @, and used to open mentioned profiles. */
@@ -63,6 +62,7 @@ type SurfaceProps = {
 function ChatSurface({
   containerType,
   containerId,
+  serverId,
   title,
   titleUser,
   subtitle,
@@ -71,7 +71,6 @@ function ChatSurface({
   canManageMessages,
   disabledReason,
   roleColors,
-  serverOwnerId,
   headerAction,
   mentionUsers = [],
   allowMassMentions = false,
@@ -109,6 +108,7 @@ function ChatSurface({
     setParams((previous) => {
       const next = new URLSearchParams(previous);
       next.set("previewUser", userId);
+      if (serverId) next.set("previewServer", serverId);
       return next;
     });
   };
@@ -179,6 +179,7 @@ function ChatSurface({
       <MessageList
         containerType={containerType}
         containerId={containerId}
+        serverId={serverId}
         canManageMessages={canManageMessages}
         currentUserId={me?.id ?? ""}
         onReply={setReply}
@@ -190,7 +191,6 @@ function ChatSurface({
           })
         }
         roleColors={roleColors}
-        serverOwnerId={serverOwnerId}
         mentionUsers={mentionUsers}
       />
 
@@ -339,14 +339,12 @@ export function ChannelChat({
       PERMISSIONS.MENTION_EVERYONE,
     );
   const roleColors: Record<string, string> = {};
-  let serverOwnerId: string | undefined;
   const serverMembers = [
     ...(members?.online ?? []),
     ...(members?.offline ?? []),
   ];
   for (const member of serverMembers) {
     if (member.topRoleColor) roleColors[member.user.id] = member.topRoleColor;
-    if (member.isOwner) serverOwnerId = member.user.id;
   }
 
   return (
@@ -355,11 +353,11 @@ export function ChannelChat({
         <ChatSurface
           containerType="channel"
           containerId={channel.id}
+          serverId={serverId}
           title={channel.name}
           subtitle={channel.topic}
           icon={<Hash className="size-4" />}
           canManageMessages={canManageMessages}
-          serverOwnerId={serverOwnerId}
           disabledReason={
             channel.readOnly && !canManageMessages
               ? "This channel is read-only."

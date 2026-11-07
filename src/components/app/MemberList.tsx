@@ -4,8 +4,6 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { UserAvatar, DeviceBadge } from "@/components/app/UserAvatar";
 import { ServerTagChip } from "@/components/app/ServerTag";
-import { CrownBadge } from "@/components/app/CrownBadge";
-import { InlineBadge, OfficialBadge } from "@/components/app/GlobalBadges";
 import { StyledDisplayName } from "@/components/app/StyledDisplayName";
 import type { PresenceState } from "@/lib/format";
 
@@ -49,6 +47,7 @@ export function MemberList({ serverId }: { serverId: string }) {
     setParams((previous) => {
       const next = new URLSearchParams(previous);
       next.set("previewUser", userId);
+      next.set("previewServer", serverId);
       return next;
     });
   };
@@ -96,15 +95,6 @@ export function MemberList({ serverId }: { serverId: string }) {
             roleColor={member.topRoleColor}
             className="truncate text-[15px] font-semibold"
           />
-          {member.user.official && <OfficialBadge compact />}
-          {member.user.badges && member.user.badges.length > 0 ? (
-            <InlineBadge
-              badges={member.user.badges}
-              primaryBadge={member.user.primaryBadge}
-            />
-          ) : member.isOwner ? (
-            <CrownBadge label="Server owner" />
-          ) : null}
           {member.user.serverTag && (
             <ServerTagChip
               tag={member.user.serverTag}

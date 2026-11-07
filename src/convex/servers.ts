@@ -413,6 +413,9 @@ export const get = query({
       welcomeMessage: access.server.welcomeMessage ?? null,
       isPublic: access.server.isPublic,
       isPlatformHome: access.server.isPlatformHome === true,
+      verified:
+        access.server.isPlatformHome === true ||
+        access.server.verified === true,
       ownerId: access.server.ownerId as string,
       iconUrl,
       bannerUrl,

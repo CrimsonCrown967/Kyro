@@ -28,12 +28,11 @@ import { StyledDisplayName } from "@/components/app/StyledDisplayName";
 import { ProfileDecorationLayer } from "@/components/app/DecorationArt";
 import { ServerTagChip } from "@/components/app/ServerTag";
 import {
+  BadgeTray,
+  CommunityRoleChips,
   GlobalBadgeIcon,
-  GlobalBadges,
   GLOBAL_BADGE_META,
   GRANTABLE_BADGES,
-  InlineBadge,
-  OfficialBadge,
 } from "@/components/app/GlobalBadges";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -60,12 +59,18 @@ export function ProfileCard() {
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   const userId = params.get("user");
+  const serverId = params.get("profileServer");
   const [busy, setBusy] = useState(false);
   const me = useQuery(api.users.me);
 
   const profile = useQuery(
     api.users.profile,
-    userId ? { userId: userId as Id<"users"> } : "skip",
+    userId
+      ? {
+          userId: userId as Id<"users">,
+          ...(serverId ? { serverId: serverId as Id<"servers"> } : {}),
+        }
+      : "skip",
   );
   const social = useQuery(
     api.social.mutualContext,
@@ -94,6 +99,7 @@ export function ProfileCard() {
     if (open) return;
     const next = new URLSearchParams(params);
     next.delete("user");
+    next.delete("profileServer");
     setParams(next, { replace: true });
   };
 
@@ -143,6 +149,7 @@ export function ProfileCard() {
   const openSettings = () => {
     const next = new URLSearchParams(params);
     next.delete("user");
+    next.delete("profileServer");
     next.set("settings", "1");
     setParams(next, { replace: true });
   };
@@ -233,24 +240,16 @@ export function ProfileCard() {
                       <UserAvatar user={user} size="2xl" />
                     </span>
                   </div>
+                  <BadgeTray
+                    badges={user.badges}
+                    primaryBadge={user.primaryBadge}
+                    official={user.official}
+                    className="absolute right-5 top-4"
+                  />
 
                   <DialogHeader className="mt-3 space-y-1 text-left">
                     <DialogTitle className="flex flex-wrap items-center gap-x-2 gap-y-1 text-2xl font-bold leading-tight sm:text-3xl">
                       <StyledDisplayName user={user} className="break-words" />
-                      {user.official && <OfficialBadge />}
-                      <InlineBadge
-                        badges={user.badges}
-                        primaryBadge={user.primaryBadge}
-                        size="size-4"
-                      />
-                      {user.badges.length > 1 && (
-                        <span
-                          title={`${user.badges.length} badges`}
-                          className="inline-flex size-5 items-center justify-center rounded-full bg-surface text-[10px] font-bold text-muted-foreground ring-1 ring-border/70"
-                        >
-                          {user.badges.length}
-                        </span>
-                      )}
                     </DialogTitle>
                     <DialogDescription className="sr-only">
                       {user.name}'s profile
@@ -389,6 +388,12 @@ export function ProfileCard() {
                       </ProfileSection>
                     )}
 
+                    {profile && profile.serverRoles.length > 0 ? (
+                      <ProfileSection label="Roles">
+                        <CommunityRoleChips roles={profile.serverRoles} />
+                      </ProfileSection>
+                    ) : null}
+
                     {profile && profile.mutualServers.length > 0 && (
                       <ProfileSection
                         label={`Mutual communities · ${profile.mutualServers.length}`}
@@ -412,140 +417,152 @@ export function ProfileCard() {
                       </ProfileSection>
                     )}
 
-                    {/* Dedicated home for platform-wide badges — separate from
-                      community roles, which live in each server. */}
-                    <ProfileSection
-                      label="Global badges"
-                      icon={<Sparkles className="size-3.5" />}
-                    >
-                      <GlobalBadges badges={user.badges} />
-                      {isSelf && me?.isFounder && (
-                        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border/60 pt-2.5">
-                          <p className="min-w-0 flex-1 text-[11px] text-muted-foreground">
-                            Founder only: your Admin badge can be hidden from
-                            this profile. Staff powers stay active either way.
-                          </p>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={busy}
-                            onClick={() => {
-                              const holdsAdmin = user.badges.includes("admin");
-                              void run(
-                                holdsAdmin
-                                  ? removeAdminBadge({})
-                                  : restoreAdminBadge({}),
-                                holdsAdmin
-                                  ? "Admin badge hidden from your profile."
-                                  : "Admin badge restored.",
-                              );
-                            }}
-                          >
-                            {user.badges.includes("admin")
-                              ? "Hide Admin badge"
-                              : "Restore Admin badge"}
-                          </Button>
-                        </div>
-                      )}
-
-                      {canManageBadges && (
-                        <div className="mt-3 border-t border-border/60 pt-3">
-                          <p className="text-[11px] text-muted-foreground">
-                            You're an admin — tap a badge to grant or revoke it.
-                          </p>
-                          <div className="mt-1.5 flex flex-wrap gap-1.5">
-                            {GRANTABLE_BADGES.map((badge) => {
-                              const granted = user.badges.includes(badge);
-                              // Badge id → setBadges argument name (bughunter → bugHunter).
-                              const field:
-                                | "coFounder"
-                                | "admin"
-                                | "manager"
-                                | "staff"
-                                | "trialStaff"
-                                | "moderator"
-                                | "verified"
-                                | "bugHunter"
-                                | "vip"
-                                | "og"
-                                | "supporter"
-                                | "donator"
-                                | "partner" =
-                                badge === "bughunter"
-                                  ? "bugHunter"
-                                  : badge === "cofounder"
-                                    ? "coFounder"
-                                    : badge === "trialstaff"
-                                      ? "trialStaff"
-                                      : badge;
-                              return (
-                                <button
-                                  key={badge}
-                                  type="button"
-                                  disabled={busy}
-                                  className={cn(
-                                    "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold tracking-wide transition-opacity",
-                                    "shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]",
-                                    granted
-                                      ? GLOBAL_BADGE_META[badge].chip
-                                      : "border-border/70 bg-surface/40 text-muted-foreground hover:text-foreground",
-                                    busy ? "opacity-60" : "",
-                                  )}
-                                  onClick={() => {
-                                    void run(
-                                      setBadges({
-                                        userId: userId as Id<"users">,
-                                        [field]: !granted,
-                                      }),
-                                      granted
-                                        ? `${GLOBAL_BADGE_META[badge].label} badge removed.`
-                                        : `${GLOBAL_BADGE_META[badge].label} badge granted.`,
-                                    );
-                                  }}
-                                >
-                                  <GlobalBadgeIcon badge={badge} />
-                                  {GLOBAL_BADGE_META[badge].label}
-                                  <span
-                                    aria-hidden="true"
-                                    className="text-[10px]"
-                                  >
-                                    {granted ? "✓ grant" : "+ grant"}
-                                  </span>
-                                </button>
-                              );
-                            })}
-                          </div>
-                          <div className="mt-2 flex items-center gap-2">
-                            <Input
-                              value={warnReason}
-                              onChange={(event) =>
-                                setWarnReason(event.target.value)
-                              }
-                              placeholder="Warning reason…"
-                              maxLength={300}
-                              className="h-8 flex-1 text-xs"
-                              aria-label="Warning reason"
-                            />
+                    {/* Badge grants are an admin tool; the earned badges
+                      themselves live in the tray at the top of the card. */}
+                    {(canManageBadges || (isSelf && me?.isFounder)) && (
+                      <ProfileSection
+                        label={
+                          canManageBadges ? "Badge management" : "Admin badge"
+                        }
+                        icon={<Sparkles className="size-3.5" />}
+                      >
+                        {isSelf && me?.isFounder && (
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="min-w-0 flex-1 text-[11px] text-muted-foreground">
+                              Founder only: your Admin badge can be hidden from
+                              this profile. Staff powers stay active either way.
+                            </p>
                             <Button
                               size="sm"
-                              variant="destructive"
-                              disabled={busy || warnReason.trim().length < 3}
+                              variant="outline"
+                              disabled={busy}
                               onClick={() => {
+                                const holdsAdmin =
+                                  user.badges.includes("admin");
                                 void run(
-                                  warn({
-                                    userId: userId as Id<"users">,
-                                    reason: warnReason.trim(),
-                                  }).then(() => setWarnReason("")),
-                                  "Warning issued — it counts for 3 days.",
+                                  holdsAdmin
+                                    ? removeAdminBadge({})
+                                    : restoreAdminBadge({}),
+                                  holdsAdmin
+                                    ? "Admin badge hidden from your profile."
+                                    : "Admin badge restored.",
                                 );
                               }}
                             >
-                              Warn
+                              {user.badges.includes("admin")
+                                ? "Hide Admin badge"
+                                : "Restore Admin badge"}
                             </Button>
                           </div>
-                        </div>
-                      )}
-                    </ProfileSection>
+                        )}
+
+                        {canManageBadges && (
+                          <div
+                            className={cn(
+                              "border-border/60",
+                              isSelf && me?.isFounder
+                                ? "mt-3 border-t pt-3"
+                                : undefined,
+                            )}
+                          >
+                            <p className="text-[11px] text-muted-foreground">
+                              You're an admin — tap a badge to grant or revoke
+                              it.
+                            </p>
+                            <div className="mt-1.5 flex flex-wrap gap-1.5">
+                              {GRANTABLE_BADGES.map((badge) => {
+                                const granted = user.badges.includes(badge);
+                                // Badge id → setBadges argument name (bughunter → bugHunter).
+                                const field:
+                                  | "coFounder"
+                                  | "admin"
+                                  | "manager"
+                                  | "staff"
+                                  | "trialStaff"
+                                  | "moderator"
+                                  | "verified"
+                                  | "bugHunter"
+                                  | "vip"
+                                  | "og"
+                                  | "supporter"
+                                  | "donator"
+                                  | "partner" =
+                                  badge === "bughunter"
+                                    ? "bugHunter"
+                                    : badge === "cofounder"
+                                      ? "coFounder"
+                                      : badge === "trialstaff"
+                                        ? "trialStaff"
+                                        : badge;
+                                return (
+                                  <button
+                                    key={badge}
+                                    type="button"
+                                    disabled={busy}
+                                    className={cn(
+                                      "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold tracking-wide transition-opacity",
+                                      "shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]",
+                                      granted
+                                        ? GLOBAL_BADGE_META[badge].chip
+                                        : "border-border/70 bg-surface/40 text-muted-foreground hover:text-foreground",
+                                      busy ? "opacity-60" : "",
+                                    )}
+                                    onClick={() => {
+                                      void run(
+                                        setBadges({
+                                          userId: userId as Id<"users">,
+                                          [field]: !granted,
+                                        }),
+                                        granted
+                                          ? `${GLOBAL_BADGE_META[badge].label} badge removed.`
+                                          : `${GLOBAL_BADGE_META[badge].label} badge granted.`,
+                                      );
+                                    }}
+                                  >
+                                    <GlobalBadgeIcon badge={badge} />
+                                    {GLOBAL_BADGE_META[badge].label}
+                                    <span
+                                      aria-hidden="true"
+                                      className="text-[10px]"
+                                    >
+                                      {granted ? "✓ grant" : "+ grant"}
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                            <div className="mt-2 flex items-center gap-2">
+                              <Input
+                                value={warnReason}
+                                onChange={(event) =>
+                                  setWarnReason(event.target.value)
+                                }
+                                placeholder="Warning reason…"
+                                maxLength={300}
+                                className="h-8 flex-1 text-xs"
+                                aria-label="Warning reason"
+                              />
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                disabled={busy || warnReason.trim().length < 3}
+                                onClick={() => {
+                                  void run(
+                                    warn({
+                                      userId: userId as Id<"users">,
+                                      reason: warnReason.trim(),
+                                    }).then(() => setWarnReason("")),
+                                    "Warning issued — it counts for 3 days.",
+                                  );
+                                }}
+                              >
+                                Warn
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </ProfileSection>
+                    )}
 
                     <div className="flex items-center justify-end gap-1.5 pt-0.5 text-[10px] font-mono text-muted-foreground/60">
                       <span className="truncate">ID {user.id}</span>
@@ -853,12 +870,6 @@ function ProfileContextPanel({
                         user={friend}
                         className="truncate text-sm"
                       />
-                      {friend.badges.length > 0 ? (
-                        <InlineBadge
-                          badges={friend.badges}
-                          primaryBadge={friend.primaryBadge}
-                        />
-                      ) : null}
                     </span>
                     <span className="block truncate text-xs text-muted-foreground">
                       @{friend.username ?? "no username"}

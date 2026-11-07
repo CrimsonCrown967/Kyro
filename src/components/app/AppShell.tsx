@@ -1,5 +1,13 @@
 import { useMutation, useQuery } from "convex/react";
-import { Bell, Home, Loader2, Menu, Search, User } from "@/components/icons";
+import {
+  Bell,
+  Home,
+  Loader2,
+  Menu,
+  Search,
+  User,
+  Users,
+} from "@/components/icons";
 import { useEffect, useRef, type ReactNode } from "react";
 import {
   useLocation,
@@ -162,9 +170,38 @@ export function AppShell({ children }: { children: ReactNode }) {
   const sidebar = (
     <Sidebar activeServerId={activeServerId} onOpenSettings={openSettings} />
   );
+  const desktopTitle = location.pathname.startsWith("/dashboard/admin")
+    ? "Admin Portal"
+    : location.pathname === "/dashboard"
+      ? "Friends"
+      : activeServerId
+        ? "Community"
+        : "Direct Messages";
 
   return (
     <div className="kyro-app-shell flex h-dvh w-full flex-col overflow-hidden bg-background text-foreground">
+      <div className="relative hidden h-10 shrink-0 items-center justify-center border-b border-border bg-[#232428] px-4 md:flex">
+        <span className="flex items-center gap-2 text-sm font-medium text-foreground">
+          {desktopTitle === "Friends" ? (
+            <Users className="size-4 text-muted-foreground" />
+          ) : (
+            <KyroMark className="size-4" />
+          )}
+          {desktopTitle}
+        </span>
+        <button
+          type="button"
+          aria-label="Inbox"
+          title="Inbox"
+          onClick={() => setInboxOpen(!inboxOpen)}
+          className="absolute right-4 rounded-md p-1.5 text-muted-foreground hover:bg-surface hover:text-foreground"
+        >
+          <Bell className="size-4" />
+          {(unread ?? 0) > 0 ? (
+            <span className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-destructive" />
+          ) : null}
+        </button>
+      </div>
       <div className="flex min-h-0 flex-1">
         <div className="hidden md:flex">{rail}</div>
         <div className="hidden md:flex">{sidebar}</div>

@@ -14,7 +14,6 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { UserAvatar } from "@/components/app/UserAvatar";
 import { StyledDisplayName } from "@/components/app/StyledDisplayName";
-import { OfficialBadge } from "@/components/app/GlobalBadges";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -218,7 +217,6 @@ export function SearchOverlay({
                           user={user}
                           className="block truncate text-sm"
                         />
-                        {user.official && <OfficialBadge compact />}
                       </span>
                       <span className="block truncate text-xs text-muted-foreground">
                         {user.username

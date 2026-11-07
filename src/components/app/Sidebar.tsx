@@ -27,7 +27,7 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { UserAvatar } from "@/components/app/UserAvatar";
 import { UserBar } from "@/components/app/UserBar";
 import { StyledDisplayName } from "@/components/app/StyledDisplayName";
-import { InlineBadge, OfficialBadge } from "@/components/app/GlobalBadges";
+import { VerifiedCommunityBadge } from "@/components/app/VerifiedCommunityBadge";
 import { CreateChannelDialog, InviteDialog } from "@/components/app/dialogs";
 import { Button } from "@/components/ui/button";
 import {
@@ -47,6 +47,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { PERMISSIONS } from "@/lib/permissions";
+import { useUiStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
 export function Sidebar({
@@ -186,123 +187,84 @@ function ServerSection({ serverId }: { serverId: string }) {
         {server.bannerUrl ? (
           <span className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/65 via-black/5 to-sidebar/95" />
         ) : null}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className="relative z-10 flex h-14 w-full items-center justify-between gap-2 px-4 text-left text-base font-bold text-white drop-shadow hover:bg-black/15">
-              <span className="flex min-w-0 items-center gap-2 truncate tracking-tight">
-                <span className="truncate">{server.name}</span>
-                {server.isPlatformHome ? (
-                  <span className="inline-flex size-4 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] text-white ring-2 ring-white/20">
-                    ✓
-                  </span>
-                ) : null}
-              </span>
-              <span className="text-sm text-white/75">⌄</span>
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-56">
-            <DropdownMenuLabel className="truncate text-xs text-muted-foreground">
-              {server.memberCount} members
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {canInvite && (
-              <DropdownMenuItem onClick={() => setInviteOpen(true)}>
-                <UserPlus className="size-4" /> Invite people
-              </DropdownMenuItem>
-            )}
-            {canManageChannels && (
-              <DropdownMenuItem onClick={() => setCreateOpen(true)}>
-                <Plus className="size-4" /> Create channel
-              </DropdownMenuItem>
-            )}
-            {canManageServer && (
-              <DropdownMenuItem
-                onClick={() =>
-                  void run(
-                    setLocked({
-                      serverId: serverId as Id<"servers">,
-                      locked: !server.locked,
-                    }),
-                    server.locked
-                      ? "Server unlocked — everyone can post again."
-                      : "Server locked — only staff can post now.",
-                  )
-                }
+        <div className="relative z-10 flex h-14 items-center gap-1 px-3 text-white drop-shadow">
+          <div className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-1 py-2">
+            {server.verified ? (
+              <VerifiedCommunityBadge className="size-5" />
+            ) : null}
+            <span className="truncate text-base font-bold tracking-tight">
+              {server.name}
+            </span>
+          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                aria-label={`${server.name} menu`}
+                className="rounded-md p-2 text-lg text-white/80 hover:bg-black/20 hover:text-white"
               >
-                <Lock className="size-4" />
-                {server.locked ? "Unlock server" : "Lock server"}
-              </DropdownMenuItem>
-            )}
-            <DropdownMenuItem
-              onClick={() => {
-                void navigator.clipboard
-                  .writeText(serverId)
-                  .then(() => toast.success("Server ID copied."))
-                  .catch(() =>
-                    toast.error("Clipboard access was blocked by the browser."),
-                  );
-              }}
-            >
-              <Copy className="size-4" /> Copy server ID
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setNicknameOpen(true)}>
-              <Pencil className="size-4" /> Change nickname
-            </DropdownMenuItem>
-            {canManageChannels && (
-              <DropdownMenuItem
-                onClick={async () => {
-                  try {
-                    await createCategory({
-                      serverId: serverId as Id<"servers">,
-                      name: "New category",
-                    });
-                    toast.success("Category added");
-                  } catch (error) {
-                    toast.error(
-                      error instanceof Error ? error.message : "Failed",
-                    );
+                ⌄
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-56">
+              <DropdownMenuLabel className="truncate text-xs text-muted-foreground">
+                {server.memberCount} members
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {canInvite && (
+                <DropdownMenuItem onClick={() => setInviteOpen(true)}>
+                  <UserPlus className="size-4" /> Invite people
+                </DropdownMenuItem>
+              )}
+              {canManageChannels && (
+                <DropdownMenuItem onClick={() => setCreateOpen(true)}>
+                  <Plus className="size-4" /> Create channel
+                </DropdownMenuItem>
+              )}
+              {canManageServer && (
+                <DropdownMenuItem
+                  onClick={() =>
+                    void run(
+                      setLocked({
+                        serverId: serverId as Id<"servers">,
+                        locked: !server.locked,
+                      }),
+                      server.locked
+                        ? "Server unlocked — everyone can post again."
+                        : "Server locked — only staff can post now.",
+                    )
                   }
+                >
+                  <Lock className="size-4" />
+                  {server.locked ? "Unlock server" : "Lock server"}
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem
+                onClick={() => {
+                  void navigator.clipboard
+                    .writeText(serverId)
+                    .then(() => toast.success("Server ID copied."))
+                    .catch(() =>
+                      toast.error(
+                        "Clipboard access was blocked by the browser.",
+                      ),
+                    );
                 }}
               >
-                <Plus className="size-4" /> Add category
+                <Copy className="size-4" /> Copy server ID
               </DropdownMenuItem>
-            )}
-            {canManageServer && (
-              <DropdownMenuItem
-                onClick={() =>
-                  navigate(`/dashboard/s/${serverId}/settings/overview`)
-                }
-              >
-                <Settings className="size-4" /> Server Settings
+              <DropdownMenuItem onClick={() => setNicknameOpen(true)}>
+                <Pencil className="size-4" /> Change nickname
               </DropdownMenuItem>
-            )}
-            <DropdownMenuItem
-              onClick={async () => {
-                try {
-                  await setMuted({
-                    serverId: serverId as Id<"servers">,
-                    muted: !server.muted,
-                  });
-                } catch (error) {
-                  toast.error(
-                    error instanceof Error ? error.message : "Failed",
-                  );
-                }
-              }}
-            >
-              <MicOff className="size-4" />
-              {server.muted ? "Unmute notifications" : "Mute notifications"}
-            </DropdownMenuItem>
-            {!server.isOwner && (
-              <>
-                <DropdownMenuSeparator />
+              {canManageChannels && (
                 <DropdownMenuItem
-                  className="text-destructive focus:text-destructive"
                   onClick={async () => {
                     try {
-                      await leave({ serverId: serverId as Id<"servers"> });
-                      navigate("/dashboard");
-                      toast.success(`Left ${server.name}`);
+                      await createCategory({
+                        serverId: serverId as Id<"servers">,
+                        name: "New category",
+                      });
+                      toast.success("Category added");
                     } catch (error) {
                       toast.error(
                         error instanceof Error ? error.message : "Failed",
@@ -310,12 +272,59 @@ function ServerSection({ serverId }: { serverId: string }) {
                     }
                   }}
                 >
-                  <LogOut className="size-4" /> Leave community
+                  <Plus className="size-4" /> Add category
                 </DropdownMenuItem>
-              </>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
+              )}
+              {canManageServer && (
+                <DropdownMenuItem
+                  onClick={() =>
+                    navigate(`/dashboard/s/${serverId}/settings/overview`)
+                  }
+                >
+                  <Settings className="size-4" /> Server Settings
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem
+                onClick={async () => {
+                  try {
+                    await setMuted({
+                      serverId: serverId as Id<"servers">,
+                      muted: !server.muted,
+                    });
+                  } catch (error) {
+                    toast.error(
+                      error instanceof Error ? error.message : "Failed",
+                    );
+                  }
+                }}
+              >
+                <MicOff className="size-4" />
+                {server.muted ? "Unmute notifications" : "Mute notifications"}
+              </DropdownMenuItem>
+              {!server.isOwner && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive"
+                    onClick={async () => {
+                      try {
+                        await leave({ serverId: serverId as Id<"servers"> });
+                        navigate("/dashboard");
+                        toast.success(`Left ${server.name}`);
+                      } catch (error) {
+                        toast.error(
+                          error instanceof Error ? error.message : "Failed",
+                        );
+                      }
+                    }}
+                  >
+                    <LogOut className="size-4" /> Leave community
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       <div className="px-2.5 py-4">
@@ -554,6 +563,7 @@ function HomeSection() {
   const [query, setQuery] = useState("");
   const [params] = useSearchParams();
   const [createGroupOpen, setCreateGroupOpen] = useState(false);
+  const setSearchOpen = useUiStore((state) => state.setSearchOpen);
   const friendsMatch = useMatch("/dashboard");
   const findPeopleMatch = params.get("tab") === "add";
   const discoverMatch = useMatch("/dashboard/discover");
@@ -570,8 +580,14 @@ function HomeSection() {
 
   return (
     <div className="px-2 py-3">
-      <div className="-mx-2 -mt-3 mb-3 flex h-14 items-center border-b border-border/70 px-4 text-base font-bold tracking-tight">
-        Direct messages
+      <div className="-mx-2 -mt-3 mb-3 flex h-16 items-center border-b border-border/70 px-3">
+        <button
+          type="button"
+          onClick={() => setSearchOpen(true)}
+          className="h-10 w-full rounded-md bg-background/70 px-3 text-left text-sm font-semibold text-foreground shadow-inner transition-colors hover:bg-background"
+        >
+          Find or start a conversation
+        </button>
       </div>
       <Link
         to="/dashboard"
@@ -710,13 +726,6 @@ function HomeSection() {
                       name={label}
                       className="truncate"
                     />
-                    {other.official ? <OfficialBadge compact /> : null}
-                    {other.badges.length > 0 ? (
-                      <InlineBadge
-                        badges={other.badges}
-                        primaryBadge={other.primaryBadge}
-                      />
-                    ) : null}
                   </span>
                 ) : (
                   <span className="block truncate font-semibold">{label}</span>

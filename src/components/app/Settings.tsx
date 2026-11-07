@@ -61,11 +61,9 @@ import { PROFILE_THEMES } from "@/lib/profileThemes";
 import { APP_TINTS } from "@/lib/tints";
 import { findAvatarDecoration, findProfileDecoration } from "@/lib/decorations";
 import {
+  BadgeTray,
   GLOBAL_BADGE_META,
   GlobalBadgeIcon,
-  GlobalBadges,
-  InlineBadge,
-  OfficialBadge,
 } from "@/components/app/GlobalBadges";
 import { Slider } from "@/components/ui/slider";
 import { MAX_UPLOAD_BYTES, useUploadFile } from "@/lib/upload";
@@ -1403,7 +1401,12 @@ function ProfilePreviewCard({
               <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/80">
                 Badges
               </p>
-              <GlobalBadges badges={me.badges} className="mt-1.5" />
+              <BadgeTray
+                badges={me.badges}
+                primaryBadge={me.primaryBadge}
+                official={me.official}
+                className="mt-1.5"
+              />
             </div>
           )}
 
@@ -1946,8 +1949,8 @@ function ProfileTab() {
             Badge
           </p>
           <p className="mb-3 text-xs text-muted-foreground">
-            This one shows next to your name in chat and the member list. Your
-            profile card always shows every badge you've earned.
+            This badge leads your profile badge tray. Every badge you've earned
+            still shows in the tray.
           </p>
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
             {me.badges.map((badge) => {
@@ -2435,6 +2438,12 @@ function ProfilePreviewPane({
         }
       >
         <ProfileDecorationLayer decorationId={me.profileDecoration} />
+        <BadgeTray
+          badges={me.badges}
+          primaryBadge={badgeId}
+          official={me.official}
+          className="absolute right-3 top-3 z-20"
+        />
         {/* Banner: current picture, else the chosen colour theme. */}
         <div
           className={cn(
@@ -2464,15 +2473,6 @@ function ProfilePreviewPane({
 
           <h3 className="mt-2 break-words text-lg font-semibold leading-snug">
             <StyledDisplayName user={{ ...me, name: nameValue }} />
-            <span className="ml-2 inline-flex items-center gap-1 align-middle">
-              {me.official && <OfficialBadge compact />}
-              <InlineBadge badges={me.badges} primaryBadge={badgeId} />
-              {me.badges.length > 1 && (
-                <span className="inline-flex size-4 items-center justify-center rounded-full bg-white/15 text-[9px] font-bold text-zinc-100">
-                  {me.badges.length}
-                </span>
-              )}
-            </span>
           </h3>
 
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-zinc-400">

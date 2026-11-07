@@ -31,8 +31,6 @@ import {
   extractInviteCodes,
   ServerInviteCard,
 } from "@/components/app/ServerInviteCard";
-import { CrownBadge } from "@/components/app/CrownBadge";
-import { InlineBadge, OfficialBadge } from "@/components/app/GlobalBadges";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -157,7 +155,6 @@ export function MessageList({
   containerType,
   containerId,
   serverId,
-  serverOwnerId,
   canManageMessages,
   currentUserId,
   onReply,
@@ -168,9 +165,6 @@ export function MessageList({
   containerType: "channel" | "conversation";
   containerId: string;
   serverId?: string;
-  /** Owner of the server this channel belongs to; their crown is only shown
-   *  inside server views, which only members can reach. */
-  serverOwnerId?: string;
   canManageMessages: boolean;
   currentUserId: string;
   onReply: (target: ReplyTarget) => void;
@@ -371,7 +365,6 @@ export function MessageList({
                       containerType={containerType}
                       containerId={containerId}
                       serverId={serverId}
-                      serverOwnerId={serverOwnerId}
                       currentUserId={currentUserId}
                       canManageMessages={canManageMessages}
                       isLast={
@@ -469,7 +462,7 @@ function MessageRow({
   onReply,
   onReport,
   roleColors,
-  serverOwnerId,
+  serverId,
   mentionUsers,
   onOpenMedia,
   onForward,
@@ -480,7 +473,6 @@ function MessageRow({
   containerType: "channel" | "conversation";
   containerId: string;
   serverId?: string;
-  serverOwnerId?: string;
   currentUserId: string;
   canManageMessages: boolean;
   isLast: boolean;
@@ -543,6 +535,7 @@ function MessageRow({
     setParams((previous) => {
       const next = new URLSearchParams(previous);
       next.set("previewUser", author.id);
+      if (serverId) next.set("previewServer", serverId);
       return next;
     });
   };
@@ -553,6 +546,7 @@ function MessageRow({
     setParams((previous) => {
       const next = new URLSearchParams(previous);
       next.set("previewUser", userId);
+      if (serverId) next.set("previewServer", serverId);
       return next;
     });
   };
@@ -711,15 +705,6 @@ function MessageRow({
                   "Unknown user"
                 )}
               </button>
-              {author?.official && <OfficialBadge compact />}
-              {author?.badges && author.badges.length > 0 ? (
-                <InlineBadge
-                  badges={author.badges}
-                  primaryBadge={author.primaryBadge}
-                />
-              ) : serverOwnerId && author?.id === serverOwnerId ? (
-                <CrownBadge label="Server owner" />
-              ) : null}
               {author?.serverTag && (
                 <ServerTagChip tag={author.serverTag} ownerName={author.name} />
               )}
