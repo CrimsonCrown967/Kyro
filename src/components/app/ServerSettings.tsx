@@ -57,6 +57,14 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { InviteDialog } from "@/components/app/dialogs";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { motion } from "framer-motion";
 import {
   ALL_PERMISSIONS,
@@ -1419,6 +1427,7 @@ function RolesTab({
   const updateRole = useMutation(api.roles.update);
   const deleteRole = useMutation(api.roles.remove);
   const moveRole = useMutation(api.roles.move);
+  const normalizeRolePositions = useMutation(api.roles.normalizePositions);
 
   const [name, setName] = useState("");
   const [color, setColor] = useState(DEFAULT_ROLE_COLORS[0]);
@@ -1433,11 +1442,29 @@ function RolesTab({
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
 
-  const run = async (action: Promise<unknown>, success?: string) => {
+  useEffect(() => {
+    if (!canManageRoles) return;
+    void normalizeRolePositions({
+      serverId: serverId as Id<"servers">,
+    }).catch((error: unknown) => {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Could not prepare role editing.",
+      );
+    });
+  }, [canManageRoles, normalizeRolePositions, serverId]);
+
+  const run = async (
+    action: () => Promise<unknown>,
+    success?: string,
+    onSuccess?: () => void,
+  ) => {
     if (busy) return;
     setBusy(true);
     try {
-      await action;
+      await action();
+      onSuccess?.();
       if (success) toast.success(success);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "That didn't work.");
@@ -1477,7 +1504,7 @@ function RolesTab({
     const target = ordered[index];
     if (!target) return;
     await run(
-      moveRole({ roleId: target.id as Id<"serverRoles">, direction }),
+      () => moveRole({ roleId: target.id as Id<"serverRoles">, direction }),
       direction === "up" ? "Role moved up." : "Role moved down.",
     );
   };
@@ -1493,11 +1520,12 @@ function RolesTab({
     const to = ordered.findIndex((role) => role.id === toId);
     if (from < 0 || to < 0 || from === to) return;
     await run(
-      moveRole({
-        roleId: fromId as Id<"serverRoles">,
-        direction: to < from ? "up" : "down",
-        steps: Math.abs(to - from),
-      }),
+      () =>
+        moveRole({
+          roleId: fromId as Id<"serverRoles">,
+          direction: to < from ? "up" : "down",
+          steps: Math.abs(to - from),
+        }),
       "Role order saved.",
     );
   };
@@ -1567,11 +1595,13 @@ function RolesTab({
                 disabled={busy}
                 onClick={() =>
                   void run(
-                    updateRole({
-                      roleId: defaultRole.id as Id<"serverRoles">,
-                      permissions: editPerms,
-                    }).then(() => setEditingId(null)),
+                    () =>
+                      updateRole({
+                        roleId: defaultRole.id as Id<"serverRoles">,
+                        permissions: editPerms,
+                      }),
                     "Default permissions updated.",
+                    () => setEditingId(null),
                   )
                 }
               >
@@ -1695,65 +1725,113 @@ function RolesTab({
           )}
         </div>
 
-        {editingRole && (
-          <div className="mt-4 rounded-md border border-primary/40 bg-surface p-4">
-            <h3 className="text-sm font-medium">Edit {editingRole.name}</h3>
-            <div className="mt-3 space-y-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="edit-role-name">Role name</Label>
-                <Input
-                  id="edit-role-name"
-                  value={editName}
-                  onChange={(event) => setEditName(event.target.value)}
-                  maxLength={60}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Colour</Label>
-                <div className="flex flex-wrap gap-2">
-                  {DEFAULT_ROLE_COLORS.map((entry) => (
-                    <button
-                      key={entry}
-                      type="button"
-                      aria-label={`Colour ${entry}`}
-                      onClick={() => setEditColor(entry)}
-                      className={cn(
-                        "size-7 rounded-full transition-transform",
-                        editColor === entry
-                          ? "scale-110 ring-2 ring-foreground ring-offset-2 ring-offset-panel"
-                          : "hover:scale-105",
-                      )}
-                      style={{ background: entry }}
+        {editingRole ? (
+          <Dialog
+            open
+            onOpenChange={(open) => {
+              if (!open && !busy) setEditingId(null);
+            }}
+          >
+            <DialogContent className="flex max-h-[90vh] flex-col overflow-hidden sm:max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Edit {editingRole.name}</DialogTitle>
+                <DialogDescription>
+                  Change how this role looks and exactly what its members can
+                  do.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="min-h-0 flex-1 space-y-5 overflow-y-auto pr-1">
+                <div className="grid gap-4 sm:grid-cols-[1fr_auto]">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="edit-role-name">Role name</Label>
+                    <Input
+                      id="edit-role-name"
+                      autoFocus
+                      value={editName}
+                      onChange={(event) => setEditName(event.target.value)}
+                      maxLength={60}
                     />
-                  ))}
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="edit-role-colour">Custom colour</Label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        id="edit-role-colour"
+                        type="color"
+                        value={
+                          /^#[0-9a-f]{6}$/i.test(editColor)
+                            ? editColor
+                            : DEFAULT_ROLE_COLORS[0]
+                        }
+                        onChange={(event) => setEditColor(event.target.value)}
+                        className="size-10 cursor-pointer rounded-md border border-input bg-background p-1"
+                      />
+                      <Input
+                        value={editColor}
+                        onChange={(event) => setEditColor(event.target.value)}
+                        maxLength={7}
+                        className="w-28 font-mono uppercase"
+                        aria-label="Role colour hex value"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Colour presets</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {DEFAULT_ROLE_COLORS.map((entry) => (
+                      <button
+                        key={entry}
+                        type="button"
+                        aria-label={`Colour ${entry}`}
+                        onClick={() => setEditColor(entry)}
+                        className={cn(
+                          "size-8 rounded-full transition-transform",
+                          editColor.toLowerCase() === entry.toLowerCase()
+                            ? "scale-110 ring-2 ring-foreground ring-offset-2 ring-offset-panel"
+                            : "hover:scale-105",
+                        )}
+                        style={{ background: entry }}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <p className="mb-2 text-sm font-medium">Permissions</p>
+                  <PermissionToggles
+                    value={editPerms}
+                    onChange={setEditPerms}
+                    allowAdmin={isOwner}
+                  />
                 </div>
               </div>
-              <div>
-                <p className="mb-2 text-sm font-medium">Permissions</p>
-                <PermissionToggles
-                  value={editPerms}
-                  onChange={setEditPerms}
-                  allowAdmin={isOwner}
-                />
-              </div>
-            </div>
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-              <Button
-                variant="ghost"
-                disabled={busy}
-                className="text-destructive hover:text-destructive"
-                onClick={() =>
-                  void run(
-                    deleteRole({
-                      roleId: editingRole.id as Id<"serverRoles">,
-                    }).then(() => setEditingId(null)),
-                    "Role deleted.",
-                  )
-                }
-              >
-                <Trash2 className="mr-1.5 size-4" /> Delete role
-              </Button>
-              <div className="flex gap-2">
+
+              <DialogFooter className="mt-1 gap-2 sm:items-center sm:justify-between">
+                <Button
+                  variant="ghost"
+                  disabled={busy}
+                  className="mr-auto text-destructive hover:text-destructive"
+                  onClick={() => {
+                    if (
+                      !window.confirm(`Delete the ${editingRole.name} role?`)
+                    ) {
+                      return;
+                    }
+                    void run(
+                      () =>
+                        deleteRole({
+                          roleId: editingRole.id as Id<"serverRoles">,
+                        }),
+                      "Role deleted.",
+                      () => setEditingId(null),
+                    );
+                  }}
+                >
+                  <Trash2 className="mr-1.5 size-4" /> Delete role
+                </Button>
                 <Button
                   variant="ghost"
                   onClick={() => setEditingId(null)}
@@ -1762,25 +1840,34 @@ function RolesTab({
                   Cancel
                 </Button>
                 <Button
-                  disabled={busy || editName.trim().length < 2}
+                  disabled={
+                    busy ||
+                    editName.trim().length < 2 ||
+                    !/^#[0-9a-f]{6}$/i.test(editColor)
+                  }
                   onClick={() =>
                     void run(
-                      updateRole({
-                        roleId: editingRole.id as Id<"serverRoles">,
-                        name: editName.trim(),
-                        color: editColor,
-                        permissions: editPerms,
-                      }).then(() => setEditingId(null)),
+                      () =>
+                        updateRole({
+                          roleId: editingRole.id as Id<"serverRoles">,
+                          name: editName.trim(),
+                          color: editColor.toUpperCase(),
+                          permissions: editPerms,
+                        }),
                       "Role updated.",
+                      () => setEditingId(null),
                     )
                   }
                 >
-                  Save role
+                  {busy ? (
+                    <Loader2 className="mr-2 size-4 animate-spin" />
+                  ) : null}
+                  Save changes
                 </Button>
-              </div>
-            </div>
-          </div>
-        )}
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        ) : null}
       </div>
 
       <div className="rounded-lg border border-border/60 bg-panel p-5">
@@ -1826,16 +1913,18 @@ function RolesTab({
               disabled={busy || name.trim().length < 2}
               onClick={() =>
                 void run(
-                  createRole({
-                    serverId: serverId as Id<"servers">,
-                    name: name.trim(),
-                    color,
-                    permissions,
-                  }).then(() => {
+                  () =>
+                    createRole({
+                      serverId: serverId as Id<"servers">,
+                      name: name.trim(),
+                      color,
+                      permissions,
+                    }),
+                  "Role created.",
+                  () => {
                     setName("");
                     setPermissions([PERMISSIONS.SEND_MESSAGES]);
-                  }),
-                  "Role created.",
+                  },
                 )
               }
             >

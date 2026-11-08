@@ -16,6 +16,51 @@ import {
 } from "./lib";
 import type { Doc } from "./_generated/dataModel";
 
+/**
+ * Old role rows can share the same numeric position, which makes drag/drop and
+ * hierarchy checks appear to do nothing. Preserve the order currently shown in
+ * the UI, then assign stable unique ranks above @everyone.
+ */
+async function normalizeRolePositions(
+  ctx: Parameters<typeof logAudit>[0],
+  serverId: Doc<"servers">["_id"],
+) {
+  const roles = await ctx.db
+    .query("serverRoles")
+    .withIndex("by_server", (q) => q.eq("serverId", serverId))
+    .collect();
+  const defaults = roles
+    .filter((role) => role.isDefault)
+    .sort((a, b) => a._creationTime - b._creationTime);
+  const primaryDefault = defaults[0] ?? null;
+  const ordered = roles
+    .filter((role) => role._id !== primaryDefault?._id)
+    .sort(
+      (a, b) => b.position - a.position || a._creationTime - b._creationTime,
+    );
+  let changed = false;
+  const normalized: Doc<"serverRoles">[] = [];
+  if (primaryDefault) {
+    if (primaryDefault.position !== 0) {
+      await ctx.db.patch(primaryDefault._id, { position: 0 });
+      changed = true;
+    }
+    normalized.push({ ...primaryDefault, position: 0 });
+  }
+  for (const [index, role] of ordered.entries()) {
+    const position = ordered.length - index;
+    const patch: Partial<Doc<"serverRoles">> = {};
+    if (role.position !== position) patch.position = position;
+    if (role.isDefault) patch.isDefault = false;
+    if (Object.keys(patch).length > 0) {
+      await ctx.db.patch(role._id, patch);
+      changed = true;
+    }
+    normalized.push({ ...role, ...patch, position });
+  }
+  return { roles: normalized, changed };
+}
+
 export const list = query({
   args: { serverId: v.id("servers") },
   handler: async (ctx, { serverId }) => {
@@ -52,6 +97,30 @@ export const list = query({
   },
 });
 
+/** Repairs duplicate legacy ranks when a manager opens the role editor. */
+export const normalizePositions = mutation({
+  args: { serverId: v.id("servers") },
+  handler: async (ctx, { serverId }) => {
+    const { id } = await requireProfile(ctx);
+    const access = await requireServerAccess(ctx, serverId, id);
+    if (!can(access.permissions, PERMISSIONS.MANAGE_ROLES)) {
+      throw new Error("You don't have permission to manage roles.");
+    }
+    const result = await normalizeRolePositions(ctx, serverId);
+    if (result.changed) {
+      await logAudit(ctx, {
+        serverId,
+        actorId: id,
+        action: "role.normalize_positions",
+        targetType: "server",
+        targetId: serverId,
+        details: "Repaired duplicate or invalid role positions",
+      });
+    }
+    return { changed: result.changed };
+  },
+});
+
 /**
  * Align a role: move it up or down past `steps` neighbouring roles in the
  * rank order (higher position = higher rank). Positions are only ever
@@ -76,10 +145,8 @@ export const move = mutation({
     if (role.isDefault) {
       throw new Error("The @everyone role stays at the bottom.");
     }
-    const roles = await ctx.db
-      .query("serverRoles")
-      .withIndex("by_server", (q) => q.eq("serverId", role.serverId))
-      .collect();
+    const { roles } = await normalizeRolePositions(ctx, role.serverId);
+    const normalizedRole = roles.find((entry) => entry._id === roleId) ?? role;
     const sorted = [...roles].sort((a, b) => a.position - b.position);
     const from = sorted.findIndex((entry) => entry._id === roleId);
     const distance = Math.max(
@@ -94,7 +161,7 @@ export const move = mutation({
     if (to === from) return;
 
     const myTop = await topPosition(ctx, access, roles);
-    if (role.position >= myTop && access.server.ownerId !== id) {
+    if (normalizedRole.position >= myTop && access.server.ownerId !== id) {
       throw new Error("You can't move a role as high as your own.");
     }
     const lo = Math.min(from, to);
@@ -141,10 +208,7 @@ export const create = mutation({
     }
     const clean = name.trim().slice(0, 60);
     if (clean.length < 2) throw new Error("Role names need 2+ characters.");
-    const existing = await ctx.db
-      .query("serverRoles")
-      .withIndex("by_server", (q) => q.eq("serverId", serverId))
-      .collect();
+    const { roles: existing } = await normalizeRolePositions(ctx, serverId);
     if (
       existing.some((role) => role.name.toLowerCase() === clean.toLowerCase())
     ) {
@@ -201,14 +265,13 @@ export const update = mutation({
     if (!can(access.permissions, PERMISSIONS.MANAGE_ROLES)) {
       throw new Error("You don't have permission to manage roles.");
     }
-    const roles = await ctx.db
-      .query("serverRoles")
-      .withIndex("by_server", (q) => q.eq("serverId", role.serverId))
-      .collect();
+    const { roles } = await normalizeRolePositions(ctx, role.serverId);
+    const normalizedRole =
+      roles.find((entry) => entry._id === args.roleId) ?? role;
     const myTop = await topPosition(ctx, access, roles);
     if (
       !role.isDefault &&
-      role.position >= myTop &&
+      normalizedRole.position >= myTop &&
       access.server.ownerId !== id
     ) {
       throw new Error("You can't edit a role as high as your own.");
@@ -217,6 +280,15 @@ export const update = mutation({
     if (args.name !== undefined) {
       const clean = args.name.trim().slice(0, 60);
       if (clean.length < 2) throw new Error("Role names need 2+ characters.");
+      if (
+        roles.some(
+          (entry) =>
+            entry._id !== role._id &&
+            entry.name.toLowerCase() === clean.toLowerCase(),
+        )
+      ) {
+        throw new Error("A role with that name already exists.");
+      }
       patch.name = clean;
     }
     if (args.color !== undefined) {
@@ -263,12 +335,10 @@ export const remove = mutation({
       throw new Error("You don't have permission to manage roles.");
     }
     if (role.isDefault) throw new Error("The @everyone role can't be deleted.");
-    const roles = await ctx.db
-      .query("serverRoles")
-      .withIndex("by_server", (q) => q.eq("serverId", role.serverId))
-      .collect();
+    const { roles } = await normalizeRolePositions(ctx, role.serverId);
+    const normalizedRole = roles.find((entry) => entry._id === roleId) ?? role;
     const myTop = await topPosition(ctx, access, roles);
-    if (role.position >= myTop && access.server.ownerId !== id) {
+    if (normalizedRole.position >= myTop && access.server.ownerId !== id) {
       throw new Error("You can't delete a role as high as your own.");
     }
     const members = await ctx.db
