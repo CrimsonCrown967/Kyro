@@ -1,11 +1,15 @@
 import { useMutation, useQuery } from "convex/react";
 import {
+  Bell,
+  BellOff,
   BookOpen,
+  CheckCheck,
   PhoneOff,
   Volume2,
   Compass,
   Copy,
   Hash,
+  Link2,
   Loader2,
   Lock,
   LogOut,
@@ -16,6 +20,7 @@ import {
   Search,
   Settings,
   ShieldCheck,
+  Trash2,
   UserPlus,
   Users,
 } from "@/components/icons";
@@ -38,6 +43,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -366,48 +378,15 @@ function ServerSection({ serverId }: { serverId: string }) {
             )}
 
             {!collapsed[group.id] &&
-              group.channels.map((channel) => {
-                const active = activeChannelId === channel.id;
-                const isVoice = channel.kind === "voice";
-                const isForum = channel.kind === "forum";
-                return (
-                  <Link
-                    key={channel.id}
-                    to={`/dashboard/s/${serverId}/${isVoice ? "v" : isForum ? "f" : "c"}/${channel.id}`}
-                    title={channel.topic ?? channel.name}
-                    className={cn(
-                      "mb-0.5 flex min-h-10 items-center gap-2 rounded-md px-2.5 py-2 text-[15px] transition-colors",
-                      active
-                        ? "bg-sidebar-accent font-semibold text-foreground"
-                        : "text-muted-foreground hover:bg-sidebar-accent/65 hover:text-foreground",
-                    )}
-                  >
-                    {isVoice ? (
-                      <Volume2 className="size-4 shrink-0 opacity-70" />
-                    ) : isForum ? (
-                      <MessagesSquare className="size-4 shrink-0 opacity-70" />
-                    ) : channel.isRules ? (
-                      <BookOpen className="size-4 shrink-0 opacity-70" />
-                    ) : (
-                      <Hash className="size-4 shrink-0 opacity-70" />
-                    )}
-                    <span
-                      className={cn(
-                        "truncate",
-                        channel.unread &&
-                          !active &&
-                          "font-semibold text-foreground",
-                        channel.readOnly && "italic",
-                      )}
-                    >
-                      {channel.name}
-                    </span>
-                    {channel.unread && !active && (
-                      <span className="ml-auto size-1.5 shrink-0 rounded-full bg-foreground" />
-                    )}
-                  </Link>
-                );
-              })}
+              group.channels.map((channel) => (
+                <ChannelRow
+                  key={channel.id}
+                  serverId={serverId}
+                  channel={channel}
+                  active={activeChannelId === channel.id}
+                  canManageChannels={canManageChannels}
+                />
+              ))}
           </div>
         ))}
 
@@ -441,6 +420,177 @@ function ServerSection({ serverId }: { serverId: string }) {
         onOpenChange={setNicknameOpen}
       />
     </>
+  );
+}
+
+/** One sidebar channel with a Discord-style right-click menu. */
+function ChannelRow({
+  serverId,
+  channel,
+  active,
+  canManageChannels,
+}: {
+  serverId: string;
+  channel: {
+    id: string;
+    name: string;
+    topic: string | null;
+    kind: "text" | "voice" | "forum";
+    isRules: boolean;
+    readOnly: boolean;
+    unread: boolean;
+    notificationLevel: "all" | "mentions" | "none";
+  };
+  active: boolean;
+  canManageChannels: boolean;
+}) {
+  const navigate = useNavigate();
+  const setPreference = useMutation(api.notifications.setChannelPreference);
+  const markRead = useMutation(api.messages.markContainerRead);
+  const removeChannel = useMutation(api.channels.remove);
+  const [busy, setBusy] = useState(false);
+
+  const isVoice = channel.kind === "voice";
+  const isForum = channel.kind === "forum";
+  const muted = channel.notificationLevel === "none";
+
+  const run = async (action: Promise<unknown>, success?: string) => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await action;
+      if (success) toast.success(success);
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "That didn't work — try again.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const copyChannelLink = () => {
+    const segment = isVoice ? "v" : isForum ? "f" : "c";
+    const url = `${window.location.origin}/dashboard/s/${serverId}/${segment}/${channel.id}`;
+    void navigator.clipboard
+      .writeText(url)
+      .then(() => toast.success("Channel link copied."))
+      .catch(() => toast.error("Couldn't copy the channel link."));
+  };
+
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <Link
+          to={`/dashboard/s/${serverId}/${isVoice ? "v" : isForum ? "f" : "c"}/${channel.id}`}
+          title={channel.topic ?? channel.name}
+          className={cn(
+            "mb-0.5 flex min-h-10 items-center gap-2 rounded-md px-2.5 py-2 text-[15px] transition-colors",
+            active
+              ? "bg-sidebar-accent font-semibold text-foreground"
+              : "text-muted-foreground hover:bg-sidebar-accent/65 hover:text-foreground",
+          )}
+        >
+          {isVoice ? (
+            <Volume2 className="size-4 shrink-0 opacity-70" />
+          ) : isForum ? (
+            <MessagesSquare className="size-4 shrink-0 opacity-70" />
+          ) : channel.isRules ? (
+            <BookOpen className="size-4 shrink-0 opacity-70" />
+          ) : (
+            <Hash className="size-4 shrink-0 opacity-70" />
+          )}
+          <span
+            className={cn(
+              "truncate",
+              channel.unread && !active && "font-semibold text-foreground",
+              channel.readOnly && "italic",
+            )}
+          >
+            {channel.name}
+          </span>
+          {muted && (
+            <BellOff className="ml-auto size-3.5 shrink-0 opacity-60" />
+          )}
+          {!muted && channel.unread && !active && (
+            <span className="ml-auto size-1.5 shrink-0 rounded-full bg-foreground" />
+          )}
+        </Link>
+      </ContextMenuTrigger>
+      <ContextMenuContent className="w-56">
+        <ContextMenuItem
+          onClick={() =>
+            void run(
+              markRead({
+                containerType: "channel",
+                containerId: channel.id,
+              }),
+              "Marked as read.",
+            )
+          }
+        >
+          <CheckCheck className="size-4" /> Mark as read
+        </ContextMenuItem>
+        <ContextMenuItem onClick={copyChannelLink}>
+          <Link2 className="size-4" /> Copy channel link
+        </ContextMenuItem>
+        <ContextMenuItem
+          onClick={() =>
+            void run(
+              setPreference({
+                channelId: channel.id as Id<"channels">,
+                level: muted ? "mentions" : "none",
+              }),
+              muted ? "Channel unmuted." : "Channel muted.",
+            )
+          }
+        >
+          {muted ? <Bell className="size-4" /> : <BellOff className="size-4" />}
+          {muted ? "Unmute channel" : "Mute channel"}
+        </ContextMenuItem>
+        {canManageChannels && (
+          <>
+            <ContextMenuSeparator />
+            <ContextMenuItem
+              onClick={() =>
+                navigate(`/dashboard/s/${serverId}/settings/channels`)
+              }
+            >
+              <Pencil className="size-4" /> Edit channel
+            </ContextMenuItem>
+            <ContextMenuItem
+              className="text-destructive focus:text-destructive"
+              onClick={async () => {
+                if (
+                  !window.confirm(
+                    `Delete #${channel.name}? Messages in it will be removed too.`,
+                  )
+                ) {
+                  return;
+                }
+                try {
+                  await removeChannel({
+                    channelId: channel.id as Id<"channels">,
+                  });
+                  toast.success(`#${channel.name} deleted.`);
+                  if (active) navigate(`/dashboard/s/${serverId}`);
+                } catch (error) {
+                  toast.error(
+                    error instanceof Error
+                      ? error.message
+                      : "Could not delete that channel.",
+                  );
+                }
+              }}
+            >
+              <Trash2 className="size-4" /> Delete channel
+            </ContextMenuItem>
+          </>
+        )}
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }
 
@@ -642,23 +792,20 @@ function HomeSection() {
         Discover
       </Link>
 
-      {me &&
-        (me.role === "admin" ||
-          me.isFounder ||
-          me.badges.includes("moderator")) && (
-          <Link
-            to="/dashboard/admin"
-            className={cn(
-              "mb-1 flex items-center gap-2 rounded-md px-2 py-2 text-sm",
-              adminMatch
-                ? "bg-brand/15 font-medium text-brand"
-                : "text-brand/90 hover:bg-brand/10 hover:text-brand",
-            )}
-          >
-            <ShieldCheck className="size-4" />
-            Admin Portal
-          </Link>
-        )}
+      {me && me.isPlatformTrialStaff && (
+        <Link
+          to="/dashboard/admin"
+          className={cn(
+            "mb-1 flex items-center gap-2 rounded-md px-2 py-2 text-sm",
+            adminMatch
+              ? "bg-brand/15 font-medium text-brand"
+              : "text-brand/90 hover:bg-brand/10 hover:text-brand",
+          )}
+        >
+          <ShieldCheck className="size-4" />
+          Admin Portal
+        </Link>
+      )}
 
       <div className="mt-5 mb-1 flex items-center justify-between px-2">
         <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">

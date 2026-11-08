@@ -110,18 +110,18 @@ export function OfficialBadge({ compact = false }: { compact?: boolean }) {
 export type GlobalBadgeKey =
   | "founder"
   | "cofounder"
-  | "admin"
   | "manager"
-  | "staff"
+  | "admin"
   | "moderator"
+  | "staff"
   | "trialstaff"
   | "verified"
-  | "bughunter"
-  | "vip"
-  | "og"
-  | "supporter"
+  | "partner"
   | "donator"
-  | "partner";
+  | "supporter"
+  | "vip"
+  | "bughunter"
+  | "og";
 
 export const GLOBAL_BADGE_META: Record<
   GlobalBadgeKey,
@@ -137,24 +137,24 @@ export const GLOBAL_BADGE_META: Record<
     blurb: "Co-founded Kyro and helps steer it.",
     chip: "border-indigo-300/20 bg-[#151d32] text-indigo-100",
   },
-  admin: {
-    label: "Admin",
-    blurb: "Runs the Kyro platform.",
-    chip: "border-indigo-300/20 bg-[#151d32] text-indigo-100",
-  },
   manager: {
     label: "Manager",
     blurb: "Leads Kyro's staff and communities.",
     chip: "border-indigo-300/20 bg-[#151d32] text-indigo-100",
   },
-  staff: {
-    label: "Staff",
-    blurb: "Part of the Kyro staff team.",
+  admin: {
+    label: "Admin",
+    blurb: "Runs the Kyro platform.",
     chip: "border-indigo-300/20 bg-[#151d32] text-indigo-100",
   },
   moderator: {
     label: "Moderator",
     blurb: "Keeps Kyro safe for everyone.",
+    chip: "border-indigo-300/20 bg-[#151d32] text-indigo-100",
+  },
+  staff: {
+    label: "Staff",
+    blurb: "Part of the Kyro staff team.",
     chip: "border-indigo-300/20 bg-[#151d32] text-indigo-100",
   },
   trialstaff: {
@@ -167,24 +167,9 @@ export const GLOBAL_BADGE_META: Record<
     blurb: "Verified by the Kyro team.",
     chip: "border-indigo-300/20 bg-[#151d32] text-indigo-100",
   },
-  bughunter: {
-    label: "Bug Hunter",
-    blurb: "Helped squash bugs in Kyro.",
-    chip: "border-indigo-300/20 bg-[#151d32] text-indigo-100",
-  },
-  vip: {
-    label: "VIP",
-    blurb: "A very important Kyro member.",
-    chip: "border-indigo-300/20 bg-[#151d32] text-indigo-100",
-  },
-  og: {
-    label: "OG",
-    blurb: "Been here since the early days.",
-    chip: "border-indigo-300/20 bg-[#151d32] text-indigo-100",
-  },
-  supporter: {
-    label: "Supporter",
-    blurb: "Stands behind Kyro.",
+  partner: {
+    label: "Partner",
+    blurb: "An official Kyro partner.",
     chip: "border-indigo-300/20 bg-[#151d32] text-indigo-100",
   },
   donator: {
@@ -192,9 +177,24 @@ export const GLOBAL_BADGE_META: Record<
     blurb: "Donated to help Kyro grow.",
     chip: "border-indigo-300/20 bg-[#151d32] text-indigo-100",
   },
-  partner: {
-    label: "Partner",
-    blurb: "An official Kyro partner.",
+  supporter: {
+    label: "Supporter",
+    blurb: "Stands behind Kyro.",
+    chip: "border-indigo-300/20 bg-[#151d32] text-indigo-100",
+  },
+  vip: {
+    label: "VIP",
+    blurb: "A very important Kyro member.",
+    chip: "border-indigo-300/20 bg-[#151d32] text-indigo-100",
+  },
+  bughunter: {
+    label: "Bug Hunter",
+    blurb: "Helped squash bugs in Kyro.",
+    chip: "border-indigo-300/20 bg-[#151d32] text-indigo-100",
+  },
+  og: {
+    label: "OG",
+    blurb: "Been here since the early days.",
     chip: "border-indigo-300/20 bg-[#151d32] text-indigo-100",
   },
 };
@@ -202,37 +202,41 @@ export const GLOBAL_BADGE_META: Record<
 /** Badges staff can grant (founder is derived from the account). */
 export const GRANTABLE_BADGES = [
   "cofounder",
-  "admin",
   "manager",
-  "staff",
+  "admin",
   "moderator",
+  "staff",
   "trialstaff",
   "verified",
-  "bughunter",
-  "vip",
-  "og",
-  "supporter",
-  "donator",
   "partner",
+  "donator",
+  "supporter",
+  "vip",
+  "bughunter",
+  "og",
 ] as const;
 export type GrantableBadge = (typeof GRANTABLE_BADGES)[number];
 
-/** Inline display order — compact rows show only the highest of these. */
+/**
+ * Display order — compact rows show only the highest of these. It is also the
+ * authority ladder for staff rungs (Founder > Co Founder > Manager > Admin >
+ * Moderator > Staff > Trial Staff); cosmetic badges never grant authority.
+ */
 export const BADGE_PRIORITY: GlobalBadgeKey[] = [
   "founder",
   "cofounder",
-  "admin",
   "manager",
-  "staff",
+  "admin",
   "moderator",
+  "staff",
   "trialstaff",
+  "verified",
   "partner",
-  "bughunter",
-  "vip",
-  "og",
   "donator",
   "supporter",
-  "verified",
+  "vip",
+  "bughunter",
+  "og",
 ];
 
 const GLOBAL_BADGE_SET = new Set<string>(BADGE_PRIORITY);
@@ -251,8 +255,8 @@ export function topGlobalBadge(
 /**
  * Compact single-badge renderer for surfaces that explicitly request one.
  * Shows the badge the user picked in Settings → Profile → Badge (when they
- * hold it), else their highest one (founder → co-founder → admin → manager →
- * staff → moderator → trial staff → …). Badges stay visible throughout the
+ * hold it), else their highest one (founder → co-founder → manager → admin →
+ * moderator → staff → trial staff → …). Badges stay visible throughout the
  * interface; selecting "none" simply falls back to the highest held badge.
  */
 export function InlineBadge({

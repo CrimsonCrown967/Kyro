@@ -6,10 +6,16 @@ import {
   PRESENCE_TIMEOUT_MS,
   activeSiteBan,
   canViewIpDirectory,
+  globalBadgesFor,
   hydrateUsers,
   isFounderUser,
+  isPlatformAdmin,
+  isPlatformStaff,
+  isPlatformTrialStaff,
   isSyntheticUser,
   notify,
+  platformRank,
+  platformRoleFor,
   requireActiveUser,
   requireUser,
   type Ctx,
@@ -20,10 +26,11 @@ import { deleteMessageData, deleteServerData } from "./cleanup";
 /**
  * Admin Portal backend.
  *
- * Kyro staff sign in with their normal Kyro account: admins are `role ===
- * "admin"` (or the founder), moderators carry the platform-wide Moderator
- * badge (`siteModerator`). Moderators can review reports, bugs, warnings and
- * bans; only admins can grant badges, ban staff or delete a community.
+ * Kyro staff sign in with their normal Kyro account and authority follows the
+ * platform badge ladder: Founder > Co Founder > Manager > Admin > Moderator >
+ * Staff > Trial Staff. Trial Staff can read the portal; Staff and above can
+ * moderate; Admins and above can grant badges, ban staff or delete a
+ * community. Cosmetic badges never grant access.
  */
 
 function isFounder(user: Doc<"users">): boolean {
@@ -31,17 +38,31 @@ function isFounder(user: Doc<"users">): boolean {
 }
 
 function isAdmin(user: Doc<"users">): boolean {
-  return user.role === "admin" || isFounder(user);
+  return isPlatformAdmin(user);
 }
 
 function isStaff(user: Doc<"users">): boolean {
-  return isAdmin(user) || user.siteModerator === true;
+  return isPlatformStaff(user);
 }
 
+function isTrialStaff(user: Doc<"users">): boolean {
+  return isPlatformTrialStaff(user);
+}
+
+/** Read-only portal access for Trial Staff and above. */
+async function requirePortalAccess(ctx: Ctx) {
+  const { id, user } = await requireActiveUser(ctx);
+  if (!isTrialStaff(user)) {
+    throw new Error("The Admin Portal is only available to Kyro staff.");
+  }
+  return { id, user };
+}
+
+/** Real moderation actions for Staff and above. */
 async function requireStaff(ctx: Ctx) {
   const { id, user } = await requireActiveUser(ctx);
   if (!isStaff(user)) {
-    throw new Error("The Admin Portal is only available to Kyro staff.");
+    throw new Error("Only Kyro staff can do that.");
   }
   return { id, user };
 }
@@ -77,43 +98,22 @@ async function logAction(
 type BadgeFlag =
   | "founder"
   | "cofounder"
-  | "admin"
   | "manager"
-  | "staff"
+  | "admin"
   | "moderator"
+  | "staff"
   | "trialstaff"
   | "verified"
-  | "bughunter"
-  | "vip"
-  | "og"
-  | "supporter"
+  | "partner"
   | "donator"
-  | "partner";
+  | "supporter"
+  | "vip"
+  | "bughunter"
+  | "og";
 
 /** Mirrors hydrateUser's badge derivation so the portal agrees with profiles. */
 function badgeFlags(user: Doc<"users">): BadgeFlag[] {
-  const flags: BadgeFlag[] = [];
-  const founder = isFounder(user);
-  const founderHeld = founder
-    ? user.founderBadgeRemoved !== true
-    : user.founderBadge === true;
-  if (founderHeld) flags.push("founder");
-  if (user.coFounder === true) flags.push("cofounder");
-  if (user.role === "admin" || (founder && user.adminBadgeRemoved !== true)) {
-    flags.push("admin");
-  }
-  if (user.manager === true) flags.push("manager");
-  if (user.staff === true) flags.push("staff");
-  if (user.siteModerator === true) flags.push("moderator");
-  if (user.trialStaff === true) flags.push("trialstaff");
-  if (user.verified === true) flags.push("verified");
-  if (user.bugHunter === true) flags.push("bughunter");
-  if (user.vip === true) flags.push("vip");
-  if (user.og === true) flags.push("og");
-  if (user.supporter === true) flags.push("supporter");
-  if (user.donator === true) flags.push("donator");
-  if (user.partner === true) flags.push("partner");
-  return flags;
+  return globalBadgesFor(user);
 }
 
 /** Everything the portal's Overview tab needs in one round trip. */
@@ -121,7 +121,7 @@ export const overview = query({
   args: {},
   handler: async (ctx) => {
     const { id, user } = await requireUser(ctx);
-    if (!isStaff(user) || (await activeSiteBan(ctx, id))) {
+    if (!isTrialStaff(user) || (await activeSiteBan(ctx, id))) {
       return { allowed: false as const };
     }
 
@@ -158,7 +158,10 @@ export const overview = query({
       me: {
         id,
         name: user.name ?? user.username ?? "Staff",
+        platformRole: platformRoleFor(user),
         isAdmin: isAdmin(user),
+        isStaff: isStaff(user),
+        isTrialStaff: isTrialStaff(user) && !isStaff(user),
         isFounder: isFounder(user),
         isModerator: user.siteModerator === true,
       },
@@ -250,7 +253,7 @@ export const ipDirectory = query({
 export const searchMembers = query({
   args: { term: v.optional(v.string()) },
   handler: async (ctx, { term }) => {
-    await requireStaff(ctx);
+    await requirePortalAccess(ctx);
     const needle = (term ?? "").trim().toLowerCase();
     const users = await ctx.db.query("users").take(1000);
     const matches = users
@@ -316,7 +319,7 @@ export const reportQueue = query({
     ),
   },
   handler: async (ctx, { status }) => {
-    await requireStaff(ctx);
+    await requirePortalAccess(ctx);
     const reports = await (status
       ? ctx.db
           .query("reports")
@@ -367,7 +370,7 @@ export const reportQueue = query({
 export const banList = query({
   args: {},
   handler: async (ctx) => {
-    await requireStaff(ctx);
+    await requirePortalAccess(ctx);
     const bans = await ctx.db
       .query("siteBans")
       .withIndex("by_created")
@@ -411,8 +414,13 @@ export const banUser = mutation({
     const target = await ctx.db.get(userId);
     if (!target) throw new Error("That account no longer exists.");
     if (isFounder(target)) throw new Error("The Kyro founder can't be banned.");
-    if (isAdmin(target) && !isAdmin(user)) {
-      throw new Error("Only an admin can ban another admin.");
+    if (isPlatformTrialStaff(target)) {
+      if (!isAdmin(user)) {
+        throw new Error("Only an admin can ban a Kyro staff member.");
+      }
+      if (!isFounder(user) && platformRank(target) >= platformRank(user)) {
+        throw new Error("You can't ban a staff member at your rank or higher.");
+      }
     }
     const clean = reason.trim().slice(0, 300);
     if (clean.length < 3) {
@@ -512,7 +520,7 @@ export const unbanUser = mutation({
 export const warningList = query({
   args: {},
   handler: async (ctx) => {
-    await requireStaff(ctx);
+    await requirePortalAccess(ctx);
     const warnings = await ctx.db.query("warnings").take(300);
     const people = await ctx.db.query("users").take(1000);
     const byId = new Map(people.map((person) => [person._id, person]));
@@ -595,7 +603,7 @@ export const removeServer = mutation({
 export const actionLog = query({
   args: {},
   handler: async (ctx) => {
-    const { id } = await requireStaff(ctx);
+    const { id } = await requirePortalAccess(ctx);
     const actions = await ctx.db
       .query("adminActions")
       .withIndex("by_created")

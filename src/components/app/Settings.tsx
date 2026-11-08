@@ -798,7 +798,7 @@ function BugHunting() {
   const [category, setCategory] = useState<string>("other");
   const [busy, setBusy] = useState(false);
 
-  const isAdmin = me?.role === "admin";
+  const isAdmin = me?.isPlatformStaff === true;
   const rows = isAdmin ? all : mine;
 
   const send = async () => {

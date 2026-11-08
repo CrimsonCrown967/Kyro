@@ -13,10 +13,72 @@ const INLINE_PATTERN =
 export interface MessageRenderOptions {
   customEmojis?: readonly CustomEmoji[];
   onMention?: (username: string) => void;
+  /** Enables embedding/hiding direct media URLs; the preview is drawn outside. */
   onMedia?: (url: string) => void;
+  /** Render an emoji-only message at Discord-style jumbo size. */
+  jumboEmoji?: boolean;
 }
 
 const DIRECT_MEDIA_URL = /\.(?:gif|png|jpe?g|webp|avif)(?:[?#].*)?$/i;
+const KLIPY_MEDIA_URL = /^https?:\/\/(?:static\.)?klipy\.com\//i;
+
+function isDirectMediaUrl(url: string): boolean {
+  return DIRECT_MEDIA_URL.test(url) || KLIPY_MEDIA_URL.test(url);
+}
+
+const CUSTOM_EMOJI_TOKEN = /<:([a-zA-Z0-9_]{2,32}):([a-z0-9]+)>/g;
+
+/**
+ * A single pictographic emoji cluster: keycaps, flags, skin tones, variation
+ * selectors and zero-width-joiner sequences. Kept global so plain text can be
+ * split into normal runs and enlarged emoji runs.
+ */
+const EMOJI_SEQUENCE =
+  /(?:[0-9#*]\uFE0F?\u20E3|\p{Regional_Indicator}{2}|\p{Extended_Pictographic}(?:\uFE0F|\u200D\p{Extended_Pictographic}|[\u{1F3FB}-\u{1F3FF}])*)/gu;
+
+/** Discord-style jumbo rendering only applies to messages that are all emoji. */
+export function isEmojiOnly(content: string): boolean {
+  const customCount = (content.match(CUSTOM_EMOJI_TOKEN) ?? []).length;
+  const withoutCustom = content.replace(CUSTOM_EMOJI_TOKEN, " ");
+  const emojiCount = (withoutCustom.match(EMOJI_SEQUENCE) ?? []).length;
+  const total = customCount + emojiCount;
+  if (total === 0 || total > 27) return false;
+  return withoutCustom.replace(EMOJI_SEQUENCE, "").trim().length === 0;
+}
+
+/** Splits a plain-text run so Unicode emojis render larger than body copy. */
+function renderTextWithEmoji(
+  text: string,
+  keyPrefix: string,
+  jumbo: boolean,
+): ReactNode[] {
+  if (!text) return [];
+  const nodes: ReactNode[] = [];
+  let lastIndex = 0;
+  let index = 0;
+  EMOJI_SEQUENCE.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = EMOJI_SEQUENCE.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      nodes.push(text.slice(lastIndex, match.index));
+    }
+    nodes.push(
+      <span
+        key={`${keyPrefix}-emoji-${index++}`}
+        className={
+          jumbo
+            ? "inline-block text-[3rem] leading-none align-[-0.12em]"
+            : "inline-block text-[1.35em] leading-none align-[-0.12em]"
+        }
+      >
+        {match[0]}
+      </span>,
+    );
+    lastIndex = match.index + match[0].length;
+  }
+  if (lastIndex < text.length) nodes.push(text.slice(lastIndex));
+  return nodes;
+}
 
 function renderInline(
   text: string,
@@ -24,6 +86,7 @@ function renderInline(
   options: MessageRenderOptions,
 ): ReactNode[] {
   const nodes: ReactNode[] = [];
+  const jumbo = options.jumboEmoji === true;
   let lastIndex = 0;
   let index = 0;
   INLINE_PATTERN.lastIndex = 0;
@@ -31,7 +94,13 @@ function renderInline(
 
   while ((match = INLINE_PATTERN.exec(text)) !== null) {
     if (match.index > lastIndex) {
-      nodes.push(text.slice(lastIndex, match.index));
+      nodes.push(
+        ...renderTextWithEmoji(
+          text.slice(lastIndex, match.index),
+          `${keyPrefix}-${index}`,
+          jumbo,
+        ),
+      );
     }
     const token = match[0];
     const key = `${keyPrefix}-${index++}`;
@@ -45,7 +114,7 @@ function renderInline(
             src={emoji.url}
             alt={`:${emoji.name}:`}
             title={`:${emoji.name}:${emoji.serverName ? ` · ${emoji.serverName}` : ""}`}
-            className="mx-0.5 inline-block size-6 object-contain align-middle"
+            className={`mx-0.5 inline-block object-contain align-middle ${jumbo ? "size-12" : "size-7"}`}
             loading="lazy"
           />
         ) : (
@@ -82,18 +151,11 @@ function renderInline(
         </em>,
       );
     } else if (token.startsWith("http")) {
-      const media = DIRECT_MEDIA_URL.test(token);
-      nodes.push(
-        media && options.onMedia ? (
-          <button
-            key={key}
-            type="button"
-            onClick={() => options.onMedia?.(token)}
-            className="text-cyan underline decoration-cyan/40 underline-offset-2 hover:decoration-cyan"
-          >
-            {token}
-          </button>
-        ) : (
+      // When the message view can draw an inline preview, showing the raw URL
+      // as well would duplicate it (and was exactly how GIFs leaked their
+      // link text). The preview becomes the whole message.
+      if (!(options.onMedia && isDirectMediaUrl(token))) {
+        nodes.push(
           <a
             key={key}
             href={token}
@@ -102,9 +164,9 @@ function renderInline(
             className="text-cyan underline decoration-cyan/40 underline-offset-2 hover:decoration-cyan"
           >
             {token}
-          </a>
-        ),
-      );
+          </a>,
+        );
+      }
     } else if (token.startsWith("@")) {
       const username = token.slice(1).toLowerCase();
       const massMention = username === "everyone" || username === "here";
@@ -127,7 +189,11 @@ function renderInline(
     }
     lastIndex = match.index + token.length;
   }
-  if (lastIndex < text.length) nodes.push(text.slice(lastIndex));
+  if (lastIndex < text.length) {
+    nodes.push(
+      ...renderTextWithEmoji(text.slice(lastIndex), `${keyPrefix}-tail`, jumbo),
+    );
+  }
   return nodes;
 }
 

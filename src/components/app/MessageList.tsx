@@ -21,7 +21,14 @@ import {
   SmilePlus,
   Trash2,
 } from "@/components/icons";
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Fragment,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useSearchParams } from "react-router";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -32,6 +39,13 @@ import {
   ServerInviteCard,
 } from "@/components/app/ServerInviteCard";
 import { Button } from "@/components/ui/button";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -45,7 +59,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { dayKey, dayLabel, formatTime, type PresenceState } from "@/lib/format";
-import { renderMessage } from "@/lib/markdown";
+import { isEmojiOnly, renderMessage } from "@/lib/markdown";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { CustomEmoji } from "@/lib/emoji";
@@ -142,7 +156,7 @@ export interface ReplyTarget {
 }
 
 const DIRECT_MEDIA_PATTERN =
-  /https?:\/\/[^\s<>()]+\.(?:gif|png|jpe?g|webp|avif)(?:[?#][^\s<>()]*)?/gi;
+  /https?:\/\/(?:[^\s<>()]+\.(?:gif|png|jpe?g|webp|avif)(?:[?#][^\s<>()]*)?|(?:static\.)?klipy\.com\/[^\s<>()]+)/gi;
 
 function mediaUrls(content: string): string[] {
   return Array.from(new Set(content.match(DIRECT_MEDIA_PATTERN) ?? [])).slice(
@@ -519,6 +533,7 @@ function MessageRow({
     () => mediaUrls(message.content),
     [message.content],
   );
+  const jumbo = useMemo(() => isEmojiOnly(message.content), [message.content]);
   const mentionMap = useMemo(
     () =>
       new Map(
@@ -628,6 +643,153 @@ function MessageRow({
     }
   };
 
+  /**
+   * Shared action list for the hover ellipsis menu and the right-click menu,
+   * so a message can never offer a different set of actions depending on how
+   * it was opened (Discord keeps both in sync too).
+   */
+  const actions: {
+    key: string;
+    label: string;
+    icon: ReactNode;
+    onSelect: () => void;
+    destructive?: boolean;
+    separatorBefore?: boolean;
+  }[] = [
+    {
+      key: "reaction",
+      label: "Add reaction",
+      icon: <SmilePlus className="size-4" />,
+      onSelect: () => {
+        loadReactionEmojis();
+        window.setTimeout(() => setReactionOpen(true), 0);
+      },
+    },
+    {
+      key: "reply",
+      label: "Reply",
+      icon: <Reply className="size-4" />,
+      onSelect: () =>
+        onReply({
+          id: message.id,
+          author: author?.name ?? "Unknown",
+          excerpt: message.content.slice(0, 80),
+        }),
+    },
+    {
+      key: "copy-text",
+      label: "Copy text",
+      icon: <Copy className="size-4" />,
+      separatorBefore: true,
+      onSelect: () => {
+        void navigator.clipboard
+          .writeText(message.content)
+          .then(() => toast.success("Message copied."))
+          .catch(() => toast.error("Could not copy that message."));
+      },
+    },
+    ...(isAuthor
+      ? [
+          {
+            key: "edit",
+            label: "Edit message",
+            icon: <Pencil className="size-4" />,
+            onSelect: () => {
+              setDraft(message.content);
+              setEditing(true);
+            },
+          },
+        ]
+      : []),
+    {
+      key: "forward",
+      label: "Forward",
+      icon: <Forward className="size-4" />,
+      onSelect: onForward,
+    },
+    {
+      key: "thread",
+      label: message.thread ? "Open thread" : "Start thread",
+      icon: <Reply className="size-4" />,
+      onSelect: onOpenThread,
+    },
+    {
+      key: "copy-link",
+      label: "Copy message link",
+      icon: <Link2 className="size-4" />,
+      onSelect: () => void copyMessageLink(),
+    },
+    {
+      key: "mark-unread",
+      label: "Mark unread",
+      icon: <EyeOff className="size-4" />,
+      onSelect: () => void markMessageUnread(),
+    },
+    {
+      key: "translate",
+      label: "Translate",
+      icon: <Globe className="size-4" />,
+      onSelect: () => void translateMessage(),
+    },
+    {
+      key: "copy-message-id",
+      label: "Copy message ID",
+      icon: <Copy className="size-4" />,
+      separatorBefore: true,
+      onSelect: () => {
+        void navigator.clipboard.writeText(message.id);
+        toast.success("Message ID copied.");
+      },
+    },
+    {
+      key: "copy-user-id",
+      label: "Copy user ID",
+      icon: <Copy className="size-4" />,
+      onSelect: () => {
+        void navigator.clipboard.writeText(message.authorId);
+        toast.success("User ID copied.");
+      },
+    },
+    {
+      key: "pin",
+      label: message.pinnedAt ? "Unpin message" : "Pin message",
+      icon: <Pin className="size-4" />,
+      onSelect: () => void pinMessage(),
+    },
+    {
+      key: "delete",
+      label: "Delete message",
+      icon: <Trash2 className="size-4" />,
+      destructive: true,
+      separatorBefore: true,
+      onSelect: async () => {
+        try {
+          await deleteMessage({
+            messageId: message.id as Id<"messages">,
+          });
+        } catch (error) {
+          toast.error(
+            error instanceof Error ? error.message : "Could not delete.",
+          );
+        }
+      },
+    },
+    ...(!isAuthor
+      ? [
+          {
+            key: "report",
+            label: "Report message",
+            icon: <AlertTriangle className="size-4" />,
+            onSelect: () => onReport(message),
+          },
+        ]
+      : []),
+  ].filter((action) => {
+    if (action.key === "delete") return isAuthor || canManageMessages;
+    if (action.key === "pin") return canManageMessages;
+    return true;
+  });
+
   // Call records are timeline events, not chat bubbles: a centered pill with
   // the outcome (missed call / call length) and when it happened.
   if (message.kind === "call_missed" || message.kind === "call_ended") {
@@ -668,363 +830,329 @@ function MessageRow({
   }
 
   return (
-    <div
-      className={cn(
-        "message-row group relative rounded-xl px-3 py-1.5 transition-colors hover:bg-panel/45",
-        grouped ? "mt-0 py-0.5" : "mt-3",
-      )}
-    >
-      <div className="flex gap-3">
-        <div className="w-10 shrink-0">
-          {!grouped && author && (
-            <button
-              type="button"
-              onClick={openProfile}
-              aria-label={`Open ${author.name}'s profile`}
-              className="mt-0.5 block rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <UserAvatar user={author} size="md" showStatus={false} />
-            </button>
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div
+          className={cn(
+            "message-row group relative rounded-xl px-3 py-1.5 transition-colors hover:bg-panel/45",
+            grouped ? "mt-0 py-0.5" : "mt-3",
           )}
-        </div>
-
-        <div className="min-w-0 flex-1">
-          {!grouped && (
-            <div className="flex flex-wrap items-baseline gap-2">
-              <button
-                type="button"
-                onClick={openProfile}
-                className="text-sm hover:underline"
-              >
-                {author ? (
-                  <StyledDisplayName
-                    user={author}
-                    roleColor={roleColors?.[author.id]}
-                  />
-                ) : (
-                  "Unknown user"
-                )}
-              </button>
-              {author?.serverTag && (
-                <ServerTagChip tag={author.serverTag} ownerName={author.name} />
-              )}
-              <DeviceBadge device={author?.device} />
-              <span className="text-[11px] text-muted-foreground">
-                {dayLabel(message.createdAt)} {formatTime(message.createdAt)}
-              </span>
-              {message.pinnedAt && (
-                <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-primary">
-                  <Pin className="size-3" /> Pinned
-                </span>
-              )}
-            </div>
-          )}
-
-          {translated && !editing && (
-            <div className="mt-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-sm">
-              <p className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-primary">
-                <Globe className="size-3" /> Translation
-              </p>
-              <p className="whitespace-pre-wrap break-words">{translated}</p>
-            </div>
-          )}
-
-          {message.poll && !editing && <PollCard poll={message.poll} />}
-
-          {message.thread && !editing && (
-            <button
-              type="button"
-              onClick={onOpenThread}
-              className="mt-2 flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10"
-            >
-              <Reply className="size-3.5" />
-              {message.thread.replyCount} thread repl
-              {message.thread.replyCount === 1 ? "y" : "ies"}
-              {message.thread.locked && <Lock className="size-3" />}
-            </button>
-          )}
-
-          {message.replyTo && (
-            <div className="mb-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-              <CornerUpLeft className="size-3" />
-              {message.replyTo.author ? (
-                <StyledDisplayName
-                  user={message.replyTo.author}
-                  className="text-foreground/80"
-                />
-              ) : (
-                <span className="font-medium text-foreground/80">
-                  a message
-                </span>
-              )}
-              <span className="truncate">{message.replyTo.excerpt}</span>
-            </div>
-          )}
-
-          {editing ? (
-            <div className="mt-1">
-              <textarea
-                autoFocus
-                value={draft}
-                onChange={(event) => setDraft(event.target.value)}
-                onKeyDown={async (event) => {
-                  if (event.key === "Enter" && !event.shiftKey) {
-                    event.preventDefault();
-                    if (draft.trim()) {
-                      try {
-                        await editMessage({
-                          messageId: message.id as Id<"messages">,
-                          content: draft,
-                        });
-                        setEditing(false);
-                      } catch (error) {
-                        toast.error(
-                          error instanceof Error
-                            ? error.message
-                            : "Could not edit.",
-                        );
-                      }
-                    }
-                  }
-                  if (event.key === "Escape") {
-                    setDraft(message.content);
-                    setEditing(false);
-                  }
-                }}
-                rows={Math.min(6, draft.split("\n").length + 1)}
-                className="w-full resize-none rounded-lg border border-primary/50 bg-surface p-2 text-sm outline-none"
-              />
-              <p className="mt-1 text-[11px] text-muted-foreground">
-                Enter to save · Esc to cancel · Shift+Enter for a new line
-              </p>
-            </div>
-          ) : (
-            <div className="whitespace-pre-wrap break-words text-sm leading-6 text-foreground/95">
-              {renderMessage(message.content, {
-                customEmojis: message.customEmojis,
-                onMention: openMention,
-                onMedia: (url) => onOpenMedia(url, "Shared image"),
-              })}
-              {message.editedAt && (
-                <span className="ml-1.5 text-[10px] text-muted-foreground">
-                  (edited)
-                </span>
-              )}
-            </div>
-          )}
-
-          {inviteCodes.length > 0 && !editing && (
-            <div className="mt-2 flex flex-col gap-2">
-              {inviteCodes.slice(0, 2).map((code) => (
-                <ServerInviteCard key={code} code={code} />
-              ))}
-            </div>
-          )}
-
-          {embeddedMedia.length > 0 && !editing && (
-            <div className="mt-2 flex flex-wrap gap-2">
-              {embeddedMedia.map((url) => (
+        >
+          <div className="flex gap-3">
+            <div className="w-10 shrink-0">
+              {!grouped && author && (
                 <button
-                  key={url}
                   type="button"
-                  onClick={() => onOpenMedia(url, "Shared image or GIF")}
-                  className="block overflow-hidden rounded-lg border border-border/70 bg-black/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  onClick={openProfile}
+                  aria-label={`Open ${author.name}'s profile`}
+                  className="mt-0.5 block rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                  <img
-                    src={url}
-                    alt="Shared image or GIF"
-                    loading="lazy"
-                    className="max-h-72 max-w-xs object-contain sm:max-w-sm"
-                  />
+                  <UserAvatar user={author} size="md" showStatus={false} />
                 </button>
-              ))}
-            </div>
-          )}
-
-          {message.attachments.length > 0 && (
-            <div className="mt-1.5 flex flex-wrap gap-2">
-              {" "}
-              {message.attachments.map((attachment) =>
-                attachment.mimeType.startsWith("audio/") && attachment.url ? (
-                  <div
-                    key={attachment.storageId}
-                    className="w-full max-w-sm rounded-xl border border-border/70 bg-surface px-3 py-2.5"
-                  >
-                    <p className="mb-2 flex items-center gap-2 text-xs font-semibold">
-                      <span className="flex size-7 items-center justify-center rounded-full bg-primary/12 text-primary">
-                        <Mic className="size-3.5" />
-                      </span>
-                      Voice message
-                    </p>
-                    <audio
-                      src={attachment.url}
-                      controls
-                      preload="metadata"
-                      className="h-9 w-full"
-                    />
-                  </div>
-                ) : attachment.mimeType.startsWith("video/") &&
-                  attachment.url ? (
-                  <video
-                    key={attachment.storageId}
-                    src={attachment.url}
-                    controls
-                    playsInline
-                    preload="metadata"
-                    className="max-h-72 max-w-xs rounded-lg border border-border/70 bg-black"
-                  />
-                ) : attachment.mimeType.startsWith("image/") &&
-                  attachment.url ? (
-                  <button
-                    key={attachment.storageId}
-                    type="button"
-                    onClick={() =>
-                      onOpenMedia(attachment.url!, attachment.name)
-                    }
-                    className="block overflow-hidden rounded-lg border border-border/70"
-                  >
-                    <img
-                      src={attachment.url}
-                      alt={attachment.name}
-                      loading="lazy"
-                      className="max-h-72 max-w-xs object-cover"
-                    />
-                  </button>
-                ) : (
-                  <a
-                    key={attachment.storageId}
-                    href={attachment.url ?? "#"}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex max-w-xs items-center gap-2 rounded-lg border border-border/70 bg-surface px-3 py-2 text-xs hover:border-primary/40"
-                  >
-                    <span className="truncate font-medium">
-                      {attachment.name}
-                    </span>
-                    <span className="shrink-0 text-muted-foreground">
-                      {Math.max(1, Math.round(attachment.size / 1024))} KB
-                    </span>
-                  </a>
-                ),
               )}
             </div>
-          )}
 
-          {message.reactions.length > 0 && (
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {message.reactions.map((reaction) => (
-                <button
-                  key={reaction.emoji}
-                  type="button"
-                  onClick={() => void send(reaction.emoji)}
-                  className={cn(
-                    "flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs transition-colors",
-                    reaction.mine
-                      ? "border-primary bg-primary/15 text-primary"
-                      : "border-border/70 bg-surface text-muted-foreground hover:border-primary/40",
+            <div className="min-w-0 flex-1">
+              {!grouped && (
+                <div className="flex flex-wrap items-baseline gap-2">
+                  <button
+                    type="button"
+                    onClick={openProfile}
+                    className="text-sm hover:underline"
+                  >
+                    {author ? (
+                      <StyledDisplayName
+                        user={author}
+                        roleColor={roleColors?.[author.id]}
+                      />
+                    ) : (
+                      "Unknown user"
+                    )}
+                  </button>
+                  {author?.serverTag && (
+                    <ServerTagChip
+                      tag={author.serverTag}
+                      ownerName={author.name}
+                    />
                   )}
+                  <DeviceBadge device={author?.device} />
+                  <span className="text-[11px] text-muted-foreground">
+                    {dayLabel(message.createdAt)}{" "}
+                    {formatTime(message.createdAt)}
+                  </span>
+                  {message.pinnedAt && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-primary">
+                      <Pin className="size-3" /> Pinned
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {translated && !editing && (
+                <div className="mt-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-sm">
+                  <p className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-primary">
+                    <Globe className="size-3" /> Translation
+                  </p>
+                  <p className="whitespace-pre-wrap break-words">
+                    {translated}
+                  </p>
+                </div>
+              )}
+
+              {message.poll && !editing && <PollCard poll={message.poll} />}
+
+              {message.thread && !editing && (
+                <button
+                  type="button"
+                  onClick={onOpenThread}
+                  className="mt-2 flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10"
                 >
-                  {reaction.url ? (
-                    <img
-                      src={reaction.url}
-                      alt={reaction.emoji}
-                      className="size-4 object-contain"
+                  <Reply className="size-3.5" />
+                  {message.thread.replyCount} thread repl
+                  {message.thread.replyCount === 1 ? "y" : "ies"}
+                  {message.thread.locked && <Lock className="size-3" />}
+                </button>
+              )}
+
+              {message.replyTo && (
+                <div className="mb-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <CornerUpLeft className="size-3" />
+                  {message.replyTo.author ? (
+                    <StyledDisplayName
+                      user={message.replyTo.author}
+                      className="text-foreground/80"
                     />
                   ) : (
-                    <span>{reaction.emoji}</span>
+                    <span className="font-medium text-foreground/80">
+                      a message
+                    </span>
                   )}
-                  <span>{reaction.count}</span>
-                </button>
-              ))}
+                  <span className="truncate">{message.replyTo.excerpt}</span>
+                </div>
+              )}
+
+              {editing ? (
+                <div className="mt-1">
+                  <textarea
+                    autoFocus
+                    value={draft}
+                    onChange={(event) => setDraft(event.target.value)}
+                    onKeyDown={async (event) => {
+                      if (event.key === "Enter" && !event.shiftKey) {
+                        event.preventDefault();
+                        if (draft.trim()) {
+                          try {
+                            await editMessage({
+                              messageId: message.id as Id<"messages">,
+                              content: draft,
+                            });
+                            setEditing(false);
+                          } catch (error) {
+                            toast.error(
+                              error instanceof Error
+                                ? error.message
+                                : "Could not edit.",
+                            );
+                          }
+                        }
+                      }
+                      if (event.key === "Escape") {
+                        setDraft(message.content);
+                        setEditing(false);
+                      }
+                    }}
+                    rows={Math.min(6, draft.split("\n").length + 1)}
+                    className="w-full resize-none rounded-lg border border-primary/50 bg-surface p-2 text-sm outline-none"
+                  />
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Enter to save · Esc to cancel · Shift+Enter for a new line
+                  </p>
+                </div>
+              ) : (
+                <div className="whitespace-pre-wrap break-words text-sm leading-6 text-foreground/95">
+                  {renderMessage(message.content, {
+                    customEmojis: message.customEmojis,
+                    onMention: openMention,
+                    onMedia: (url) => onOpenMedia(url, "Shared image"),
+                    jumboEmoji: jumbo,
+                  })}
+                  {message.editedAt && (
+                    <span className="ml-1.5 text-[10px] text-muted-foreground">
+                      (edited)
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {inviteCodes.length > 0 && !editing && (
+                <div className="mt-2 flex flex-col gap-2">
+                  {inviteCodes.slice(0, 2).map((code) => (
+                    <ServerInviteCard key={code} code={code} />
+                  ))}
+                </div>
+              )}
+
+              {embeddedMedia.length > 0 && !editing && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {embeddedMedia.map((url) => (
+                    <button
+                      key={url}
+                      type="button"
+                      onClick={() => onOpenMedia(url, "Shared image or GIF")}
+                      className="block overflow-hidden rounded-lg border border-border/70 bg-black/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    >
+                      <img
+                        src={url}
+                        alt="Shared image or GIF"
+                        loading="lazy"
+                        className="max-h-72 max-w-xs object-contain sm:max-w-sm"
+                      />
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {message.attachments.length > 0 && (
+                <div className="mt-1.5 flex flex-wrap gap-2">
+                  {" "}
+                  {message.attachments.map((attachment) =>
+                    attachment.mimeType.startsWith("audio/") &&
+                    attachment.url ? (
+                      <div
+                        key={attachment.storageId}
+                        className="w-full max-w-sm rounded-xl border border-border/70 bg-surface px-3 py-2.5"
+                      >
+                        <p className="mb-2 flex items-center gap-2 text-xs font-semibold">
+                          <span className="flex size-7 items-center justify-center rounded-full bg-primary/12 text-primary">
+                            <Mic className="size-3.5" />
+                          </span>
+                          Voice message
+                        </p>
+                        <audio
+                          src={attachment.url}
+                          controls
+                          preload="metadata"
+                          className="h-9 w-full"
+                        />
+                      </div>
+                    ) : attachment.mimeType.startsWith("video/") &&
+                      attachment.url ? (
+                      <video
+                        key={attachment.storageId}
+                        src={attachment.url}
+                        controls
+                        playsInline
+                        preload="metadata"
+                        className="max-h-72 max-w-xs rounded-lg border border-border/70 bg-black"
+                      />
+                    ) : attachment.mimeType.startsWith("image/") &&
+                      attachment.url ? (
+                      <button
+                        key={attachment.storageId}
+                        type="button"
+                        onClick={() =>
+                          onOpenMedia(attachment.url!, attachment.name)
+                        }
+                        className="block overflow-hidden rounded-lg border border-border/70"
+                      >
+                        <img
+                          src={attachment.url}
+                          alt={attachment.name}
+                          loading="lazy"
+                          className="max-h-72 max-w-xs object-cover"
+                        />
+                      </button>
+                    ) : (
+                      <a
+                        key={attachment.storageId}
+                        href={attachment.url ?? "#"}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex max-w-xs items-center gap-2 rounded-lg border border-border/70 bg-surface px-3 py-2 text-xs hover:border-primary/40"
+                      >
+                        <span className="truncate font-medium">
+                          {attachment.name}
+                        </span>
+                        <span className="shrink-0 text-muted-foreground">
+                          {Math.max(1, Math.round(attachment.size / 1024))} KB
+                        </span>
+                      </a>
+                    ),
+                  )}
+                </div>
+              )}
+
+              {message.reactions.length > 0 && (
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  {message.reactions.map((reaction) => (
+                    <button
+                      key={reaction.emoji}
+                      type="button"
+                      onClick={() => void send(reaction.emoji)}
+                      className={cn(
+                        "flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs transition-colors",
+                        reaction.mine
+                          ? "border-primary bg-primary/15 text-primary"
+                          : "border-border/70 bg-surface text-muted-foreground hover:border-primary/40",
+                      )}
+                    >
+                      {reaction.url ? (
+                        <img
+                          src={reaction.url}
+                          alt={reaction.emoji}
+                          className="size-4 object-contain"
+                        />
+                      ) : (
+                        <span>{reaction.emoji}</span>
+                      )}
+                      <span>{reaction.count}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-          )}
-        </div>
-      </div>
+          </div>
 
-      {/* Hover toolbar */}
-      <div className="message-toolbar absolute -top-3 right-2 flex items-center gap-0.5 rounded-lg border border-border/70 bg-panel px-1 py-0.5 shadow-lg">
-        {["🎉", "👍", "🙂", "❤️"].map((emoji) => (
-          <button
-            key={emoji}
-            type="button"
-            aria-label={`React with ${emoji}`}
-            onClick={() => void send(emoji)}
-            className="hidden rounded p-1 text-sm hover:bg-surface sm:block"
-          >
-            {emoji}
-          </button>
-        ))}
-        <Popover
-          open={reactionOpen}
-          onOpenChange={(open) => {
-            setReactionOpen(open);
-            if (open) loadReactionEmojis();
-          }}
-        >
-          <PopoverTrigger asChild>
-            <button
-              type="button"
-              aria-label="Add reaction"
-              className="rounded p-1.5 text-muted-foreground hover:bg-surface hover:text-foreground"
-            >
-              <SmilePlus className="size-4" />
-            </button>
-          </PopoverTrigger>
-          <PopoverContent align="end" className="w-auto p-3">
-            <EmojiPicker
-              customEmojis={reactionCustomEmojis}
-              onSelect={(emoji) => void send(emoji)}
-            />
-          </PopoverContent>
-        </Popover>
-
-        <button
-          type="button"
-          aria-label="Reply"
-          onClick={() =>
-            onReply({
-              id: message.id,
-              author: author?.name ?? "Unknown",
-              excerpt: message.content.slice(0, 80),
-            })
-          }
-          className="rounded p-1.5 text-muted-foreground hover:bg-surface hover:text-foreground"
-        >
-          <Reply className="size-4" />
-        </button>
-
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              aria-label="More message actions"
-              className="rounded p-1.5 text-muted-foreground hover:bg-surface hover:text-foreground"
-            >
-              <Ellipsis className="size-4" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-60">
-            <div className="flex items-center gap-1 border-b border-border/60 p-2">
-              {["🎉", "👍", "🙂", "❤️"].map((emoji) => (
-                <button
-                  key={emoji}
-                  type="button"
-                  onClick={() => void send(emoji)}
-                  className="flex size-9 items-center justify-center rounded-lg text-lg hover:bg-surface"
-                >
-                  {emoji}
-                </button>
-              ))}
-            </div>
-            <DropdownMenuItem
-              onClick={() => {
-                loadReactionEmojis();
-                window.setTimeout(() => setReactionOpen(true), 0);
+          {/* Hover toolbar */}
+          <div className="message-toolbar absolute -top-3 right-2 flex items-center gap-0.5 rounded-lg border border-border/70 bg-panel px-1 py-0.5 shadow-lg">
+            {["🎉", "👍", "🙂", "❤️"].map((emoji) => (
+              <button
+                key={emoji}
+                type="button"
+                aria-label={`React with ${emoji}`}
+                onClick={() => void send(emoji)}
+                className="hidden rounded p-1 text-sm hover:bg-surface sm:block"
+              >
+                {emoji}
+              </button>
+            ))}
+            <Popover
+              open={reactionOpen}
+              onOpenChange={(open) => {
+                setReactionOpen(open);
+                if (open) loadReactionEmojis();
               }}
             >
-              <SmilePlus className="size-4" /> Add reaction
-            </DropdownMenuItem>
-            <DropdownMenuItem
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  aria-label="Add reaction"
+                  className="rounded p-1.5 text-muted-foreground hover:bg-surface hover:text-foreground"
+                >
+                  <SmilePlus className="size-4" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-auto p-3">
+                <EmojiPicker
+                  customEmojis={reactionCustomEmojis}
+                  onSelect={(emoji) => void send(emoji)}
+                />
+              </PopoverContent>
+            </Popover>
+
+            <button
+              type="button"
+              aria-label="Reply"
               onClick={() =>
                 onReply({
                   id: message.id,
@@ -1032,96 +1160,84 @@ function MessageRow({
                   excerpt: message.content.slice(0, 80),
                 })
               }
+              className="rounded p-1.5 text-muted-foreground hover:bg-surface hover:text-foreground"
             >
-              <Reply className="size-4" /> Reply
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => {
-                void navigator.clipboard
-                  .writeText(message.content)
-                  .then(() => toast.success("Message copied."))
-                  .catch(() => toast.error("Could not copy that message."));
-              }}
-            >
-              <Copy className="size-4" /> Copy text
-            </DropdownMenuItem>
-            {isAuthor && (
-              <DropdownMenuItem
-                onClick={() => {
-                  setDraft(message.content);
-                  setEditing(true);
-                }}
-              >
-                <Pencil className="size-4" /> Edit message
-              </DropdownMenuItem>
-            )}
-            <DropdownMenuItem onClick={onForward}>
-              <Forward className="size-4" /> Forward
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={onOpenThread}>
               <Reply className="size-4" />
-              {message.thread ? "Open thread" : "Start thread"}
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => void copyMessageLink()}>
-              <Link2 className="size-4" /> Copy message link
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => void markMessageUnread()}>
-              <EyeOff className="size-4" /> Mark unread
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => void translateMessage()}>
-              <Globe className="size-4" /> Translate
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => {
-                void navigator.clipboard.writeText(message.id);
-                toast.success("Message ID copied.");
-              }}
+            </button>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  aria-label="More message actions"
+                  className="rounded p-1.5 text-muted-foreground hover:bg-surface hover:text-foreground"
+                >
+                  <Ellipsis className="size-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-60">
+                <div className="flex items-center gap-1 border-b border-border/60 p-2">
+                  {["🎉", "👍", "🙂", "❤️"].map((emoji) => (
+                    <button
+                      key={emoji}
+                      type="button"
+                      onClick={() => void send(emoji)}
+                      className="flex size-9 items-center justify-center rounded-lg text-lg hover:bg-surface"
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+                {actions.map((action) => (
+                  <Fragment key={action.key}>
+                    {action.separatorBefore ? <DropdownMenuSeparator /> : null}
+                    <DropdownMenuItem
+                      className={
+                        action.destructive
+                          ? "text-destructive focus:text-destructive"
+                          : undefined
+                      }
+                      onClick={action.onSelect}
+                    >
+                      {action.icon} {action.label}
+                    </DropdownMenuItem>
+                  </Fragment>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+      </ContextMenuTrigger>
+      <ContextMenuContent className="w-60">
+        <div className="flex items-center gap-1 border-b border-border/60 p-2">
+          {["🎉", "👍", "🙂", "❤️"].map((emoji) => (
+            <button
+              key={emoji}
+              type="button"
+              onClick={() => void send(emoji)}
+              className="flex size-9 items-center justify-center rounded-lg text-lg hover:bg-surface"
             >
-              <Copy className="size-4" /> Copy message ID
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => {
-                void navigator.clipboard.writeText(message.authorId);
-                toast.success("User ID copied.");
-              }}
+              {emoji}
+            </button>
+          ))}
+        </div>
+        {actions.map((action) => (
+          <Fragment key={action.key}>
+            {action.separatorBefore ? <ContextMenuSeparator /> : null}
+            <ContextMenuItem
+              className={
+                action.destructive
+                  ? "text-destructive focus:text-destructive"
+                  : undefined
+              }
+              onClick={action.onSelect}
             >
-              <Copy className="size-4" /> Copy user ID
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => void pinMessage()}>
-              <Pin className="size-4" />
-              {message.pinnedAt ? "Unpin message" : "Pin message"}
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            {(isAuthor || canManageMessages) && (
-              <DropdownMenuItem
-                className="text-destructive focus:text-destructive"
-                onClick={async () => {
-                  try {
-                    await deleteMessage({
-                      messageId: message.id as Id<"messages">,
-                    });
-                  } catch (error) {
-                    toast.error(
-                      error instanceof Error
-                        ? error.message
-                        : "Could not delete.",
-                    );
-                  }
-                }}
-              >
-                <Trash2 className="size-4" /> Delete message
-              </DropdownMenuItem>
-            )}
-            {!isAuthor && (
-              <DropdownMenuItem onClick={() => onReport(message)}>
-                <AlertTriangle className="size-4" /> Report message
-              </DropdownMenuItem>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-    </div>
+              {action.icon} {action.label}
+            </ContextMenuItem>
+          </Fragment>
+        ))}
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }
 

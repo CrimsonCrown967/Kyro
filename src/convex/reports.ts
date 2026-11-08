@@ -5,7 +5,8 @@ import { PERMISSIONS } from "../lib/permissions";
 import {
   can,
   hydrateUsers,
-  isFounderUser,
+  isPlatformAdmin,
+  isPlatformStaff,
   notify,
   requireActiveUser,
   requireProfile,
@@ -114,8 +115,7 @@ export const queue = query({
     const visible = reports.filter(
       (report) =>
         (!serverId || report.serverId === serverId) &&
-        (user.role === "admin" ||
-          isFounderUser(user) ||
+        (isPlatformStaff(user) ||
           (report.serverId !== undefined &&
             moderatedServers.has(report.serverId))),
     );
@@ -179,8 +179,8 @@ export const resolve = mutation({
     if (!report) throw new Error("That report no longer exists.");
     // Site staff handle the platform-wide queue; community staff still need
     // permissions inside the community the report belongs to.
-    const callerIsAdmin = user.role === "admin" || isFounderUser(user);
-    let allowed = callerIsAdmin || user.siteModerator === true;
+    const callerIsAdmin = isPlatformAdmin(user);
+    let allowed = isPlatformStaff(user);
     if (!allowed && report.serverId) {
       const access = await requireServerAccess(ctx, report.serverId, id);
       allowed =

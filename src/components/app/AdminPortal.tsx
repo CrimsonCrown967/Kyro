@@ -66,53 +66,53 @@ const TABS: { id: AdminTab; label: string; icon: typeof ShieldCheck }[] = [
 
 /** Badge ids that can be granted from the portal, with their mutation key. */
 type GrantableBadgeId =
+  | "founder"
   | "cofounder"
-  | "admin"
   | "manager"
-  | "staff"
+  | "admin"
   | "moderator"
+  | "staff"
   | "trialstaff"
   | "verified"
-  | "bughunter"
-  | "vip"
-  | "og"
-  | "supporter"
-  | "donator"
   | "partner"
-  | "founder";
+  | "donator"
+  | "supporter"
+  | "vip"
+  | "bughunter"
+  | "og";
 
 const BADGE_FIELDS: {
   id: GrantableBadgeId;
   field:
     | "coFounder"
-    | "admin"
     | "manager"
+    | "admin"
+    | "moderator"
     | "staff"
     | "trialStaff"
-    | "moderator"
     | "verified"
-    | "bugHunter"
-    | "vip"
-    | "og"
-    | "supporter"
-    | "donator"
     | "partner"
+    | "donator"
+    | "supporter"
+    | "vip"
+    | "bugHunter"
+    | "og"
     | "founder";
 }[] = [
   { id: "founder", field: "founder" },
   { id: "cofounder", field: "coFounder" },
-  { id: "admin", field: "admin" },
   { id: "manager", field: "manager" },
-  { id: "staff", field: "staff" },
+  { id: "admin", field: "admin" },
   { id: "moderator", field: "moderator" },
+  { id: "staff", field: "staff" },
   { id: "trialstaff", field: "trialStaff" },
   { id: "verified", field: "verified" },
-  { id: "bughunter", field: "bugHunter" },
-  { id: "vip", field: "vip" },
-  { id: "og", field: "og" },
-  { id: "supporter", field: "supporter" },
-  { id: "donator", field: "donator" },
   { id: "partner", field: "partner" },
+  { id: "donator", field: "donator" },
+  { id: "supporter", field: "supporter" },
+  { id: "vip", field: "vip" },
+  { id: "bughunter", field: "bugHunter" },
+  { id: "og", field: "og" },
 ];
 
 function timeAgo(timestamp: number): string {
@@ -196,10 +196,20 @@ export function AdminPortal() {
             </h1>
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
-            {data.me.isFounder && <RolePill label="Founder" tone="brand" />}
-            {data.me.isAdmin && <RolePill label="Admin" tone="rose" />}
-            {data.me.isModerator && (
+            {data.me.platformRole === "founder" ? (
+              <RolePill label="Founder" tone="brand" />
+            ) : data.me.platformRole === "cofounder" ? (
+              <RolePill label="Co Founder" tone="brand" />
+            ) : data.me.platformRole === "manager" ? (
+              <RolePill label="Manager" tone="rose" />
+            ) : data.me.platformRole === "admin" ? (
+              <RolePill label="Admin" tone="rose" />
+            ) : data.me.platformRole === "moderator" ? (
               <RolePill label="Moderator" tone="emerald" />
+            ) : data.me.platformRole === "staff" ? (
+              <RolePill label="Staff" tone="emerald" />
+            ) : (
+              <RolePill label="Trial Staff · read only" tone="zinc" />
             )}
           </div>
         </div>
@@ -239,17 +249,19 @@ export function AdminPortal() {
         {tab === "badges" && (
           <BadgesTab isAdmin={data.me.isAdmin} isFounder={data.me.isFounder} />
         )}
-        {tab === "reports" && <ReportsTab isAdmin={data.me.isAdmin} />}
+        {tab === "reports" && (
+          <ReportsTab isAdmin={data.me.isAdmin} canModerate={data.me.isStaff} />
+        )}
         {tab === "bugs" && (
           <BugsTab
             isAdmin={data.me.isAdmin}
-            canTriage={data.me.isAdmin || data.me.isModerator}
+            canTriage={data.me.isStaff}
             bugs={bugs}
           />
         )}
-        {tab === "bans" && <BansTab />}
-        {tab === "warnings" && <WarningsTab />}
-        {tab === "email" && <EmailDeliveryTab />}
+        {tab === "bans" && <BansTab canModerate={data.me.isStaff} />}
+        {tab === "warnings" && <WarningsTab canModerate={data.me.isStaff} />}
+        {tab === "email" && <EmailDeliveryTab canModerate={data.me.isStaff} />}
         {tab === "activity" && <ActivityTab />}
       </div>
     </div>
@@ -293,9 +305,9 @@ function IpDetectorTab() {
         <div className="min-w-0 flex-1">
           <h2 className="text-lg font-semibold">IP detector</h2>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Client IP addresses captured on the heartbeat of real Kyro
-            accounts. This section is restricted to Kyro and adrianeosyne;
-            seeded accounts and staff viewers are never listed.
+            Client IP addresses captured on the heartbeat of real Kyro accounts.
+            This section is restricted to Kyro and adrianeosyne; seeded accounts
+            and staff viewers are never listed.
           </p>
         </div>
         <span className="rounded-full border border-border/70 bg-panel px-2.5 py-1 text-xs font-semibold tabular-nums text-muted-foreground">
@@ -358,7 +370,9 @@ function IpDetectorTab() {
                         <div className="min-w-0">
                           <p className="truncate font-medium">{entry.name}</p>
                           <p className="truncate text-xs text-muted-foreground">
-                            {entry.username ? `@${entry.username}` : "No username"}
+                            {entry.username
+                              ? `@${entry.username}`
+                              : "No username"}
                           </p>
                         </div>
                       </div>
@@ -415,7 +429,7 @@ function IpDetectorTab() {
   );
 }
 
-function EmailDeliveryTab() {
+function EmailDeliveryTab({ canModerate }: { canModerate: boolean }) {
   const failures = useQuery(api.emailOutbox.failures);
   const retry = useMutation(api.emailOutbox.retry);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -457,31 +471,33 @@ function EmailDeliveryTab() {
               <span className="rounded-full border border-destructive/30 bg-destructive/10 px-2 py-0.5 text-[10px] font-bold uppercase text-destructive">
                 {failure.status}
               </span>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={busyId !== null}
-                onClick={() => {
-                  setBusyId(failure.id);
-                  void retry({
-                    outboxId: failure.id as Id<"emailOutbox">,
-                  })
-                    .then(() => toast.success("Email queued for retry."))
-                    .catch((error) =>
-                      toast.error(
-                        error instanceof Error
-                          ? error.message
-                          : "Could not retry that email.",
-                      ),
-                    )
-                    .finally(() => setBusyId(null));
-                }}
-              >
-                {busyId === failure.id && (
-                  <Loader2 className="mr-1.5 size-3.5 animate-spin" />
-                )}
-                Retry
-              </Button>
+              {canModerate ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={busyId !== null}
+                  onClick={() => {
+                    setBusyId(failure.id);
+                    void retry({
+                      outboxId: failure.id as Id<"emailOutbox">,
+                    })
+                      .then(() => toast.success("Email queued for retry."))
+                      .catch((error) =>
+                        toast.error(
+                          error instanceof Error
+                            ? error.message
+                            : "Could not retry that email.",
+                        ),
+                      )
+                      .finally(() => setBusyId(null));
+                  }}
+                >
+                  {busyId === failure.id && (
+                    <Loader2 className="mr-1.5 size-3.5 animate-spin" />
+                  )}
+                  Retry
+                </Button>
+              ) : null}
             </div>
           ))}
         </div>
@@ -495,12 +511,13 @@ function RolePill({
   tone,
 }: {
   label: string;
-  tone: "brand" | "rose" | "emerald";
+  tone: "brand" | "rose" | "emerald" | "zinc";
 }) {
   const tones = {
     brand: "border-brand/40 bg-brand/10 text-brand",
     rose: "border-destructive/40 bg-destructive/10 text-destructive",
     emerald: "border-success/40 bg-success/10 text-success",
+    zinc: "border-border/70 bg-surface text-muted-foreground",
   } as const;
   return (
     <span
@@ -928,7 +945,13 @@ function BadgesTab({
 /* Report queue                                                        */
 /* ------------------------------------------------------------------ */
 
-function ReportsTab({ isAdmin }: { isAdmin: boolean }) {
+function ReportsTab({
+  isAdmin,
+  canModerate,
+}: {
+  isAdmin: boolean;
+  canModerate: boolean;
+}) {
   const [status, setStatus] = useState<
     "open" | "reviewing" | "resolved" | "dismissed" | "all"
   >("open");
@@ -1024,86 +1047,92 @@ function ReportsTab({ isAdmin }: { isAdmin: boolean }) {
               </p>
             )}
 
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              <ActionButton
-                icon={Check}
-                label="Resolve"
-                tone="success"
-                onClick={() =>
-                  void act(
-                    resolve({
-                      reportId: report.id as Id<"reports">,
-                      status: "resolved",
-                      resolution: "Reviewed by Kyro staff.",
-                    }),
-                    "Report resolved.",
-                  )
-                }
-              />
-              <ActionButton
-                icon={X}
-                label="Dismiss"
-                onClick={() =>
-                  void act(
-                    resolve({
-                      reportId: report.id as Id<"reports">,
-                      status: "dismissed",
-                      resolution: "No rule break found.",
-                    }),
-                    "Report dismissed.",
-                  )
-                }
-              />
-              {report.messageId && (
+            {canModerate ? (
+              <div className="mt-2 flex flex-wrap gap-1.5">
                 <ActionButton
-                  icon={Trash2}
-                  label="Delete message"
-                  tone="danger"
+                  icon={Check}
+                  label="Resolve"
+                  tone="success"
                   onClick={() =>
                     void act(
-                      removeMessage({
-                        messageId: report.messageId as Id<"messages">,
+                      resolve({
+                        reportId: report.id as Id<"reports">,
+                        status: "resolved",
+                        resolution: "Reviewed by Kyro staff.",
                       }),
-                      "Message deleted.",
+                      "Report resolved.",
                     )
                   }
                 />
-              )}
-              {report.reportedId && (
                 <ActionButton
-                  icon={Ban}
-                  label="Ban user"
-                  tone="danger"
+                  icon={X}
+                  label="Dismiss"
                   onClick={() =>
                     void act(
-                      banUser({
-                        userId: report.reportedId as Id<"users">,
-                        reason: report.reason,
-                        days: 7,
+                      resolve({
+                        reportId: report.id as Id<"reports">,
+                        status: "dismissed",
+                        resolution: "No rule break found.",
                       }),
-                      "Account banned for 7 days.",
+                      "Report dismissed.",
                     )
                   }
                 />
-              )}
-              {report.serverId && isAdmin && (
-                <ActionButton
-                  icon={Trash2}
-                  label="Delete community"
-                  tone="danger"
-                  onClick={() => {
-                    if (!window.confirm("Delete this community permanently?"))
-                      return;
-                    void act(
-                      removeServer({
-                        serverId: report.serverId as Id<"servers">,
-                      }),
-                      "Community deleted.",
-                    );
-                  }}
-                />
-              )}
-            </div>
+                {report.messageId ? (
+                  <ActionButton
+                    icon={Trash2}
+                    label="Delete message"
+                    tone="danger"
+                    onClick={() =>
+                      void act(
+                        removeMessage({
+                          messageId: report.messageId as Id<"messages">,
+                        }),
+                        "Message deleted.",
+                      )
+                    }
+                  />
+                ) : null}
+                {report.reportedId ? (
+                  <ActionButton
+                    icon={Ban}
+                    label="Ban user"
+                    tone="danger"
+                    onClick={() =>
+                      void act(
+                        banUser({
+                          userId: report.reportedId as Id<"users">,
+                          reason: report.reason,
+                          days: 7,
+                        }),
+                        "Account banned for 7 days.",
+                      )
+                    }
+                  />
+                ) : null}
+                {report.serverId && isAdmin ? (
+                  <ActionButton
+                    icon={Trash2}
+                    label="Delete community"
+                    tone="danger"
+                    onClick={() => {
+                      if (!window.confirm("Delete this community permanently?"))
+                        return;
+                      void act(
+                        removeServer({
+                          serverId: report.serverId as Id<"servers">,
+                        }),
+                        "Community deleted.",
+                      );
+                    }}
+                  />
+                ) : null}
+              </div>
+            ) : (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Trial Staff access is read-only.
+              </p>
+            )}
           </div>
         ))
       )}
@@ -1258,7 +1287,7 @@ function BugsTab({
 /* Bans                                                                */
 /* ------------------------------------------------------------------ */
 
-function BansTab() {
+function BansTab({ canModerate }: { canModerate: boolean }) {
   const bans = useQuery(api.admin.banList);
   const [term, setTerm] = useState("");
   const [target, setTarget] = useState<{
@@ -1298,100 +1327,109 @@ function BansTab() {
   };
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[1fr_1.1fr]">
-      <section className="rounded-xl border border-border/70 bg-surface p-4">
-        <h2 className="text-sm font-semibold">Issue a platform ban</h2>
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          Bans stop messaging, community creation and friend requests until
-          lifted or expired.
-        </p>
+    <div
+      className={cn(
+        "grid gap-4",
+        canModerate ? "lg:grid-cols-[1fr_1.1fr]" : "",
+      )}
+    >
+      {canModerate ? (
+        <section className="rounded-xl border border-border/70 bg-surface p-4">
+          <h2 className="text-sm font-semibold">Issue a platform ban</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Bans stop messaging, community creation and friend requests until
+            lifted or expired.
+          </p>
 
-        <div className="relative mt-3">
-          <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={target ? `${target.name}` : term}
-            onChange={(event) => {
-              setTarget(null);
-              setTerm(event.target.value);
-            }}
-            placeholder="Search an account"
-            className="pl-8"
-            aria-label="Find an account to ban"
-          />
-        </div>
+          <div className="relative mt-3">
+            <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={target ? `${target.name}` : term}
+              onChange={(event) => {
+                setTarget(null);
+                setTerm(event.target.value);
+              }}
+              placeholder="Search an account"
+              className="pl-8"
+              aria-label="Find an account to ban"
+            />
+          </div>
 
-        {!target && term.length >= 2 && (
-          <div className="mt-1 max-h-48 overflow-y-auto rounded-md border border-border/70 bg-panel">
-            {results === undefined ? (
-              <p className="px-3 py-2 text-xs text-muted-foreground">
-                Searching…
+          {!target && term.length >= 2 && (
+            <div className="mt-1 max-h-48 overflow-y-auto rounded-md border border-border/70 bg-panel">
+              {results === undefined ? (
+                <p className="px-3 py-2 text-xs text-muted-foreground">
+                  Searching…
+                </p>
+              ) : results.length === 0 ? (
+                <p className="px-3 py-2 text-xs text-muted-foreground">
+                  No accounts matched.
+                </p>
+              ) : (
+                results.slice(0, 8).map((member) => (
+                  <button
+                    key={member.id}
+                    type="button"
+                    onClick={() => {
+                      setTarget({
+                        id: member.id,
+                        name: member.name,
+                        username: member.username,
+                      });
+                      setTerm("");
+                    }}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-surface"
+                  >
+                    <span className="min-w-0 flex-1 truncate">
+                      {member.name}
+                    </span>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      @{member.username ?? "—"}
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+
+          <div className="mt-3 grid gap-2">
+            <Input
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
+              placeholder="Reason shown to the member"
+              maxLength={300}
+              aria-label="Ban reason"
+            />
+            <div className="flex items-center gap-2">
+              <select
+                value={days}
+                aria-label="Ban length"
+                onChange={(event) => setDays(Number(event.target.value))}
+                className="h-9 flex-1 rounded-md border border-input bg-background px-2 text-sm"
+              >
+                <option value={1}>1 day</option>
+                <option value={7}>7 days</option>
+                <option value={30}>30 days</option>
+                <option value={90}>90 days</option>
+                <option value={0}>Permanent</option>
+              </select>
+              <Button
+                disabled={!target || busy || reason.trim().length < 3}
+                onClick={() => void submit()}
+              >
+                {busy && <Loader2 className="mr-2 size-4 animate-spin" />}
+                Ban account
+              </Button>
+            </div>
+            {target && (
+              <p className="text-xs text-muted-foreground">
+                Target: <span className="font-medium">{target.name}</span>
+                {target.username ? ` (@${target.username})` : ""}
               </p>
-            ) : results.length === 0 ? (
-              <p className="px-3 py-2 text-xs text-muted-foreground">
-                No accounts matched.
-              </p>
-            ) : (
-              results.slice(0, 8).map((member) => (
-                <button
-                  key={member.id}
-                  type="button"
-                  onClick={() => {
-                    setTarget({
-                      id: member.id,
-                      name: member.name,
-                      username: member.username,
-                    });
-                    setTerm("");
-                  }}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-surface"
-                >
-                  <span className="min-w-0 flex-1 truncate">{member.name}</span>
-                  <span className="shrink-0 text-xs text-muted-foreground">
-                    @{member.username ?? "—"}
-                  </span>
-                </button>
-              ))
             )}
           </div>
-        )}
-
-        <div className="mt-3 grid gap-2">
-          <Input
-            value={reason}
-            onChange={(event) => setReason(event.target.value)}
-            placeholder="Reason shown to the member"
-            maxLength={300}
-            aria-label="Ban reason"
-          />
-          <div className="flex items-center gap-2">
-            <select
-              value={days}
-              aria-label="Ban length"
-              onChange={(event) => setDays(Number(event.target.value))}
-              className="h-9 flex-1 rounded-md border border-input bg-background px-2 text-sm"
-            >
-              <option value={1}>1 day</option>
-              <option value={7}>7 days</option>
-              <option value={30}>30 days</option>
-              <option value={90}>90 days</option>
-              <option value={0}>Permanent</option>
-            </select>
-            <Button
-              disabled={!target || busy || reason.trim().length < 3}
-              onClick={() => void submit()}
-            >
-              {busy && <Loader2 className="mr-2 size-4 animate-spin" />}
-              Ban account
-            </Button>
-          </div>
-          {target && (
-            <p className="text-xs text-muted-foreground">
-              Target: <span className="font-medium">{target.name}</span>
-              {target.username ? ` (@${target.username})` : ""}
-            </p>
-          )}
-        </div>
-      </section>
+        </section>
+      ) : null}
 
       <section className="rounded-xl border border-border/70 bg-surface">
         <header className="border-b border-border/60 px-4 py-3">
@@ -1435,7 +1473,7 @@ function BansTab() {
                   {ban.reason} · by {ban.bannedByName} ·{" "}
                   {timeAgo(ban.createdAt)}
                 </p>
-                {ban.active && (
+                {ban.active && canModerate ? (
                   <Button
                     size="sm"
                     variant="outline"
@@ -1454,7 +1492,7 @@ function BansTab() {
                   >
                     Lift ban
                   </Button>
-                )}
+                ) : null}
               </li>
             ))}
           </ul>
@@ -1468,7 +1506,7 @@ function BansTab() {
 /* Warnings + activity                                                 */
 /* ------------------------------------------------------------------ */
 
-function WarningsTab() {
+function WarningsTab({ canModerate }: { canModerate: boolean }) {
   const warnings = useQuery(api.admin.warningList);
   const lift = useMutation(api.admin.liftWarning);
   if (warnings === undefined) return <Loading />;
@@ -1496,23 +1534,25 @@ function WarningsTab() {
               {new Date(warning.expiresAt).toLocaleDateString()}
             </p>
           </div>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              void lift({ warningId: warning.id as Id<"warnings"> })
-                .then(() => toast.success("Warning cleared."))
-                .catch((error: unknown) =>
-                  toast.error(
-                    error instanceof Error
-                      ? error.message
-                      : "Could not clear that warning.",
-                  ),
-                );
-            }}
-          >
-            Clear warning
-          </Button>
+          {canModerate ? (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                void lift({ warningId: warning.id as Id<"warnings"> })
+                  .then(() => toast.success("Warning cleared."))
+                  .catch((error: unknown) =>
+                    toast.error(
+                      error instanceof Error
+                        ? error.message
+                        : "Could not clear that warning.",
+                    ),
+                  );
+              }}
+            >
+              Clear warning
+            </Button>
+          ) : null}
         </div>
       ))}
     </div>

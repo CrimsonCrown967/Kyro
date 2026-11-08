@@ -2,7 +2,9 @@ import { useMutation, useQuery } from "convex/react";
 import {
   CheckCheck,
   Compass,
+  Copy,
   Loader2,
+  LogOut,
   Plus,
   UserPlus,
   Volume2,
@@ -23,12 +25,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import { Input } from "@/components/ui/input";
 import {
   Tooltip,
@@ -45,20 +47,21 @@ function RailButton({
   unread,
   mentions,
   onClick,
-  onContextMenu,
   to,
   children,
   className,
+  contextMenu,
 }: {
   label: string;
   active: boolean;
   unread?: boolean;
   mentions?: number;
   onClick?: () => void;
-  onContextMenu?: (event: React.MouseEvent) => void;
   to?: string;
   children: React.ReactNode;
   className?: string;
+  /** Radix ContextMenuContent attached to this rail item, if any. */
+  contextMenu?: React.ReactNode;
 }) {
   const body = (
     <span
@@ -82,32 +85,40 @@ function RailButton({
     </span>
   );
 
-  return (
+  const trigger = to ? (
+    <Link to={to} aria-label={label} className="block">
+      {body}
+    </Link>
+  ) : (
+    <button
+      type="button"
+      aria-label={label}
+      onClick={onClick}
+      className="block"
+    >
+      {body}
+    </button>
+  );
+
+  const button = (
     <Tooltip>
       <TooltipTrigger asChild>
-        {to ? (
-          <Link
-            to={to}
-            aria-label={label}
-            className="block"
-            onContextMenu={onContextMenu}
-          >
-            {body}
-          </Link>
+        {contextMenu ? (
+          <ContextMenuTrigger asChild>{trigger}</ContextMenuTrigger>
         ) : (
-          <button
-            type="button"
-            aria-label={label}
-            onClick={onClick}
-            onContextMenu={onContextMenu}
-            className="block"
-          >
-            {body}
-          </button>
+          trigger
         )}
       </TooltipTrigger>
       <TooltipContent side="right">{label}</TooltipContent>
     </Tooltip>
+  );
+
+  if (!contextMenu) return button;
+  return (
+    <ContextMenu>
+      {button}
+      {contextMenu}
+    </ContextMenu>
   );
 }
 
@@ -116,17 +127,13 @@ export function ServerRail({ activeServerId }: { activeServerId?: string }) {
   const navigate = useNavigate();
   const [createOpen, setCreateOpen] = useState(false);
   const [discoverOpen, setDiscoverOpen] = useState(false);
-  const [menuServerId, setMenuServerId] = useState<string | null>(null);
   const [inviteServerId, setInviteServerId] = useState<string | null>(null);
   const setMuted = useMutation(api.servers.setMuted);
   const markServerRead = useMutation(api.messages.markServerRead);
+  const leaveServer = useMutation(api.servers.leave);
   const conversations = useQuery(api.conversations.list);
   const me = useQuery(api.users.me);
   const unreadDmBubbles = useUiStore((state) => state.unreadDmBubbles);
-
-  const menuServer = (servers ?? []).find(
-    (server) => server.id === menuServerId,
-  );
 
   /** Unread DM bubbles under Home — the "Unread DMs in the server list" pref. */
   const bubbleDms = (unreadDmBubbles ? (conversations ?? []) : [])
@@ -214,10 +221,97 @@ export function ServerRail({ activeServerId }: { activeServerId?: string }) {
               unread={server.unread && !server.muted}
               mentions={server.muted ? 0 : server.mentions}
               to={`/dashboard/s/${server.id}`}
-              onContextMenu={(event) => {
-                event.preventDefault();
-                setMenuServerId(server.id);
-              }}
+              contextMenu={
+                <ContextMenuContent className="w-56">
+                  <ContextMenuItem onClick={() => setInviteServerId(server.id)}>
+                    <UserPlus className="size-4" /> Invite people
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    onClick={() =>
+                      void run(
+                        markServerRead({
+                          serverId: server.id as Id<"servers">,
+                        }),
+                        "Marked as read.",
+                      )
+                    }
+                  >
+                    <CheckCheck className="size-4" /> Mark as read
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    onClick={() =>
+                      void run(
+                        setMuted({
+                          serverId: server.id as Id<"servers">,
+                          muted: !server.muted,
+                        }),
+                        server.muted ? "Server unmuted." : "Server muted.",
+                      )
+                    }
+                  >
+                    {server.muted ? (
+                      <Volume2 className="size-4" />
+                    ) : (
+                      <VolumeX className="size-4" />
+                    )}
+                    {server.muted ? "Unmute server" : "Mute server"}
+                  </ContextMenuItem>
+                  <ContextMenuSeparator />
+                  <ContextMenuItem
+                    onClick={() => {
+                      void navigator.clipboard
+                        .writeText(server.id)
+                        .then(() => toast.success("Server ID copied."))
+                        .catch(() =>
+                          toast.error(
+                            "Clipboard access was blocked by the browser.",
+                          ),
+                        );
+                    }}
+                  >
+                    <Copy className="size-4" /> Copy server ID
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    onClick={() => navigate(`/dashboard/s/${server.id}`)}
+                  >
+                    <Compass className="size-4" /> Open server
+                  </ContextMenuItem>
+                  {!server.isOwner ? (
+                    <>
+                      <ContextMenuSeparator />
+                      <ContextMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onClick={async () => {
+                          if (
+                            !window.confirm(
+                              `Leave ${server.name}? You can rejoin later if it's public.`,
+                            )
+                          ) {
+                            return;
+                          }
+                          try {
+                            await leaveServer({
+                              serverId: server.id as Id<"servers">,
+                            });
+                            toast.success(`Left ${server.name}.`);
+                            if (activeServerId === server.id) {
+                              navigate("/dashboard");
+                            }
+                          } catch (error) {
+                            toast.error(
+                              error instanceof Error
+                                ? error.message
+                                : "Could not leave that community.",
+                            );
+                          }
+                        }}
+                      >
+                        <LogOut className="size-4" /> Leave server
+                      </ContextMenuItem>
+                    </>
+                  ) : null}
+                </ContextMenuContent>
+              }
             >
               {server.iconUrl ? (
                 <img
@@ -256,74 +350,6 @@ export function ServerRail({ activeServerId }: { activeServerId?: string }) {
         onOpenChange={setDiscoverOpen}
         onJoin={(id) => navigate(`/dashboard/s/${id}`)}
       />
-
-      {/* Right-click menu for a server: invite, mark read, mute. */}
-      <DropdownMenu
-        open={menuServerId !== null}
-        onOpenChange={(open) => {
-          if (!open) setMenuServerId(null);
-        }}
-      >
-        <DropdownMenuTrigger asChild>
-          <span className="hidden" aria-hidden />
-        </DropdownMenuTrigger>
-        {menuServer && (
-          <DropdownMenuContent
-            align="start"
-            side="right"
-            className="w-56"
-            onCloseAutoFocus={(event) => event.preventDefault()}
-          >
-            <DropdownMenuItem
-              onClick={() => {
-                setInviteServerId(menuServer.id);
-                setMenuServerId(null);
-              }}
-            >
-              <UserPlus className="size-4" /> Invite people
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() =>
-                void run(
-                  markServerRead({
-                    serverId: menuServer.id as Id<"servers">,
-                  }),
-                  "Marked as read.",
-                )
-              }
-            >
-              <CheckCheck className="size-4" /> Mark all as read
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() =>
-                void run(
-                  setMuted({
-                    serverId: menuServer.id as Id<"servers">,
-                    muted: !menuServer.muted,
-                  }),
-                  menuServer.muted ? "Server unmuted." : "Server muted.",
-                )
-              }
-            >
-              {menuServer.muted ? (
-                <Volume2 className="size-4" />
-              ) : (
-                <VolumeX className="size-4" />
-              )}
-              {menuServer.muted ? "Unmute server" : "Mute server"}
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => {
-                navigate(`/dashboard/s/${menuServer.id}`);
-                setMenuServerId(null);
-              }}
-            >
-              Open server
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        )}
-      </DropdownMenu>
 
       {inviteServerId && (
         <InviteDialog

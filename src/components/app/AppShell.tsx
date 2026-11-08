@@ -64,6 +64,10 @@ export function AppShell({ children }: { children: ReactNode }) {
     api.notifications.unreadCount,
     isAuthenticated ? {} : "skip",
   );
+  const mentionCount = useQuery(
+    api.notifications.mentionCount,
+    isAuthenticated ? {} : "skip",
+  );
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -130,6 +134,15 @@ export function AppShell({ children }: { children: ReactNode }) {
       playNotificationPing();
     }
   }, [unread]);
+
+  // Browser tab title mirrors unread mentions only, Discord-style: "(6) Kyro".
+  // Ordinary unread DMs and system notes deliberately stay out of the count.
+  useEffect(() => {
+    document.title =
+      mentionCount !== undefined && mentionCount > 0
+        ? `(${mentionCount}) Kyro`
+        : "Kyro";
+  }, [mentionCount]);
 
   // Global shortcuts: ⌘K opens search, Esc closes overlays.
   useEffect(() => {

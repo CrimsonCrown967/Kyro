@@ -3,13 +3,18 @@ import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
 import {
+  globalBadgesFor,
   hydrateUser,
   hydrateUsers,
   getUserByUsername,
   isFounderUser,
+  isPlatformAdmin,
+  isPlatformStaff,
+  isPlatformTrialStaff,
   isReservedUsername,
   isSyntheticUser,
   normalizeUsername,
+  platformRoleFor,
   requireActiveUser,
   requireUser,
   USERNAME_PATTERN,
@@ -49,18 +54,18 @@ const PROFILE_BADGES = [
   "none",
   "founder",
   "cofounder",
-  "admin",
   "manager",
-  "staff",
+  "admin",
   "moderator",
+  "staff",
   "trialstaff",
   "verified",
-  "bughunter",
-  "vip",
-  "og",
-  "supporter",
-  "donator",
   "partner",
+  "donator",
+  "supporter",
+  "vip",
+  "bughunter",
+  "og",
 ];
 
 const HEX_COLOUR = /^#[0-9a-fA-F]{6}$/;
@@ -89,6 +94,10 @@ export const me = query({
       suggestible: user.suggestible !== false,
       createdAt: user.createdAt ?? null,
       role: user.role ?? null,
+      platformRole: platformRoleFor(user),
+      isPlatformTrialStaff: isPlatformTrialStaff(user),
+      isPlatformStaff: isPlatformStaff(user),
+      isPlatformAdmin: isPlatformAdmin(user),
       hasUsername: Boolean(user.username),
       usernameChangedAt: user.usernameChangedAt ?? null,
       emailChangedAt: user.emailChangedAt ?? null,
@@ -318,33 +327,8 @@ export const updateProfile = mutation({
         throw new Error("That badge doesn't exist.");
       }
       if (args.primaryBadge !== "none") {
-        // Mirror hydrateUser's badge derivation: you can only wear one you hold.
-        const isFounder = isFounderUser(user);
-        const founderAdminRemoved =
-          isFounder && user.adminBadgeRemoved === true;
-        const held = new Set<string>();
-        if (
-          isFounder
-            ? user.founderBadgeRemoved !== true
-            : user.founderBadge === true
-        ) {
-          held.add("founder");
-        }
-        if (user.coFounder === true) held.add("cofounder");
-        if (user.role === "admin" || (isFounder && !founderAdminRemoved)) {
-          held.add("admin");
-        }
-        if (user.manager === true) held.add("manager");
-        if (user.staff === true) held.add("staff");
-        if (user.siteModerator === true) held.add("moderator");
-        if (user.trialStaff === true) held.add("trialstaff");
-        if (user.verified === true) held.add("verified");
-        if (user.bugHunter === true) held.add("bughunter");
-        if (user.vip === true) held.add("vip");
-        if (user.og === true) held.add("og");
-        if (user.supporter === true) held.add("supporter");
-        if (user.donator === true) held.add("donator");
-        if (user.partner === true) held.add("partner");
+        // You can only wear a badge the same derivation gives you everywhere.
+        const held = new Set<string>(globalBadgesFor(user));
         if (!held.has(args.primaryBadge)) {
           throw new Error("You don't hold that badge.");
         }
@@ -458,8 +442,9 @@ export const setBadges = mutation({
   ) => {
     const { id, user } = await requireActiveUser(ctx);
     const callerIsFounder = isFounderUser(user);
-    const isAdmin = user.role === "admin" || callerIsFounder;
-    if (!isAdmin) throw new Error("Only admins can manage global badges.");
+    if (!isPlatformAdmin(user)) {
+      throw new Error("Only Kyro admins can manage global badges.");
+    }
     if (founder !== undefined && !callerIsFounder) {
       throw new Error("Only Kyro's founder can grant the Founder badge.");
     }

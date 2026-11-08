@@ -81,8 +81,7 @@ export function UserBar({ onOpenSettings }: { onOpenSettings?: () => void }) {
 
   if (!me) return null;
 
-  const isStaff =
-    me.role === "admin" || me.isFounder || me.badges.includes("moderator");
+  const isStaff = me.isPlatformTrialStaff;
 
   const saveStatus = async () => {
     try {

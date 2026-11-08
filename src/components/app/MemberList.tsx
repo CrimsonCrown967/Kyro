@@ -1,10 +1,25 @@
-import { useQuery } from "convex/react";
-import { useSearchParams } from "react-router";
+import { useMutation, useQuery } from "convex/react";
+import {
+  Copy,
+  MessageCircle,
+  UserCheck,
+  UserPlus,
+  UserX,
+} from "@/components/icons";
+import { useNavigate, useSearchParams } from "react-router";
+import { toast } from "sonner";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { UserAvatar, DeviceBadge } from "@/components/app/UserAvatar";
 import { ServerTagChip } from "@/components/app/ServerTag";
 import { StyledDisplayName } from "@/components/app/StyledDisplayName";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import type { PresenceState } from "@/lib/format";
 
 type Member = {
@@ -41,7 +56,17 @@ export function MemberList({ serverId }: { serverId: string }) {
   const data = useQuery(api.servers.members, {
     serverId: serverId as Id<"servers">,
   });
+  const me = useQuery(api.users.me);
+  const social = useQuery(api.social.list);
+  const createDirect = useMutation(api.conversations.createDirect);
+  const sendRequest = useMutation(api.social.sendRequest);
+  const respond = useMutation(api.social.respond);
+  const cancel = useMutation(api.social.cancel);
+  const removeFriend = useMutation(api.social.removeFriend);
+  const block = useMutation(api.social.block);
+  const unblock = useMutation(api.social.unblock);
   const [, setParams] = useSearchParams();
+  const navigate = useNavigate();
 
   const openProfile = (userId: string) => {
     setParams((previous) => {
@@ -51,6 +76,22 @@ export function MemberList({ serverId }: { serverId: string }) {
       return next;
     });
   };
+
+  const run = async (action: Promise<unknown>, success?: string) => {
+    try {
+      await action;
+      if (success) toast.success(success);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "That didn't work.");
+    }
+  };
+
+  const openMessage = (userId: string) =>
+    run(
+      createDirect({ userId: userId as Id<"users"> }).then((conversationId) =>
+        navigate(`/dashboard/dm/${conversationId}`),
+      ),
+    );
 
   if (data === undefined) {
     return (
@@ -68,49 +109,183 @@ export function MemberList({ serverId }: { serverId: string }) {
     groupedOnline.set(label, group);
   }
 
-  const row = (member: Member) => (
-    // A div (not a button) because the tag chip inside is its own button —
-    // nested buttons are invalid HTML and made clicks miss the row.
-    <div
-      key={member.user.id}
-      role="button"
-      tabIndex={0}
-      aria-label={`Open ${member.nickname ?? member.user.name}'s profile`}
-      data-profile-user={member.user.id}
-      onClick={() => openProfile(member.user.id)}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          openProfile(member.user.id);
-        }
-      }}
-      className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-surface/75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-    >
-      <UserAvatar user={member.user} size="sm" />
-      <span className="min-w-0 flex-1">
-        <span className="flex items-center gap-1.5">
-          <StyledDisplayName
-            user={member.user}
-            name={member.nickname ?? member.user.name}
-            roleColor={member.topRoleColor}
-            className="truncate text-[15px] font-semibold"
-          />
-          {member.user.serverTag && (
-            <ServerTagChip
-              tag={member.user.serverTag}
-              ownerName={member.user.name}
-            />
+  const row = (member: Member) => {
+    const targetId = member.user.id;
+    const isSelf = me?.id === targetId;
+    const incoming = social?.incoming.find(
+      (entry) => entry.user?.id === targetId,
+    );
+    const outgoing = social?.outgoing.find(
+      (entry) => entry.user?.id === targetId,
+    );
+    const isFriend = (social?.friends ?? []).some(
+      (friend) => friend.id === targetId,
+    );
+    const isBlocked = (social?.blocked ?? []).some(
+      (entry) => entry.user?.id === targetId,
+    );
+    return (
+      <ContextMenu key={targetId}>
+        <ContextMenuTrigger asChild>
+          {/* A div (not a button) because the tag chip inside is its own
+              button — nested buttons are invalid HTML and made clicks miss. */}
+          <div
+            role="button"
+            tabIndex={0}
+            aria-label={`Open ${member.nickname ?? member.user.name}'s profile`}
+            data-profile-user={targetId}
+            onClick={() => openProfile(targetId)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                openProfile(targetId);
+              }
+            }}
+            className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-surface/75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+          >
+            <UserAvatar user={member.user} size="sm" />
+            <span className="min-w-0 flex-1">
+              <span className="flex items-center gap-1.5">
+                <StyledDisplayName
+                  user={member.user}
+                  name={member.nickname ?? member.user.name}
+                  roleColor={member.topRoleColor}
+                  className="truncate text-[15px] font-semibold"
+                />
+                {member.user.serverTag && (
+                  <ServerTagChip
+                    tag={member.user.serverTag}
+                    ownerName={member.user.name}
+                  />
+                )}
+                <DeviceBadge device={member.user.device} />
+              </span>
+              {member.user.customStatus && (
+                <span className="block truncate text-xs text-muted-foreground">
+                  {member.user.customStatus}
+                </span>
+              )}
+            </span>
+          </div>
+        </ContextMenuTrigger>
+        <ContextMenuContent className="w-56">
+          <ContextMenuItem onClick={() => openProfile(targetId)}>
+            <UserAvatar user={member.user} size="xs" />
+            View profile
+          </ContextMenuItem>
+          {!isSelf && (
+            <>
+              <ContextMenuItem onClick={() => void openMessage(targetId)}>
+                <MessageCircle className="size-4" /> Message
+              </ContextMenuItem>
+              <ContextMenuSeparator />
+              {incoming ? (
+                <>
+                  <ContextMenuItem
+                    onClick={() =>
+                      void run(
+                        respond({
+                          connectionId:
+                            incoming.connectionId as Id<"connections">,
+                          accept: true,
+                        }),
+                        "You are now friends.",
+                      )
+                    }
+                  >
+                    <UserCheck className="size-4" /> Accept friend request
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    onClick={() =>
+                      void run(
+                        respond({
+                          connectionId:
+                            incoming.connectionId as Id<"connections">,
+                          accept: false,
+                        }),
+                        "Request ignored.",
+                      )
+                    }
+                  >
+                    <UserX className="size-4" /> Ignore request
+                  </ContextMenuItem>
+                </>
+              ) : outgoing ? (
+                <ContextMenuItem
+                  onClick={() =>
+                    void run(
+                      cancel({
+                        connectionId:
+                          outgoing.connectionId as Id<"connections">,
+                      }),
+                      "Request cancelled.",
+                    )
+                  }
+                >
+                  <UserX className="size-4" /> Cancel friend request
+                </ContextMenuItem>
+              ) : isFriend ? (
+                <ContextMenuItem
+                  onClick={() =>
+                    void run(
+                      removeFriend({ userId: targetId as Id<"users"> }),
+                      "Friend removed.",
+                    )
+                  }
+                >
+                  <UserX className="size-4" /> Remove friend
+                </ContextMenuItem>
+              ) : (
+                <ContextMenuItem
+                  onClick={() =>
+                    void run(
+                      sendRequest({ userId: targetId as Id<"users"> }),
+                      "Friend request sent.",
+                    )
+                  }
+                >
+                  <UserPlus className="size-4" /> Add friend
+                </ContextMenuItem>
+              )}
+              <ContextMenuItem
+                onClick={() =>
+                  void run(
+                    isBlocked
+                      ? unblock({ userId: targetId as Id<"users"> })
+                      : block({ userId: targetId as Id<"users"> }),
+                    isBlocked ? "User unblocked." : "User blocked.",
+                  )
+                }
+              >
+                <UserX className="size-4" /> {isBlocked ? "Unblock" : "Block"}
+              </ContextMenuItem>
+              <ContextMenuSeparator />
+            </>
           )}
-          <DeviceBadge device={member.user.device} />
-        </span>
-        {member.user.customStatus && (
-          <span className="block truncate text-xs text-muted-foreground">
-            {member.user.customStatus}
-          </span>
-        )}
-      </span>
-    </div>
-  );
+          <ContextMenuItem
+            onClick={() => {
+              void navigator.clipboard
+                .writeText(member.user.username ?? member.user.name)
+                .then(() => toast.success("Username copied."))
+                .catch(() => toast.error("Couldn't copy the username."));
+            }}
+          >
+            <Copy className="size-4" /> Copy username
+          </ContextMenuItem>
+          <ContextMenuItem
+            onClick={() => {
+              void navigator.clipboard
+                .writeText(targetId)
+                .then(() => toast.success("User ID copied."))
+                .catch(() => toast.error("Couldn't copy the user ID."));
+            }}
+          >
+            <Copy className="size-4" /> Copy user ID
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
+    );
+  };
 
   return (
     <aside className="hidden w-[20.5rem] shrink-0 flex-col border-l border-border/70 bg-panel lg:flex">

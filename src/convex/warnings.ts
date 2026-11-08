@@ -1,6 +1,12 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { isFounderUser, notify, requireActiveUser, requireUser } from "./lib";
+import {
+  isPlatformAdmin,
+  isPlatformStaff,
+  notify,
+  requireActiveUser,
+  requireUser,
+} from "./lib";
 import { enqueueUserEmail } from "./emailOutbox";
 
 /** Warnings last 3 days, exactly like the account-standing copy says. */
@@ -14,21 +20,13 @@ export const warn = mutation({
   args: { userId: v.id("users"), reason: v.string() },
   handler: async (ctx, { userId, reason }) => {
     const { id, user } = await requireActiveUser(ctx);
-    if (
-      user.role !== "admin" &&
-      !isFounderUser(user) &&
-      user.siteModerator !== true
-    ) {
+    if (!isPlatformStaff(user)) {
       throw new Error("Only Kyro staff can issue warnings.");
     }
     if (userId === id) throw new Error("You can't warn yourself.");
     const target = await ctx.db.get(userId);
     if (!target) throw new Error("That user no longer exists.");
-    if (
-      (target.role === "admin" || isFounderUser(target)) &&
-      user.role !== "admin" &&
-      !isFounderUser(user)
-    ) {
+    if (isPlatformAdmin(target) && !isPlatformAdmin(user)) {
       throw new Error("Only an admin can warn another administrator.");
     }
     const clean = reason.trim().slice(0, 300);

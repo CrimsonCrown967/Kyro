@@ -91,9 +91,9 @@ export function ProfileCard() {
   const restoreAdminBadge = useMutation(api.admin.restoreMyAdminBadge);
   const warn = useMutation(api.warnings.warn);
   const [warnReason, setWarnReason] = useState("");
-  const [profileTab, setProfileTab] = useState<
-    "comments" | "friends" | "communities"
-  >("comments");
+  const [profileTab, setProfileTab] = useState<"friends" | "communities">(
+    "friends",
+  );
 
   const close = (open: boolean) => {
     if (open) return;
@@ -161,8 +161,8 @@ export function ProfileCard() {
   const isBlocked = (lists?.blocked ?? []).some(
     (row) => row.user?.id === userId,
   );
-  /** Only site admins can grant or revoke global badges. */
-  const canManageBadges = Boolean(me && (me.role === "admin" || me.isFounder));
+  /** Badge grants follow the platform ladder: Admin and above only. */
+  const canManageBadges = Boolean(me?.isPlatformAdmin);
   const presenceMeta = user
     ? PRESENCE_META[(user.presence as keyof typeof PRESENCE_META) ?? "offline"]
     : null;
@@ -772,7 +772,7 @@ export function ProfileCard() {
   );
 }
 
-type ProfileContextTab = "comments" | "friends" | "communities";
+type ProfileContextTab = "friends" | "communities";
 
 type MutualFriend = {
   id: string;
@@ -805,7 +805,6 @@ function ProfileContextPanel({
   onOpenServer: (serverId: string) => void;
 }) {
   const tabs: { id: ProfileContextTab; label: string; count?: number }[] = [
-    { id: "comments", label: "Comments" },
     { id: "friends", label: "Mutual friends", count: mutualFriends.length },
     {
       id: "communities",
@@ -841,18 +840,6 @@ function ProfileContextPanel({
       </nav>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-10">
-        {activeTab === "comments" ? (
-          <div className="flex min-h-72 flex-col items-center justify-center text-center">
-            <span className="flex size-12 items-center justify-center rounded-full bg-surface text-muted-foreground">
-              <MessageCircle className="size-5" />
-            </span>
-            <p className="mt-4 text-sm font-semibold">No comments yet</p>
-            <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-              Profile comments will appear here when this feature is enabled.
-            </p>
-          </div>
-        ) : null}
-
         {activeTab === "friends" ? (
           mutualFriends.length > 0 ? (
             <div className="grid gap-2 sm:grid-cols-2">

@@ -46,6 +46,25 @@ export const unreadCount = query({
   },
 });
 
+/**
+ * Unread mentions and replies only — the number shown in the browser title.
+ * Ordinary unread DMs, friend requests and system notes deliberately do not
+ * count, so the tab stays quiet unless someone actually referenced you.
+ */
+export const mentionCount = query({
+  args: {},
+  handler: async (ctx) => {
+    const { id } = await requireUser(ctx);
+    const notes = await ctx.db
+      .query("notifications")
+      .withIndex("by_user_unread", (q) => q.eq("userId", id).eq("read", false))
+      .collect();
+    return notes.filter(
+      (note) => note.type === "mention" || note.type === "reply",
+    ).length;
+  },
+});
+
 export const markRead = mutation({
   args: { ids: v.array(v.id("notifications")) },
   handler: async (ctx, { ids }) => {

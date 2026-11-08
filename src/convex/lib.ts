@@ -29,9 +29,7 @@ export const MAX_ATTACHMENT_BYTES = MAX_UPLOAD_BYTES;
  */
 export const SYNTHETIC_EMAIL_SUFFIX = "@kyro-seed.invalid";
 
-export function isSyntheticEmail(
-  email: string | null | undefined,
-): boolean {
+export function isSyntheticEmail(email: string | null | undefined): boolean {
   return Boolean(
     email && email.trim().toLowerCase().endsWith(SYNTHETIC_EMAIL_SUFFIX),
   );
@@ -161,8 +159,8 @@ export interface PublicUser {
   /**
    * Global (platform-wide) badges shown in the profile's own badge shelf —
    * separate from community roles. Always in this order:
-   * founder, cofounder, admin, manager, staff, moderator, trialstaff,
-   * bughunter, vip, og, verified, supporter, donator, partner.
+   * founder, cofounder, manager, admin, moderator, staff, trialstaff,
+   * verified, partner, donator, supporter, vip, bughunter, og.
    */
   badges: GlobalBadge[];
   /** External links shown on the profile, in the order they were saved. */
@@ -230,18 +228,128 @@ export function canViewIpDirectory(
 export type GlobalBadge =
   | "founder"
   | "cofounder"
-  | "admin"
   | "manager"
-  | "staff"
+  | "admin"
   | "moderator"
+  | "staff"
   | "trialstaff"
   | "verified"
-  | "bughunter"
-  | "vip"
-  | "og"
-  | "supporter"
+  | "partner"
   | "donator"
-  | "partner";
+  | "supporter"
+  | "vip"
+  | "bughunter"
+  | "og";
+
+/**
+ * Platform authority ladder. Badges are not decorative on the staff rungs:
+ * each one grants exactly the powers of its rank and everything below it.
+ * Founder > Co Founder > Manager > Admin > Moderator > Staff > Trial Staff.
+ * Cosmetic badges (Verified, Partner, Donator, Supporter, VIP, Bug Hunter, OG)
+ * never grant authority.
+ */
+export const PLATFORM_ROLE_RANK = {
+  founder: 7,
+  cofounder: 6,
+  manager: 5,
+  admin: 4,
+  moderator: 3,
+  staff: 2,
+  trialstaff: 1,
+  user: 0,
+} as const;
+export type PlatformRole = keyof typeof PLATFORM_ROLE_RANK;
+
+type PlatformUser = Pick<
+  Doc<"users">,
+  | "_id"
+  | "role"
+  | "founderBadge"
+  | "coFounder"
+  | "manager"
+  | "staff"
+  | "siteModerator"
+  | "trialStaff"
+>;
+
+/** The highest platform rung a user holds, derived from real grant flags. */
+export function platformRoleFor(user: PlatformUser): PlatformRole {
+  if (isFounderUser(user) || user.founderBadge === true) return "founder";
+  if (user.coFounder === true) return "cofounder";
+  if (user.manager === true) return "manager";
+  if (user.role === "admin") return "admin";
+  if (user.siteModerator === true) return "moderator";
+  if (user.staff === true) return "staff";
+  if (user.trialStaff === true) return "trialstaff";
+  return "user";
+}
+
+export function platformRank(user: PlatformUser): number {
+  return PLATFORM_ROLE_RANK[platformRoleFor(user)];
+}
+
+/** True when the user holds `minimum` or any higher platform rung. */
+export function hasPlatformRole(
+  user: PlatformUser,
+  minimum: PlatformRole,
+): boolean {
+  return platformRank(user) >= PLATFORM_ROLE_RANK[minimum];
+}
+
+/** Trial Staff or above: read-only Admin Portal access. */
+export function isPlatformTrialStaff(user: PlatformUser): boolean {
+  return hasPlatformRole(user, "trialstaff");
+}
+
+/** Staff or above: real moderation actions (warnings, bans, reports). */
+export function isPlatformStaff(user: PlatformUser): boolean {
+  return hasPlatformRole(user, "staff");
+}
+
+/** Admin or above: badge grants, staff bans, community deletion. */
+export function isPlatformAdmin(user: PlatformUser): boolean {
+  return hasPlatformRole(user, "admin");
+}
+
+/** The Founder platform rung (configured founder or explicitly granted badge). */
+export function isPlatformFounder(user: PlatformUser): boolean {
+  return platformRoleFor(user) === "founder";
+}
+
+/**
+ * Every platform badge a user currently holds, in display order. This is the
+ * single source of truth for profiles, the Admin Portal and badge selection.
+ */
+export function globalBadgesFor(user: Doc<"users">): GlobalBadge[] {
+  const isFounder = isFounderUser(user);
+  const badges: GlobalBadge[] = [];
+  // Founder badge: the founder always holds it (unless they stripped it from
+  // their own profile), plus anyone the founder explicitly granted it to.
+  if (
+    isFounder ? user.founderBadgeRemoved !== true : user.founderBadge === true
+  ) {
+    badges.push("founder");
+  }
+  if (user.coFounder === true) badges.push("cofounder");
+  if (user.manager === true) badges.push("manager");
+  // Admin badge: role === "admin" always carries it. The founder also carries
+  // it by default, but may strip it from their own profile via adminBadgeRemoved.
+  const founderAdminRemoved = isFounder && user.adminBadgeRemoved === true;
+  if (user.role === "admin" || (isFounder && !founderAdminRemoved)) {
+    badges.push("admin");
+  }
+  if (user.siteModerator === true) badges.push("moderator");
+  if (user.staff === true) badges.push("staff");
+  if (user.trialStaff === true) badges.push("trialstaff");
+  if (user.verified === true) badges.push("verified");
+  if (user.partner === true) badges.push("partner");
+  if (user.donator === true) badges.push("donator");
+  if (user.supporter === true) badges.push("supporter");
+  if (user.vip === true) badges.push("vip");
+  if (user.bugHunter === true) badges.push("bughunter");
+  if (user.og === true) badges.push("og");
+  return badges;
+}
 
 /**
  * Active (unexpired) staff warnings on an account: 0 = clean, 1 = limited,
@@ -279,31 +387,7 @@ export async function hydrateUser(
     (user.showPresence !== false &&
       user.status !== "invisible" &&
       user.status !== "offline");
-  const badges: GlobalBadge[] = [];
-  // Founder badge: the founder always holds it (unless they stripped it from
-  // their own profile), plus anyone the founder explicitly granted it to.
-  const founderBadgeHeld = isFounder
-    ? user.founderBadgeRemoved !== true
-    : user.founderBadge === true;
-  if (founderBadgeHeld) badges.push("founder");
-  if (user.coFounder === true) badges.push("cofounder");
-  // Admin badge: role === "admin" always carries it. The founder also carries
-  // it by default, but may strip it from their own profile via adminBadgeRemoved.
-  const founderAdminRemoved = isFounder && user.adminBadgeRemoved === true;
-  if (user.role === "admin" || (isFounder && !founderAdminRemoved)) {
-    badges.push("admin");
-  }
-  if (user.manager === true) badges.push("manager");
-  if (user.staff === true) badges.push("staff");
-  if (user.siteModerator === true) badges.push("moderator");
-  if (user.trialStaff === true) badges.push("trialstaff");
-  if (user.bugHunter === true) badges.push("bughunter");
-  if (user.vip === true) badges.push("vip");
-  if (user.og === true) badges.push("og");
-  if (user.verified === true) badges.push("verified");
-  if (user.supporter === true) badges.push("supporter");
-  if (user.donator === true) badges.push("donator");
-  if (user.partner === true) badges.push("partner");
+  const badges = globalBadgesFor(user);
   return {
     id: user._id,
     username: user.username ?? null,

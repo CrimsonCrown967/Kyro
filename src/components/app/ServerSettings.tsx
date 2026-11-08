@@ -3340,7 +3340,7 @@ function ReportsTab({ serverId }: { serverId: string }) {
     serverId: serverId as Id<"servers">,
   });
   const me = useQuery(api.users.me);
-  const isAdmin = me?.role === "admin";
+  const isAdmin = me?.isPlatformAdmin === true;
 
   return (
     <section className="rounded-xl border border-border/70 bg-panel p-5">

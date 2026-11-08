@@ -7,7 +7,11 @@ import {
   type MutationCtx,
 } from "./_generated/server";
 import { deliverEmailRef } from "./emailRefs";
-import { isFounderUser, requireActiveUser } from "./lib";
+import {
+  isPlatformStaff,
+  isPlatformTrialStaff,
+  requireActiveUser,
+} from "./lib";
 
 export type EmailTemplate =
   | "password_reset"
@@ -279,12 +283,18 @@ export const notifyExpiredBans = internalMutation({
 
 async function requireEmailStaff(ctx: Parameters<typeof requireActiveUser>[0]) {
   const { id, user } = await requireActiveUser(ctx);
-  if (
-    user.role !== "admin" &&
-    user.siteModerator !== true &&
-    !isFounderUser(user)
-  ) {
+  if (!isPlatformStaff(user)) {
     throw new Error("Only Kyro staff can manage email delivery.");
+  }
+  return id;
+}
+
+async function requireEmailViewer(
+  ctx: Parameters<typeof requireActiveUser>[0],
+) {
+  const { id, user } = await requireActiveUser(ctx);
+  if (!isPlatformTrialStaff(user)) {
+    throw new Error("The Admin Portal is only available to Kyro staff.");
   }
   return id;
 }
@@ -292,7 +302,7 @@ async function requireEmailStaff(ctx: Parameters<typeof requireActiveUser>[0]) {
 export const failures = query({
   args: {},
   handler: async (ctx) => {
-    await requireEmailStaff(ctx);
+    await requireEmailViewer(ctx);
     const [failed, dead] = await Promise.all([
       ctx.db
         .query("emailOutbox")

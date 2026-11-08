@@ -4,18 +4,15 @@ import type { Doc } from "./_generated/dataModel";
 import {
   BUG_LIST_LIMIT,
   hydrateUsers,
-  isFounderUser,
+  isPlatformStaff,
+  isPlatformTrialStaff,
   requireActiveUser,
   requireUser,
 } from "./lib";
 
-/** Site admins and site moderators may triage bug reports.
- *  (moderators only review; admins + founder grant roles too).
- */
+/** Any platform staff badge (Staff and above) may triage bug reports. */
 export function isAdminOrMod(user: Doc<"users">): boolean {
-  return (
-    user.role === "admin" || isFounderUser(user) || user.siteModerator === true
-  );
+  return isPlatformStaff(user);
 }
 
 /** What kind of bug a report is, so staff can triage at a glance. */
@@ -83,12 +80,12 @@ export const mine = query({
   },
 });
 
-/** Every bug report — admins/moderators, used by the Admin Portal. */
+/** Every bug report — Trial Staff may read; Staff and above may triage. */
 export const list = query({
   args: {},
   handler: async (ctx) => {
     const { id, user } = await requireActiveUser(ctx);
-    if (!isAdminOrMod(user)) return [];
+    if (!isPlatformTrialStaff(user)) return [];
     const reports = await ctx.db
       .query("bugReports")
       .order("desc")

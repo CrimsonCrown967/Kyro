@@ -83,25 +83,33 @@ export const list = query({
   handler: async (ctx, { serverId }) => {
     const { id } = await requireUser(ctx);
     const access = await requireServerAccess(ctx, serverId, id);
-    const [categories, channels, reads, roles] = await Promise.all([
-      ctx.db
-        .query("categories")
-        .withIndex("by_server_position", (q) => q.eq("serverId", serverId))
-        .collect(),
-      ctx.db
-        .query("channels")
-        .withIndex("by_server", (q) => q.eq("serverId", serverId))
-        .collect(),
-      ctx.db
-        .query("reads")
-        .withIndex("by_user", (q) => q.eq("userId", id))
-        .collect(),
-      ctx.db
-        .query("serverRoles")
-        .withIndex("by_server", (q) => q.eq("serverId", serverId))
-        .collect(),
-    ]);
+    const [categories, channels, reads, roles, notificationSettings] =
+      await Promise.all([
+        ctx.db
+          .query("categories")
+          .withIndex("by_server_position", (q) => q.eq("serverId", serverId))
+          .collect(),
+        ctx.db
+          .query("channels")
+          .withIndex("by_server", (q) => q.eq("serverId", serverId))
+          .collect(),
+        ctx.db
+          .query("reads")
+          .withIndex("by_user", (q) => q.eq("userId", id))
+          .collect(),
+        ctx.db
+          .query("serverRoles")
+          .withIndex("by_server", (q) => q.eq("serverId", serverId))
+          .collect(),
+        ctx.db
+          .query("channelNotificationSettings")
+          .withIndex("by_user_channel", (q) => q.eq("userId", id))
+          .collect(),
+      ]);
     const readMap = new Map(reads.map((read) => [read.key, read.lastReadAt]));
+    const notificationMap = new Map(
+      notificationSettings.map((setting) => [setting.channelId, setting.level]),
+    );
     const everyoneRole = roles.find((role) => role.isDefault) ?? null;
     const effective = new Map(
       channels.map((channel) => [
@@ -160,6 +168,8 @@ export const list = query({
           lastMessageAt: channel.lastMessageAt ?? 0,
           lastMessageSenderId:
             (channel.lastMessageSenderId as string | undefined) ?? null,
+          notificationLevel:
+            notificationMap.get(channel._id) ?? ("mentions" as const),
           unread:
             (channel.lastMessageAt ?? 0) > (readMap.get(channel._id) ?? 0),
         })),
