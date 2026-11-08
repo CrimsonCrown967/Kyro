@@ -473,6 +473,8 @@ export const get = query({
           color: role.color ?? null,
           position: role.position,
           isDefault: role.isDefault,
+          hoist: role.hoist === true,
+          mentionable: role.mentionable === true,
           permissions: role.permissions,
         })),
     };
@@ -511,6 +513,9 @@ export const members = query({
           .sort((a, b) => a.position - b.position);
         const top =
           memberRoles.length > 0 ? memberRoles[memberRoles.length - 1] : null;
+        const topHoisted = [...memberRoles]
+          .reverse()
+          .find((role) => role.hoist === true);
         return {
           user,
           nickname: row.nickname ?? null,
@@ -523,10 +528,13 @@ export const members = query({
             color: role.color ?? null,
             position: role.position,
             isDefault: role.isDefault,
+            hoist: role.hoist === true,
+            mentionable: role.mentionable === true,
           })),
           topRoleName:
             top?.name ?? (row.userId === ownerId ? "Owner" : "Member"),
           topRoleColor: top?.color ?? null,
+          topHoistedRoleName: topHoisted?.name ?? null,
         };
       })
       .filter(
@@ -1125,6 +1133,8 @@ export const exportConfiguration = mutation({
           position: role.position,
           permissions: role.permissions,
           isDefault: role.isDefault,
+          hoist: role.hoist === true,
+          mentionable: role.mentionable === true,
         })),
       categories: categories
         .slice()

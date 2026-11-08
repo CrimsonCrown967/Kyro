@@ -35,6 +35,8 @@ type TemplateRole = {
   color?: string | null;
   permissions: string[];
   isDefault?: boolean;
+  hoist?: boolean;
+  mentionable?: boolean;
 };
 type TemplateCategory = { key: string; name: string; position?: number };
 type TemplateChannel = {
@@ -341,6 +343,8 @@ function parseSnapshot(value: string): TemplateSnapshot {
         color: textValue(role.color, 16) ?? null,
         permissions: stringList(role.permissions, ALL_PERMISSIONS.length, 64),
         isDefault: role.isDefault === true,
+        hoist: role.hoist === true,
+        mentionable: role.mentionable === true,
       },
     ];
   });
@@ -565,6 +569,8 @@ async function instantiate(
           allowed.has(permission) && permission !== PERMISSIONS.ADMINISTRATOR,
       ),
       isDefault: false,
+      hoist: role.hoist === true || undefined,
+      mentionable: role.mentionable === true || undefined,
     });
     roleIds.set(role.key, roleId);
   }
@@ -900,6 +906,8 @@ export const previewDiscordTemplate = action({
           color?: number;
           position?: number;
           permissions?: string;
+          hoist?: boolean;
+          mentionable?: boolean;
         }[];
         channels?: {
           id: string;
@@ -938,6 +946,8 @@ export const previewDiscordTemplate = action({
               : null,
             permissions: discordRolePermissions(role.permissions, isDefault),
             isDefault,
+            hoist: role.hoist === true,
+            mentionable: role.mentionable === true,
           };
         }),
       categories: [...discordCategories]

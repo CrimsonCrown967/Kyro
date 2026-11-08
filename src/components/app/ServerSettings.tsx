@@ -1434,11 +1434,15 @@ function RolesTab({
   const [permissions, setPermissions] = useState<string[]>([
     PERMISSIONS.SEND_MESSAGES,
   ]);
+  const [hoist, setHoist] = useState(false);
+  const [mentionable, setMentionable] = useState(false);
   const [busy, setBusy] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editPerms, setEditPerms] = useState<string[]>([]);
   const [editName, setEditName] = useState("");
   const [editColor, setEditColor] = useState(DEFAULT_ROLE_COLORS[0]);
+  const [editHoist, setEditHoist] = useState(false);
+  const [editMentionable, setEditMentionable] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
 
@@ -1497,6 +1501,8 @@ function RolesTab({
     setEditPerms([...source.permissions]);
     setEditName(source.name);
     setEditColor(source.color ?? DEFAULT_ROLE_COLORS[0]);
+    setEditHoist(source.hoist);
+    setEditMentionable(source.mentionable);
   };
 
   /** Arrow buttons: one rank at a time, straight to the backend. */
@@ -1673,9 +1679,21 @@ function RolesTab({
                   className="size-3 shrink-0 rounded-full"
                   style={{ background: role.color ?? "#9CA3AF" }}
                 />
-                <span className="block min-w-0 flex-1 truncate text-sm font-semibold">
-                  {role.name}
-                </span>
+                <div className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold">
+                    {role.name}
+                  </span>
+                  {role.hoist || role.mentionable ? (
+                    <span className="block truncate text-[10px] text-muted-foreground">
+                      {[
+                        role.hoist ? "separate member section" : null,
+                        role.mentionable ? "mentionable" : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </span>
+                  ) : null}
+                </div>
                 <span className="flex w-16 shrink-0 items-center justify-end gap-1 text-xs text-muted-foreground">
                   <User className="size-3.5" aria-hidden="true" />
                   {role.memberCount}
@@ -1799,6 +1817,37 @@ function RolesTab({
                   </div>
                 </div>
 
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <label className="flex items-start justify-between gap-4 rounded-lg border border-border/70 p-3">
+                    <span>
+                      <span className="block text-sm font-medium">
+                        Separate member section
+                      </span>
+                      <span className="block text-xs text-muted-foreground">
+                        Show this role as its own group in the member list.
+                      </span>
+                    </span>
+                    <Switch
+                      checked={editHoist}
+                      onCheckedChange={setEditHoist}
+                    />
+                  </label>
+                  <label className="flex items-start justify-between gap-4 rounded-lg border border-border/70 p-3">
+                    <span>
+                      <span className="block text-sm font-medium">
+                        Allow role mentions
+                      </span>
+                      <span className="block text-xs text-muted-foreground">
+                        Let members notify everyone who has this role.
+                      </span>
+                    </span>
+                    <Switch
+                      checked={editMentionable}
+                      onCheckedChange={setEditMentionable}
+                    />
+                  </label>
+                </div>
+
                 <div>
                   <p className="mb-2 text-sm font-medium">Permissions</p>
                   <PermissionToggles
@@ -1853,6 +1902,8 @@ function RolesTab({
                           name: editName.trim(),
                           color: editColor.toUpperCase(),
                           permissions: editPerms,
+                          hoist: editHoist,
+                          mentionable: editMentionable,
                         }),
                       "Role updated.",
                       () => setEditingId(null),
@@ -1908,6 +1959,30 @@ function RolesTab({
             onChange={setPermissions}
             allowAdmin={isOwner}
           />
+          <div className="grid gap-2 sm:grid-cols-2">
+            <label className="flex items-start justify-between gap-4 rounded-lg border border-border/70 p-3">
+              <span>
+                <span className="block text-sm font-medium">
+                  Separate member section
+                </span>
+                <span className="block text-xs text-muted-foreground">
+                  Group members with this role in the roster.
+                </span>
+              </span>
+              <Switch checked={hoist} onCheckedChange={setHoist} />
+            </label>
+            <label className="flex items-start justify-between gap-4 rounded-lg border border-border/70 p-3">
+              <span>
+                <span className="block text-sm font-medium">
+                  Allow role mentions
+                </span>
+                <span className="block text-xs text-muted-foreground">
+                  Let members mention everyone with this role.
+                </span>
+              </span>
+              <Switch checked={mentionable} onCheckedChange={setMentionable} />
+            </label>
+          </div>
           <div className="flex justify-end">
             <Button
               disabled={busy || name.trim().length < 2}
@@ -1919,11 +1994,15 @@ function RolesTab({
                       name: name.trim(),
                       color,
                       permissions,
+                      hoist,
+                      mentionable,
                     }),
                   "Role created.",
                   () => {
                     setName("");
                     setPermissions([PERMISSIONS.SEND_MESSAGES]);
+                    setHoist(false);
+                    setMentionable(false);
                   },
                 )
               }

@@ -280,6 +280,10 @@ const schema = defineSchema(
       position: v.number(),
       permissions: v.array(v.string()),
       isDefault: v.boolean(),
+      /** Show members with this role in their own roster section. */
+      hoist: v.optional(v.boolean()),
+      /** Members may mention this role without Mention Everyone permission. */
+      mentionable: v.optional(v.boolean()),
     })
       .index("by_server", ["serverId"])
       .index("by_server_position", ["serverId", "position"]),

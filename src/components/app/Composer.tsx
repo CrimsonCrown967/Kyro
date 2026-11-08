@@ -41,6 +41,7 @@ import type { CustomEmoji } from "@/lib/emoji";
 import { GifPicker } from "@/components/app/GifPicker";
 import { StyledDisplayName } from "@/components/app/StyledDisplayName";
 import { PollComposerDialog } from "@/components/app/PollComposerDialog";
+import { roleMentionToken } from "@/lib/permissions";
 
 export interface MentionUser {
   id: string;
@@ -53,6 +54,13 @@ export interface MentionUser {
   displayNameColor2?: string | null;
 }
 
+export interface MentionRole {
+  id: string;
+  name: string;
+  color: string | null;
+  memberCount: number;
+}
+
 export function Composer({
   containerType,
   containerId,
@@ -61,6 +69,7 @@ export function Composer({
   disabledReason,
   onSent,
   mentionUsers = [],
+  mentionRoles = [],
   allowMassMentions = false,
 }: {
   containerType: "channel" | "conversation";
@@ -70,6 +79,7 @@ export function Composer({
   disabledReason?: string | null;
   onSent?: () => void;
   mentionUsers?: MentionUser[];
+  mentionRoles?: MentionRole[];
   allowMassMentions?: boolean;
 }) {
   const draftKey = `${containerType}:${containerId}`;
@@ -134,17 +144,41 @@ export function Composer({
   const mentionOptions = [
     ...(allowMassMentions
       ? [
-          { id: "everyone", name: "Everyone", username: "everyone" },
-          { id: "here", name: "Here", username: "here" },
+          {
+            kind: "mass" as const,
+            id: "everyone",
+            name: "Everyone",
+            username: "everyone",
+            token: "@everyone",
+          },
+          {
+            kind: "mass" as const,
+            id: "here",
+            name: "Here",
+            username: "here",
+            token: "@here",
+          },
         ]
       : []),
-    ...mentionUsers.filter((user) => Boolean(user.username)),
+    ...mentionRoles.map((role) => ({
+      ...role,
+      kind: "role" as const,
+      username: null,
+      token: roleMentionToken(role.id),
+    })),
+    ...mentionUsers
+      .filter((user) => Boolean(user.username))
+      .map((user) => ({
+        ...user,
+        kind: "user" as const,
+        token: `@${user.username}`,
+      })),
   ]
-    .filter((user) => {
+    .filter((option) => {
       const query = mentionQuery ?? "";
       return (
-        user.username?.toLowerCase().includes(query) ||
-        user.name.toLowerCase().includes(query)
+        option.username?.toLowerCase().includes(query) ||
+        option.name.toLowerCase().includes(query)
       );
     })
     .slice(0, 8);
@@ -158,15 +192,15 @@ export function Composer({
         .slice(0, 8)
     : [];
 
-  const insertMention = (username: string) => {
+  const insertMention = (token: string) => {
     const cursor = textareaRef.current?.selectionStart ?? draft.length;
     if (mentionStart === null) return;
-    const next = `${draft.slice(0, mentionStart)}@${username} ${draft.slice(cursor)}`;
+    const next = `${draft.slice(0, mentionStart)}${token} ${draft.slice(cursor)}`;
     setDraft(draftKey, next);
     setMentionQuery(null);
     setMentionStart(null);
     requestAnimationFrame(() => {
-      const position = mentionStart + username.length + 2;
+      const position = mentionStart + token.length + 1;
       textareaRef.current?.focus();
       textareaRef.current?.setSelectionRange(position, position);
     });
@@ -579,7 +613,7 @@ export function Composer({
                 event.preventDefault();
                 const selected =
                   mentionOptions[mentionIndex] ?? mentionOptions[0];
-                if (selected.username) insertMention(selected.username);
+                insertMention(selected.token);
                 return;
               }
               if (event.key === "Escape") {
@@ -666,14 +700,15 @@ export function Composer({
             <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
               Mentions
             </p>
-            {mentionOptions.map((user, index) => {
-              const mass = user.id === "everyone" || user.id === "here";
+            {mentionOptions.map((option, index) => {
+              const mass = option.kind === "mass";
+              const role = option.kind === "role";
               return (
                 <button
-                  key={user.id}
+                  key={`${option.kind}:${option.id}`}
                   type="button"
                   onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => user.username && insertMention(user.username)}
+                  onClick={() => insertMention(option.token)}
                   className={cn(
                     "flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left",
                     index === mentionIndex
@@ -685,26 +720,42 @@ export function Composer({
                     <span className="flex size-7 items-center justify-center rounded-full bg-warning/15 text-sm font-bold text-warning">
                       @
                     </span>
+                  ) : role ? (
+                    <span
+                      className="flex size-7 items-center justify-center rounded-full text-sm font-bold text-white"
+                      style={{ background: option.color ?? "#5865F2" }}
+                    >
+                      @
+                    </span>
                   ) : (
-                    <UserAvatar user={user} size="xs" showStatus={false} />
+                    <UserAvatar user={option} size="xs" showStatus={false} />
                   )}
                   <span className="min-w-0 flex-1">
                     {mass ? (
                       <span className="block truncate text-sm font-medium">
-                        @{user.username}
+                        @{option.username}
+                      </span>
+                    ) : role ? (
+                      <span
+                        className="block truncate text-sm font-semibold"
+                        style={{ color: option.color ?? undefined }}
+                      >
+                        @{option.name}
                       </span>
                     ) : (
                       <StyledDisplayName
-                        user={user}
+                        user={option}
                         className="block truncate text-sm"
                       />
                     )}
                     <span className="block truncate text-xs text-muted-foreground">
                       {mass
-                        ? user.id === "everyone"
+                        ? option.id === "everyone"
                           ? "Notify every server member"
                           : "Notify members currently online"
-                        : `@${user.username}`}
+                        : role
+                          ? `Notify ${option.memberCount} role member${option.memberCount === 1 ? "" : "s"}`
+                          : `@${option.username}`}
                     </span>
                   </span>
                 </button>

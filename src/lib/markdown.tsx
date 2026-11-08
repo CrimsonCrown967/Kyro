@@ -8,10 +8,17 @@ import type { CustomEmoji } from "@/lib/emoji";
  */
 
 const INLINE_PATTERN =
-  /(<:([a-zA-Z0-9_]{2,32}):([a-z0-9]+)>)|(`[^`\n]+`)|(\*\*[^*\n]+\*\*)|(__[^_\n]+__)|(\*[^*\n]+\*)|(~~[^~\n]+~~)|(https?:\/\/[^\s<>()]+)|(@[a-zA-Z0-9_]{2,32})/g;
+  /(<:([a-zA-Z0-9_]{2,32}):([a-z0-9]+)>)|(`[^`\n]+`)|(\*\*[^*\n]+\*\*)|(__[^_\n]+__)|(\*[^*\n]+\*)|(~~[^~\n]+~~)|(https?:\/\/[^\s<>()]+)|(<@&([a-z0-9]+)>)|(@[a-zA-Z0-9_]{2,32})/g;
+
+export interface RenderRoleMention {
+  id: string;
+  name: string;
+  color?: string | null;
+}
 
 export interface MessageRenderOptions {
   customEmojis?: readonly CustomEmoji[];
+  roleMentions?: readonly RenderRoleMention[];
   onMention?: (username: string) => void;
   /** Enables embedding/hiding direct media URLs; the preview is drawn outside. */
   onMedia?: (url: string) => void;
@@ -120,6 +127,19 @@ function renderInline(
         ) : (
           <span key={key}>:{match[2]}:</span>
         ),
+      );
+    } else if (token.startsWith("<@&")) {
+      const roleId = match[11];
+      const role = options.roleMentions?.find((entry) => entry.id === roleId);
+      nodes.push(
+        <span
+          key={key}
+          className="inline-flex rounded bg-primary/15 px-1 font-semibold text-primary"
+          style={role?.color ? { color: role.color } : undefined}
+          data-role-mention={roleId}
+        >
+          @{role?.name ?? "unknown-role"}
+        </span>,
       );
     } else if (token.startsWith("`")) {
       nodes.push(
@@ -231,6 +251,7 @@ export function renderMessage(
 export function plainExcerpt(content: string, max = 140): string {
   const cleaned = content
     .replace(/```[\s\S]*?```/g, " [code] ")
+    .replace(/<@&[a-z0-9]+>/g, "@role")
     .replace(/[*_~`]/g, "")
     .replace(/\s+/g, " ")
     .trim();

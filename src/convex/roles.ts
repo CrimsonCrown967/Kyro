@@ -88,6 +88,8 @@ export const list = query({
       color: role.color ?? null,
       position: role.position,
       isDefault: role.isDefault,
+      hoist: role.hoist === true,
+      mentionable: role.mentionable === true,
       permissions: role.permissions,
       // @everyone applies to every member; other roles count actual holders.
       memberCount: role.isDefault
@@ -199,8 +201,13 @@ export const create = mutation({
     name: v.string(),
     color: v.optional(v.string()),
     permissions: v.array(v.string()),
+    hoist: v.optional(v.boolean()),
+    mentionable: v.optional(v.boolean()),
   },
-  handler: async (ctx, { serverId, name, color, permissions }) => {
+  handler: async (
+    ctx,
+    { serverId, name, color, permissions, hoist, mentionable },
+  ) => {
     const { id } = await requireProfile(ctx);
     const access = await requireServerAccess(ctx, serverId, id);
     if (!can(access.permissions, PERMISSIONS.MANAGE_ROLES)) {
@@ -237,6 +244,8 @@ export const create = mutation({
       position,
       permissions: requested,
       isDefault: false,
+      hoist: hoist === true || undefined,
+      mentionable: mentionable === true || undefined,
     });
     await logAudit(ctx, {
       serverId,
@@ -256,6 +265,8 @@ export const update = mutation({
     name: v.optional(v.string()),
     color: v.optional(v.union(v.string(), v.null())),
     permissions: v.optional(v.array(v.string())),
+    hoist: v.optional(v.boolean()),
+    mentionable: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const { id } = await requireProfile(ctx);
@@ -309,6 +320,10 @@ export const update = mutation({
         throw new Error("You can only grant permissions you already have.");
       }
       patch.permissions = requested;
+    }
+    if (args.hoist !== undefined) patch.hoist = args.hoist || undefined;
+    if (args.mentionable !== undefined) {
+      patch.mentionable = args.mentionable || undefined;
     }
     await ctx.db.patch(args.roleId, patch);
     await logAudit(ctx, {

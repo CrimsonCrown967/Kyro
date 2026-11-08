@@ -130,6 +130,7 @@ export interface MessageDto {
     botName?: string | null;
   } | null;
   customEmojis?: CustomEmoji[];
+  roleMentions?: { id: string; name: string; color: string | null }[];
   pinnedAt?: number | null;
   thread?: {
     id: string;
@@ -1005,6 +1006,7 @@ function MessageRow({
                 <div className="whitespace-pre-wrap break-words text-sm leading-[1.375rem] text-foreground/95">
                   {renderMessage(message.content, {
                     customEmojis: message.customEmojis,
+                    roleMentions: message.roleMentions,
                     onMention: openMention,
                     onMedia: (url) => onOpenMedia(url, "Shared image"),
                     jumboEmoji: jumbo,

@@ -4,7 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Navigate, useSearchParams } from "react-router";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { Composer } from "@/components/app/Composer";
+import { Composer, type MentionRole } from "@/components/app/Composer";
 import { MemberList } from "@/components/app/MemberList";
 import {
   MessageList,
@@ -56,6 +56,7 @@ type SurfaceProps = {
     username: string | null;
     avatarUrl?: string | null;
   }[];
+  mentionRoles?: MentionRole[];
   allowMassMentions?: boolean;
 };
 
@@ -75,6 +76,7 @@ function ChatSurface({
   roleColors,
   headerAction,
   mentionUsers = [],
+  mentionRoles = [],
   allowMassMentions = false,
 }: SurfaceProps) {
   const me = useQuery(api.users.me);
@@ -215,6 +217,7 @@ function ChatSurface({
             onCancelReply={() => setReply(null)}
             disabledReason={disabledReason ?? null}
             mentionUsers={mentionUsers}
+            mentionRoles={mentionRoles}
             allowMassMentions={allowMassMentions}
           />
         </>
@@ -309,6 +312,9 @@ export function ChannelChat({
   const members = useQuery(api.servers.members, {
     serverId: serverId as Id<"servers">,
   });
+  const roles = useQuery(api.roles.list, {
+    serverId: serverId as Id<"servers">,
+  });
   const memberListOpen = useUiStore((state) => state.memberListOpen);
 
   if (channels === undefined) {
@@ -358,6 +364,16 @@ export function ChannelChat({
   for (const member of serverMembers) {
     if (member.topRoleColor) roleColors[member.user.id] = member.topRoleColor;
   }
+  const mentionRoles = (roles ?? [])
+    .filter(
+      (role) => !role.isDefault && (role.mentionable || allowMassMentions),
+    )
+    .map((role) => ({
+      id: role.id,
+      name: role.name,
+      color: role.color,
+      memberCount: role.memberCount,
+    }));
 
   return (
     <div className="flex h-full min-h-0">
@@ -378,6 +394,7 @@ export function ChannelChat({
           }
           roleColors={roleColors}
           mentionUsers={serverMembers.map((member) => member.user)}
+          mentionRoles={mentionRoles}
           allowMassMentions={allowMassMentions}
         />
       </div>

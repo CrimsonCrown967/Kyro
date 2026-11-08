@@ -64,6 +64,7 @@ type Member = {
   isOwner: boolean;
   topRoleColor: string | null;
   topRoleName: string;
+  topHoistedRoleName: string | null;
 };
 
 /** Right-hand roster for a community. Clicking someone opens their profile. */
@@ -127,7 +128,9 @@ export function MemberList({ serverId }: { serverId: string }) {
 
   const groupedOnline = new Map<string, Member[]>();
   for (const member of data.online) {
-    const label = member.isOwner ? "Owner" : member.topRoleName || "Online";
+    const label = member.isOwner
+      ? "Owner"
+      : (member.topHoistedRoleName ?? "Online");
     const group = groupedOnline.get(label) ?? [];
     group.push(member);
     groupedOnline.set(label, group);

@@ -191,6 +191,16 @@ export function parseMentions(content: string): string[] {
   return Array.from(new Set(names));
 }
 
+/** Stable role-mention markup stored in messages, matching Discord's shape. */
+export function roleMentionToken(roleId: string): string {
+  return `<@&${roleId}>`;
+}
+
+export function parseRoleMentionIds(content: string): string[] {
+  const matches = content.matchAll(/<@&([a-z0-9]+)>/g);
+  return Array.from(new Set(Array.from(matches, (match) => match[1])));
+}
+
 export interface ChannelPermissionOverwrite {
   roleId: string;
   allow: string[];

@@ -5,6 +5,7 @@ import { CUSTOM_EMOJI_TOKEN, customEmojiIds } from "../lib/emoji";
 import {
   channelPermissions,
   parseMentions,
+  parseRoleMentionIds,
   PERMISSIONS,
 } from "../lib/permissions";
 import {
@@ -160,7 +161,12 @@ export const list = query({
   },
   handler: async (ctx, { containerType, containerId, before, limit }) => {
     const { id: viewerId } = await requireUser(ctx);
-    await requireReadAccess(ctx, viewerId, containerType, containerId);
+    const listAccess = await requireReadAccess(
+      ctx,
+      viewerId,
+      containerType,
+      containerId,
+    );
 
     const take = Math.min(limit ?? 50, 100);
     const blocked = await blockedUserIds(ctx, viewerId);
@@ -211,6 +217,46 @@ export const list = query({
         .map((doc) => doc.authorId),
       viewerId,
     );
+
+    const roleMentionIds = Array.from(
+      new Set(
+        [...page, ...replyDocs.filter((doc) => doc !== null)].flatMap(
+          (message) => parseRoleMentionIds(message.content),
+        ),
+      ),
+    );
+    const roleMentionDocs = await Promise.all(
+      roleMentionIds.map(async (rawId) => {
+        const roleId = ctx.db.normalizeId("serverRoles", rawId);
+        return roleId ? await ctx.db.get(roleId) : null;
+      }),
+    );
+    const roleMentionMap = new Map(
+      roleMentionDocs
+        .filter(
+          (role): role is Doc<"serverRoles"> =>
+            role !== null &&
+            listAccess.kind === "channel" &&
+            role.serverId === listAccess.server._id,
+        )
+        .map((role) => [
+          role._id as string,
+          {
+            id: role._id as string,
+            name: role.name,
+            color: role.color ?? null,
+          },
+        ]),
+    );
+    const roleMentionsFor = (content: string) =>
+      parseRoleMentionIds(content)
+        .map((roleId) => roleMentionMap.get(roleId))
+        .filter((role): role is NonNullable<typeof role> => Boolean(role));
+    const roleMentionExcerpt = (content: string) =>
+      content.replace(/<@&([a-z0-9]+)>/g, (_token, roleId: string) => {
+        const role = roleMentionMap.get(roleId);
+        return role ? `@${role.name}` : "@unknown-role";
+      });
 
     const emojiIds = Array.from(
       new Set(page.flatMap((message) => [...customEmojiIds(message.content)])),
@@ -328,7 +374,7 @@ export const list = query({
           replyTo: reply
             ? {
                 id: reply._id,
-                excerpt: reply.content.slice(0, 160),
+                excerpt: roleMentionExcerpt(reply.content).slice(0, 160),
                 author: replyAuthors.get(reply.authorId) ?? null,
                 botName:
                   reply.kind === "bot_response"
@@ -369,6 +415,7 @@ export const list = query({
             .filter((emoji): emoji is NonNullable<typeof emoji> =>
               Boolean(emoji),
             ),
+          roleMentions: roleMentionsFor(message.content),
         };
       }),
     );
@@ -419,6 +466,7 @@ export const send = mutation({
       );
     }
     const content = args.content.trim();
+    const requestedRoleMentions = parseRoleMentionIds(content);
     const attachmentInputs = args.attachments ?? [];
     if (content.length > MAX_MESSAGE_LENGTH) {
       throw new Error(
@@ -476,6 +524,7 @@ export const send = mutation({
     }));
 
     let permissions: string[] = [];
+    const mentionedRoles: Doc<"serverRoles">[] = [];
     let mutedServer = false;
     let serverId: Id<"servers"> | undefined;
     let dmConversation: Doc<"conversations"> | null = null;
@@ -484,6 +533,21 @@ export const send = mutation({
       serverId = access.server._id;
       mutedServer = access.member.muted === true;
       const channel = access.channel;
+
+      for (const rawRoleId of requestedRoleMentions) {
+        const roleId = ctx.db.normalizeId("serverRoles", rawRoleId);
+        const role = roleId ? await ctx.db.get(roleId) : null;
+        if (!role || role.serverId !== access.server._id || role.isDefault) {
+          throw new Error("That role mention is no longer available.");
+        }
+        if (
+          !role.mentionable &&
+          !can(permissions, PERMISSIONS.MENTION_EVERYONE)
+        ) {
+          throw new Error(`The @${role.name} role is not mentionable.`);
+        }
+        mentionedRoles.push(role);
+      }
 
       const timeoutUntil = access.member.communicationDisabledUntil ?? 0;
       if (
@@ -589,6 +653,11 @@ export const send = mutation({
         };
       }
     } else {
+      if (requestedRoleMentions.length > 0) {
+        throw new Error(
+          "Role mentions can only be used in community channels.",
+        );
+      }
       dmConversation = access.conversation;
       if (
         dmConversation.type === "dm" &&
@@ -782,6 +851,53 @@ export const send = mutation({
         });
       }
 
+      if (mentionedRoles.length > 0) {
+        const memberships = await ctx.db
+          .query("serverMembers")
+          .withIndex("by_server", (q) => q.eq("serverId", serverId!))
+          .take(1000);
+        const roleMentionBody = mentionedRoles
+          .reduce(
+            (body, entry) =>
+              body.split(`<@&${entry._id}>`).join(`@${entry.name}`),
+            content,
+          )
+          .slice(0, 160);
+        for (const role of mentionedRoles) {
+          for (const membership of memberships) {
+            if (
+              membership.userId === userId ||
+              membership.muted ||
+              !membership.roleIds.includes(role._id) ||
+              notified.has(membership.userId)
+            ) {
+              continue;
+            }
+            if (
+              (await channelNotificationLevel(
+                ctx,
+                membership.userId,
+                args.containerId as Id<"channels">,
+              )) === "none"
+            ) {
+              continue;
+            }
+            const target = await ctx.db.get(membership.userId);
+            if (!target || target.deletedAt !== undefined) continue;
+            notified.add(target._id);
+            await notify(ctx, {
+              userId: target._id,
+              type: "mention",
+              title: `${user.name ?? user.username} mentioned @${role.name}`,
+              body: roleMentionBody,
+              actorId: userId,
+              link,
+              containerKey: args.containerId,
+            });
+          }
+        }
+      }
+
       // Members who explicitly subscribed to every message receive a normal
       // channel notification unless a mention above already notified them.
       const everyMessageSettings = await ctx.db
@@ -884,7 +1000,7 @@ export const edit = mutation({
     if (message.authorId !== userId) {
       throw new Error("You can only edit your own messages.");
     }
-    await requireReadAccess(
+    const access = await requireReadAccess(
       ctx,
       userId,
       message.containerType,
@@ -898,6 +1014,36 @@ export const edit = mutation({
     }
     if (!trimmed) throw new Error("A message can't be empty.");
     await requireUsableCustomEmojis(ctx, userId, trimmed);
+    const editedRoleMentions = parseRoleMentionIds(trimmed);
+    if (editedRoleMentions.length > 0) {
+      if (access.kind !== "channel") {
+        throw new Error(
+          "Role mentions can only be used in community channels.",
+        );
+      }
+      for (const rawRoleId of editedRoleMentions) {
+        const roleId = ctx.db.normalizeId("serverRoles", rawRoleId);
+        const role = roleId ? await ctx.db.get(roleId) : null;
+        if (!role || role.serverId !== access.server._id || role.isDefault) {
+          throw new Error("That role mention is no longer available.");
+        }
+        if (
+          !role.mentionable &&
+          !can(access.permissions, PERMISSIONS.MENTION_EVERYONE)
+        ) {
+          throw new Error(`The @${role.name} role is not mentionable.`);
+        }
+      }
+    }
+    if (
+      /(^|\s)@(everyone|here)\b/i.test(trimmed) &&
+      access.kind === "channel" &&
+      !can(access.permissions, PERMISSIONS.MENTION_EVERYONE)
+    ) {
+      throw new Error(
+        "You don't have permission to mention @everyone or @here.",
+      );
+    }
     await ctx.db.patch(messageId, { content: trimmed, editedAt: Date.now() });
   },
 });
