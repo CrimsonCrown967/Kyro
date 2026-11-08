@@ -392,6 +392,26 @@ html[data-tint] {
     );
     filter: blur(60px);
   }
+  .landing-star-field {
+    background-image:
+      radial-gradient(circle, rgb(255 255 255 / 75%) 0 1.5px, transparent 2px),
+      radial-gradient(circle, rgb(255 255 255 / 45%) 0 1px, transparent 1.5px),
+      radial-gradient(circle, rgb(255 255 255 / 30%) 0 2px, transparent 2.5px);
+    background-position:
+      0 0,
+      34px 58px,
+      96px 24px;
+    background-size:
+      128px 128px,
+      104px 104px,
+      176px 176px;
+    mask-image: linear-gradient(
+      to bottom,
+      black,
+      rgb(0 0 0 / 55%) 72%,
+      transparent
+    );
+  }
   /* Message hover toolbar: hidden until the row is hovered or focused. */
   .message-row .message-toolbar {
     opacity: 0;
