@@ -28,7 +28,7 @@ export interface Preferences {
   accent: AccentChoice;
   density: Density;
   showMemberList: boolean;
-  /** Play a soft ping when notifications arrive while the tab is hidden. */
+  /** Play a soft ping whenever a new mention or reply arrives. */
   notificationSounds: boolean;
   /** App-wide colour tint: a preset id, "custom", or "none". */
   tint: string;

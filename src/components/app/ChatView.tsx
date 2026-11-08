@@ -44,6 +44,7 @@ type SurfaceProps = {
   /** Users shown in the header for a DM. */
   participants?: { id: string; name: string; avatarUrl?: string | null }[];
   canManageMessages: boolean;
+  canSendMessages?: boolean;
   disabledReason?: string | null;
   roleColors?: Record<string, string>;
   /** Rendered to the right of the conversation header. */
@@ -69,6 +70,7 @@ function ChatSurface({
   icon,
   participants,
   canManageMessages,
+  canSendMessages = true,
   disabledReason,
   roleColors,
   headerAction,
@@ -194,25 +196,29 @@ function ChatSurface({
         mentionUsers={mentionUsers}
       />
 
-      <div className="h-5 shrink-0 px-4 text-xs text-muted-foreground">
-        {typers.length > 0 && (
-          <span className="italic">
-            {typers.slice(0, 3).join(", ")}
-            {typers.length > 3 ? " and others" : ""}{" "}
-            {typers.length === 1 ? "is" : "are"} typing…
-          </span>
-        )}
-      </div>
+      {canSendMessages ? (
+        <>
+          <div className="h-5 shrink-0 px-4 text-xs text-muted-foreground">
+            {typers.length > 0 && (
+              <span className="italic">
+                {typers.slice(0, 3).join(", ")}
+                {typers.length > 3 ? " and others" : ""}{" "}
+                {typers.length === 1 ? "is" : "are"} typing…
+              </span>
+            )}
+          </div>
 
-      <Composer
-        containerType={containerType}
-        containerId={containerId}
-        reply={reply}
-        onCancelReply={() => setReply(null)}
-        disabledReason={disabledReason ?? null}
-        mentionUsers={mentionUsers}
-        allowMassMentions={allowMassMentions}
-      />
+          <Composer
+            containerType={containerType}
+            containerId={containerId}
+            reply={reply}
+            onCancelReply={() => setReply(null)}
+            disabledReason={disabledReason ?? null}
+            mentionUsers={mentionUsers}
+            allowMassMentions={allowMassMentions}
+          />
+        </>
+      ) : null}
 
       <ReportDialog
         open={report !== null}
@@ -332,6 +338,12 @@ export function ChannelChat({
     channel.permissions ?? channels.permissions,
     PERMISSIONS.MANAGE_MESSAGES,
   );
+  const canSendMessages =
+    hasPermission(
+      channel.permissions ?? channels.permissions,
+      PERMISSIONS.SEND_MESSAGES,
+    ) &&
+    (!channel.readOnly || canManageMessages);
   const allowMassMentions =
     channels.isOwner ||
     hasPermission(
@@ -358,6 +370,7 @@ export function ChannelChat({
           subtitle={channel.topic}
           icon={<Hash className="size-4" />}
           canManageMessages={canManageMessages}
+          canSendMessages={canSendMessages}
           disabledReason={
             channel.readOnly && !canManageMessages
               ? "This channel is read-only."

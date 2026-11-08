@@ -9,6 +9,7 @@ import {
 } from "../lib/permissions";
 import {
   can,
+  MAX_BADGE_NOTIFICATIONS,
   logAudit,
   requireProfile,
   requireServerAccess,
@@ -83,33 +84,66 @@ export const list = query({
   handler: async (ctx, { serverId }) => {
     const { id } = await requireUser(ctx);
     const access = await requireServerAccess(ctx, serverId, id);
-    const [categories, channels, reads, roles, notificationSettings] =
-      await Promise.all([
-        ctx.db
-          .query("categories")
-          .withIndex("by_server_position", (q) => q.eq("serverId", serverId))
-          .collect(),
-        ctx.db
-          .query("channels")
-          .withIndex("by_server", (q) => q.eq("serverId", serverId))
-          .collect(),
-        ctx.db
-          .query("reads")
-          .withIndex("by_user", (q) => q.eq("userId", id))
-          .collect(),
-        ctx.db
-          .query("serverRoles")
-          .withIndex("by_server", (q) => q.eq("serverId", serverId))
-          .collect(),
-        ctx.db
-          .query("channelNotificationSettings")
-          .withIndex("by_user_channel", (q) => q.eq("userId", id))
-          .collect(),
-      ]);
+    const [
+      categories,
+      channels,
+      reads,
+      roles,
+      notificationSettings,
+      mentionNotifications,
+      replyNotifications,
+    ] = await Promise.all([
+      ctx.db
+        .query("categories")
+        .withIndex("by_server_position", (q) => q.eq("serverId", serverId))
+        .collect(),
+      ctx.db
+        .query("channels")
+        .withIndex("by_server", (q) => q.eq("serverId", serverId))
+        .collect(),
+      ctx.db
+        .query("reads")
+        .withIndex("by_user", (q) => q.eq("userId", id))
+        .collect(),
+      ctx.db
+        .query("serverRoles")
+        .withIndex("by_server", (q) => q.eq("serverId", serverId))
+        .collect(),
+      ctx.db
+        .query("channelNotificationSettings")
+        .withIndex("by_user_channel", (q) => q.eq("userId", id))
+        .collect(),
+      ctx.db
+        .query("notifications")
+        .withIndex("by_user_unread_type", (q) =>
+          q.eq("userId", id).eq("read", false).eq("type", "mention"),
+        )
+        .order("desc")
+        .take(MAX_BADGE_NOTIFICATIONS),
+      ctx.db
+        .query("notifications")
+        .withIndex("by_user_unread_type", (q) =>
+          q.eq("userId", id).eq("read", false).eq("type", "reply"),
+        )
+        .order("desc")
+        .take(MAX_BADGE_NOTIFICATIONS),
+    ]);
     const readMap = new Map(reads.map((read) => [read.key, read.lastReadAt]));
     const notificationMap = new Map(
       notificationSettings.map((setting) => [setting.channelId, setting.level]),
     );
+    const mentionMap = new Map<string, number>();
+    for (const notification of [
+      ...mentionNotifications,
+      ...replyNotifications,
+    ]) {
+      if (notification.containerKey) {
+        mentionMap.set(
+          notification.containerKey,
+          (mentionMap.get(notification.containerKey) ?? 0) + 1,
+        );
+      }
+    }
     const everyoneRole = roles.find((role) => role.isDefault) ?? null;
     const effective = new Map(
       channels.map((channel) => [
@@ -170,6 +204,7 @@ export const list = query({
             (channel.lastMessageSenderId as string | undefined) ?? null,
           notificationLevel:
             notificationMap.get(channel._id) ?? ("mentions" as const),
+          mentionCount: mentionMap.get(channel._id) ?? 0,
           unread:
             (channel.lastMessageAt ?? 0) > (readMap.get(channel._id) ?? 0),
         })),

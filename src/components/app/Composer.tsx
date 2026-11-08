@@ -1,11 +1,17 @@
-import { useAction, useConvex, useMutation } from "convex/react";
+import { useAction, useConvex, useMutation, useQuery } from "convex/react";
 import {
   BarChart3,
+  Bot,
+  Bold,
+  Code,
+  Italic,
   Mic,
   Paperclip,
   Send,
   Smile,
   StopCircle,
+  Strikethrough,
+  Underline,
   X,
 } from "@/components/icons";
 import { useEffect, useRef, useState } from "react";
@@ -70,7 +76,14 @@ export function Composer({
   const draft = useUiStore((state) => state.drafts[draftKey] ?? "");
   const setDraft = useUiStore((state) => state.setDraft);
   const sendMessage = useMutation(api.messages.send);
+  const runBotCommand = useMutation(api.bots.execute);
   const setTyping = useMutation(api.messages.setTyping);
+  const botCommands = useQuery(
+    api.bots.listForChannel,
+    containerType === "channel"
+      ? { channelId: containerId as Id<"channels"> }
+      : "skip",
+  );
   const upload = useUploadFile();
   const convex = useConvex();
   const registerGifShare = useAction(api.gifs.registerShare);
@@ -84,6 +97,11 @@ export function Composer({
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionStart, setMentionStart] = useState<number | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);
+  const [commandIndex, setCommandIndex] = useState(0);
+  const [selection, setSelection] = useState<{
+    start: number;
+    end: number;
+  } | null>(null);
   const [recording, setRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -130,6 +148,15 @@ export function Composer({
       );
     })
     .slice(0, 8);
+  const commandMatch =
+    containerType === "channel" ? draft.match(/^\/([a-z0-9_-]*)$/i) : null;
+  const commandOptions = commandMatch
+    ? (botCommands ?? [])
+        .filter((command) =>
+          command.name.toLowerCase().startsWith(commandMatch[1].toLowerCase()),
+        )
+        .slice(0, 8)
+    : [];
 
   const insertMention = (username: string) => {
     const cursor = textareaRef.current?.selectionStart ?? draft.length;
@@ -142,6 +169,29 @@ export function Composer({
       const position = mentionStart + username.length + 2;
       textareaRef.current?.focus();
       textareaRef.current?.setSelectionRange(position, position);
+    });
+  };
+
+  const updateSelection = () => {
+    const element = textareaRef.current;
+    if (!element || element.selectionStart === element.selectionEnd) {
+      setSelection(null);
+      return;
+    }
+    setSelection({ start: element.selectionStart, end: element.selectionEnd });
+  };
+
+  const formatSelection = (before: string, after = before) => {
+    if (!selection) return;
+    const selected = draft.slice(selection.start, selection.end);
+    const next = `${draft.slice(0, selection.start)}${before}${selected}${after}${draft.slice(selection.end)}`;
+    setDraft(draftKey, next);
+    const start = selection.start + before.length;
+    const end = start + selected.length;
+    setSelection(null);
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+      textareaRef.current?.setSelectionRange(start, end);
     });
   };
 
@@ -184,11 +234,43 @@ export function Composer({
     if (!content && attachments.length === 0) return;
     if (busy) return;
     setBusy(true);
-    const clientId =
-      typeof crypto !== "undefined" && "randomUUID" in crypto
-        ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random()}`;
+    const clientId = crypto.randomUUID();
     try {
+      const command = content.match(/^\/([a-z0-9_-]+)(?:\s+[\s\S]*)?$/i);
+      if (
+        containerType === "channel" &&
+        command &&
+        attachments.length === 0 &&
+        botCommands === undefined
+      ) {
+        toast.error("Commands are still loading. Try again in a moment.");
+        return;
+      }
+      const knownCommand = command
+        ? (botCommands ?? []).some(
+            (entry) => entry.name.toLowerCase() === command[1].toLowerCase(),
+          )
+        : false;
+      if (
+        containerType === "channel" &&
+        command &&
+        knownCommand &&
+        attachments.length === 0
+      ) {
+        const result = await runBotCommand({
+          channelId: containerId as Id<"channels">,
+          commandLine: content,
+        });
+        if (result.blocked) {
+          toast.error(result.blocked);
+          return;
+        }
+        setDraft(draftKey, "");
+        setMentionQuery(null);
+        onCancelReply();
+        onSent?.();
+        return;
+      }
       const result = await sendMessage({
         containerType,
         containerId,
@@ -457,7 +539,31 @@ export function Composer({
               );
             }
           }}
+          onSelect={updateSelection}
+          onMouseUp={updateSelection}
+          onKeyUp={updateSelection}
           onKeyDown={(event) => {
+            if (commandOptions.length > 0) {
+              if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                event.preventDefault();
+                setCommandIndex((current) =>
+                  event.key === "ArrowDown"
+                    ? (current + 1) % commandOptions.length
+                    : (current - 1 + commandOptions.length) %
+                      commandOptions.length,
+                );
+                return;
+              }
+              if (event.key === "Tab" || event.key === "Enter") {
+                event.preventDefault();
+                const selected =
+                  commandOptions[commandIndex] ?? commandOptions[0];
+                setDraft(draftKey, `/${selected.name} `);
+                setCommandIndex(0);
+                requestAnimationFrame(() => textareaRef.current?.focus());
+                return;
+              }
+            }
             if (mentionQuery !== null && mentionOptions.length > 0) {
               if (event.key === "ArrowDown" || event.key === "ArrowUp") {
                 event.preventDefault();
@@ -499,6 +605,61 @@ export function Composer({
           placeholder="Message…"
           className="max-h-56 min-h-9 flex-1 resize-none bg-transparent py-1.5 text-sm leading-6 outline-none placeholder:text-muted-foreground"
         />
+
+        {selection && mentionQuery === null ? (
+          <div className="absolute bottom-full left-12 z-40 mb-2 flex items-center gap-0.5 rounded-lg border border-border/70 bg-popover p-1 shadow-xl">
+            {[
+              { label: "Bold", icon: Bold, before: "**" },
+              { label: "Italic", icon: Italic, before: "*" },
+              { label: "Underline", icon: Underline, before: "__" },
+              { label: "Strikethrough", icon: Strikethrough, before: "~~" },
+              { label: "Inline code", icon: Code, before: "`" },
+            ].map((action) => (
+              <button
+                key={action.label}
+                type="button"
+                title={action.label}
+                aria-label={action.label}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => formatSelection(action.before)}
+                className="rounded-md p-1.5 text-muted-foreground hover:bg-surface hover:text-foreground"
+              >
+                <action.icon className="size-4" />
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        {commandOptions.length > 0 ? (
+          <div className="absolute bottom-full left-2 right-2 z-30 mb-2 overflow-hidden rounded-xl border border-border/70 bg-popover p-1 shadow-xl">
+            <p className="flex items-center gap-1.5 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <Bot className="size-3" /> Commands
+            </p>
+            {commandOptions.map((command, index) => (
+              <button
+                key={command.name}
+                type="button"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => {
+                  setDraft(draftKey, `/${command.name} `);
+                  setCommandIndex(0);
+                  requestAnimationFrame(() => textareaRef.current?.focus());
+                }}
+                className={cn(
+                  "flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left",
+                  index === commandIndex ? "bg-primary/15" : "hover:bg-surface",
+                )}
+              >
+                <span className="font-mono text-sm font-semibold text-primary">
+                  /{command.name}
+                </span>
+                <span className="truncate text-xs text-muted-foreground">
+                  {command.description}
+                </span>
+              </button>
+            ))}
+          </div>
+        ) : null}
 
         {mentionQuery !== null && mentionOptions.length > 0 && (
           <div className="absolute bottom-full left-2 right-2 z-30 mb-2 overflow-hidden rounded-xl border border-border/70 bg-popover p-1 shadow-xl">

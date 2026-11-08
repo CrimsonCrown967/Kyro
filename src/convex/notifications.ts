@@ -1,6 +1,11 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { hydrateUsers, requireServerAccess, requireUser } from "./lib";
+import {
+  hydrateUsers,
+  MAX_BADGE_NOTIFICATIONS,
+  requireServerAccess,
+  requireUser,
+} from "./lib";
 
 /** Notification inbox for the signed-in user. */
 export const list = query({
@@ -55,13 +60,60 @@ export const mentionCount = query({
   args: {},
   handler: async (ctx) => {
     const { id } = await requireUser(ctx);
-    const notes = await ctx.db
-      .query("notifications")
-      .withIndex("by_user_unread", (q) => q.eq("userId", id).eq("read", false))
-      .collect();
-    return notes.filter(
-      (note) => note.type === "mention" || note.type === "reply",
-    ).length;
+    const [mentions, replies] = await Promise.all([
+      ctx.db
+        .query("notifications")
+        .withIndex("by_user_unread_type", (q) =>
+          q.eq("userId", id).eq("read", false).eq("type", "mention"),
+        )
+        .order("desc")
+        .take(MAX_BADGE_NOTIFICATIONS),
+      ctx.db
+        .query("notifications")
+        .withIndex("by_user_unread_type", (q) =>
+          q.eq("userId", id).eq("read", false).eq("type", "reply"),
+        )
+        .order("desc")
+        .take(MAX_BADGE_NOTIFICATIONS),
+    ]);
+    return mentions.length + replies.length;
+  },
+});
+
+/**
+ * Mention count plus a monotonic event marker. Tracking the latest creation
+ * time means a new ping still sounds when another notification is read at the
+ * same moment and the total count happens to stay unchanged.
+ */
+export const mentionSummary = query({
+  args: {},
+  handler: async (ctx) => {
+    const { id } = await requireUser(ctx);
+    const [mentions, replies] = await Promise.all([
+      ctx.db
+        .query("notifications")
+        .withIndex("by_user_unread_type", (q) =>
+          q.eq("userId", id).eq("read", false).eq("type", "mention"),
+        )
+        .order("desc")
+        .take(MAX_BADGE_NOTIFICATIONS),
+      ctx.db
+        .query("notifications")
+        .withIndex("by_user_unread_type", (q) =>
+          q.eq("userId", id).eq("read", false).eq("type", "reply"),
+        )
+        .order("desc")
+        .take(MAX_BADGE_NOTIFICATIONS),
+    ]);
+    const notes = [...mentions, ...replies];
+    return {
+      count: notes.length,
+      latestCreationTime:
+        notes.reduce(
+          (latest, note) => Math.max(latest, note._creationTime),
+          0,
+        ) || null,
+    };
   },
 });
 

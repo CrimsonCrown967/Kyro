@@ -1,8 +1,10 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
-import { action } from "./_generated/server";
+import { action, mutation, query } from "./_generated/server";
+import { requireUser } from "./lib";
 
 const KLIPY_BASE = "https://api.klipy.com/api/v1";
+const MAX_GIF_FAVORITES = 100;
 
 type KlipyAsset = {
   url?: string;
@@ -15,6 +17,16 @@ type KlipyItem = {
   slug?: string;
   title?: string;
   file?: Record<string, Record<string, KlipyAsset>>;
+};
+
+const gifArgs = {
+  gifId: v.string(),
+  slug: v.string(),
+  title: v.string(),
+  url: v.string(),
+  previewUrl: v.string(),
+  width: v.number(),
+  height: v.number(),
 };
 
 function apiKey() {
@@ -95,5 +107,72 @@ export const registerShare = action({
       )}?customer_id=${encodeURIComponent(userId)}`,
       { method: "POST", headers: { Accept: "application/json" } },
     ).catch(() => undefined);
+  },
+});
+
+/** Account-synced favourite GIFs, newest first. */
+export const favorites = query({
+  args: {},
+  handler: async (ctx) => {
+    const { id } = await requireUser(ctx);
+    const rows = await ctx.db
+      .query("gifFavorites")
+      .withIndex("by_user", (q) => q.eq("userId", id))
+      .order("desc")
+      .take(100);
+    return rows.map((row) => ({
+      id: row.gifId,
+      slug: row.slug,
+      title: row.title,
+      url: row.url,
+      previewUrl: row.previewUrl,
+      width: row.width,
+      height: row.height,
+    }));
+  },
+});
+
+/** Adds or removes one KLIPY result from the signed-in user's favourites. */
+export const toggleFavorite = mutation({
+  args: gifArgs,
+  handler: async (ctx, args) => {
+    const { id } = await requireUser(ctx);
+    const gifId = args.gifId.trim().slice(0, 160);
+    if (!gifId) throw new Error("That GIF is missing an identifier.");
+    const existing = await ctx.db
+      .query("gifFavorites")
+      .withIndex("by_user_gif", (q) => q.eq("userId", id).eq("gifId", gifId))
+      .unique();
+    if (existing) {
+      await ctx.db.delete(existing._id);
+      return { favorite: false };
+    }
+    const url = args.url.trim().slice(0, 1000);
+    const previewUrl = args.previewUrl.trim().slice(0, 1000);
+    if (!/^https:\/\//i.test(url) || !/^https:\/\//i.test(previewUrl)) {
+      throw new Error("GIF URLs must use HTTPS.");
+    }
+    if (!Number.isFinite(args.width) || !Number.isFinite(args.height)) {
+      throw new Error("That GIF has invalid dimensions.");
+    }
+    const favorites = await ctx.db
+      .query("gifFavorites")
+      .withIndex("by_user", (q) => q.eq("userId", id))
+      .take(MAX_GIF_FAVORITES);
+    if (favorites.length >= MAX_GIF_FAVORITES) {
+      throw new Error(`You can favorite up to ${MAX_GIF_FAVORITES} GIFs.`);
+    }
+    await ctx.db.insert("gifFavorites", {
+      userId: id,
+      gifId,
+      slug: args.slug.trim().slice(0, 160),
+      title: args.title.trim().slice(0, 200) || "Favourite GIF",
+      url,
+      previewUrl,
+      width: Math.max(1, Math.min(Math.floor(args.width), 4000)),
+      height: Math.max(1, Math.min(Math.floor(args.height), 4000)),
+      createdAt: Date.now(),
+    });
+    return { favorite: true };
   },
 });

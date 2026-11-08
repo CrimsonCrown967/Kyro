@@ -35,6 +35,8 @@ import { DecorationPickerDialog } from "@/components/app/DecorationPickerDialog"
 import { ProfileDecorationLayer } from "@/components/app/DecorationArt";
 import { ImageCropDialog } from "@/components/app/ImageCropDialog";
 import { TotpQrCode } from "@/components/app/TotpQrCode";
+import { InstallAppButton } from "@/components/app/InstallAppButton";
+import { AdBanner } from "@/components/app/AdBanner";
 import { ConfirmDangerDialog } from "@/components/app/dialogs";
 import { Button } from "@/components/ui/button";
 import {
@@ -183,6 +185,7 @@ export function SettingsDialog({
             {tab === "data" && <DataTab />}
           </div>
         </div>
+        <AdBanner />
       </DialogContent>
     </Dialog>
   );
@@ -2773,6 +2776,13 @@ function AppearanceTab() {
             }
           />
         </label>
+      </Section>
+
+      <Section
+        title="Desktop & mobile app"
+        description="Kyro can run as an installable web app without an app store download."
+      >
+        <InstallAppButton />
       </Section>
     </>
   );

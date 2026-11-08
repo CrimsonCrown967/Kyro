@@ -306,6 +306,8 @@ export const list = query({
           content: message.content,
           /** Call records render as their own system row in the timeline. */
           kind: message.kind ?? null,
+          botName: message.botName ?? null,
+          botCommand: message.botCommand ?? null,
           callDurationMs: message.callDurationMs ?? null,
           createdAt: message.createdAt,
           editedAt: message.editedAt ?? null,
@@ -328,6 +330,10 @@ export const list = query({
                 id: reply._id,
                 excerpt: reply.content.slice(0, 160),
                 author: replyAuthors.get(reply.authorId) ?? null,
+                botName:
+                  reply.kind === "bot_response"
+                    ? (reply.botName ?? "Kyro Bot")
+                    : null,
               }
             : null,
           thread: thread
@@ -830,6 +836,8 @@ export const send = mutation({
       if (
         replyTarget &&
         replyTarget.containerId === args.containerId &&
+        replyTarget.kind !== "bot_response" &&
+        replyTarget.authorId !== userId &&
         !notified.has(replyTarget.authorId)
       ) {
         const target = await ctx.db.get(replyTarget.authorId);
@@ -870,6 +878,9 @@ export const edit = mutation({
     const { id: userId } = await requireActiveUser(ctx);
     const message = await ctx.db.get(messageId);
     if (!message) throw new Error("That message no longer exists.");
+    if (message.kind === "bot_response") {
+      throw new Error("Bot responses can't be edited.");
+    }
     if (message.authorId !== userId) {
       throw new Error("You can only edit your own messages.");
     }

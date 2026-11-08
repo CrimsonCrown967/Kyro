@@ -64,10 +64,11 @@ export function AppShell({ children }: { children: ReactNode }) {
     api.notifications.unreadCount,
     isAuthenticated ? {} : "skip",
   );
-  const mentionCount = useQuery(
-    api.notifications.mentionCount,
+  const mentionSummary = useQuery(
+    api.notifications.mentionSummary,
     isAuthenticated ? {} : "skip",
   );
+  const mentionCount = mentionSummary?.count;
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -118,22 +119,23 @@ export function AppShell({ children }: { children: ReactNode }) {
     };
   }, [heartbeat, isAuthenticated]);
 
-  // Notification ping: fires when unread notifications arrive while the tab
-  // is in the background — gated by the "Notification sounds" menu toggle.
-  const prevUnread = useRef<number | undefined>(undefined);
+  // Mention ping: only direct mentions/replies make a sound. Unlike the old
+  // unread counter this also works while the tab is visible, Discord-style.
+  const previousMentionEvent = useRef<number | null | undefined>(undefined);
   useEffect(() => {
-    if (unread === undefined) return;
-    const previous = prevUnread.current;
-    prevUnread.current = unread;
+    if (mentionSummary === undefined) return;
+    const latest = mentionSummary.latestCreationTime;
+    const previous = previousMentionEvent.current;
+    previousMentionEvent.current = latest;
     if (
       previous !== undefined &&
-      unread > previous &&
-      document.hidden &&
+      latest !== null &&
+      (previous === null || latest > previous) &&
       useUiStore.getState().notificationSounds
     ) {
       playNotificationPing();
     }
-  }, [unread]);
+  }, [mentionSummary]);
 
   // Browser tab title mirrors unread mentions only, Discord-style: "(6) Kyro".
   // Ordinary unread DMs and system notes deliberately stay out of the count.

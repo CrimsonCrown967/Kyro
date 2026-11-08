@@ -1,11 +1,26 @@
 {
-  "name": "freebuff.com application",
-  "short_name": "freebuff.com",
-  "description": "freebuff.com application",
-  "start_url": "/",
+  "id": "/dashboard",
+  "name": "Kyro",
+  "short_name": "Kyro",
+  "description": "Free communities, chat, voice, forums and moderation.",
+  "start_url": "/dashboard",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#000000",
+  "background_color": "#15171c",
+  "theme_color": "#15171c",
+  "categories": ["social", "productivity"],
+  "shortcuts": [
+    {
+      "name": "Open Kyro",
+      "short_name": "Open",
+      "url": "/dashboard"
+    },
+    {
+      "name": "Discover communities",
+      "short_name": "Discover",
+      "url": "/dashboard/discover"
+    }
+  ],
   "icons": [
     {
       "src": "/logo-192.png",

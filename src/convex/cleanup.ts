@@ -167,6 +167,8 @@ export async function deleteServerData(
     automodSettings,
     automodEvents,
     moderationCases,
+    botCommands,
+    templates,
   ] = await Promise.all([
     ctx.db
       .query("channels")
@@ -220,11 +222,22 @@ export async function deleteServerData(
       .query("moderationCases")
       .withIndex("by_server", (q) => q.eq("serverId", serverId))
       .collect(),
+    ctx.db
+      .query("serverBotCommands")
+      .withIndex("by_server", (q) => q.eq("serverId", serverId))
+      .collect(),
+    ctx.db
+      .query("serverTemplates")
+      .withIndex("by_source", (q) => q.eq("sourceServerId", serverId))
+      .collect(),
   ]);
   for (const channel of channels) await deleteChannelData(ctx, channel);
   for (const emoji of emojis) {
     await deleteClaimedUpload(ctx, emoji.storageId, "server_emoji", emoji._id);
     await ctx.db.delete(emoji._id);
+  }
+  for (const template of templates) {
+    await ctx.db.patch(template._id, { sourceServerId: undefined });
   }
   for (const row of [
     ...categories,
@@ -238,6 +251,7 @@ export async function deleteServerData(
     ...automodSettings,
     ...automodEvents,
     ...moderationCases,
+    ...botCommands,
   ]) {
     await ctx.db.delete(row._id);
   }

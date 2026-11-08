@@ -2,6 +2,22 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      (() => {
+        try {
+          const stored = JSON.parse(
+            localStorage.getItem("kyro.prefs.v1") || "{}",
+          );
+          const dark =
+            stored.theme !== "light" &&
+            (stored.theme !== "system" ||
+              matchMedia("(prefers-color-scheme: dark)").matches);
+          document.documentElement.classList.toggle("dark", dark);
+        } catch {
+          document.documentElement.classList.add("dark");
+        }
+      })();
+    </script>
     <link
       rel="icon"
       type="image/png"
@@ -16,7 +32,7 @@
     <title>Kyro — The free community platform | No paywalls</title>
     <meta
       name="description"
-      content="Kyro is a free, real-time community platform: servers, channels, voice rooms, DMs, moderation and profiles — with no paywalls and no ads."
+      content="Kyro is a free, real-time community platform: servers, channels, voice rooms, DMs, moderation and profiles — with no paywalled features."
     />
     <link rel="canonical" href="https://kyro-chat.cyou/" />
     <meta
@@ -34,7 +50,7 @@
     <meta property="og:title" content="Kyro — The free community platform" />
     <meta
       property="og:description"
-      content="Servers, channels, voice rooms and DMs in real time. Free forever, no paywalls, no ads."
+      content="Servers, channels, voice rooms and DMs in real time. Free forever, with no paywalled features."
     />
     <meta property="og:url" content="https://kyro-chat.cyou/" />
     <meta
@@ -45,7 +61,7 @@
     <meta name="twitter:title" content="Kyro — The free community platform" />
     <meta
       name="twitter:description"
-      content="Servers, channels, voice rooms and DMs in real time. Free forever, no paywalls, no ads."
+      content="Servers, channels, voice rooms and DMs in real time. Free forever, with no paywalled features."
     />
     <meta
       name="twitter:image"

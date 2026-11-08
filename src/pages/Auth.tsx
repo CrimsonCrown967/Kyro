@@ -450,7 +450,7 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
         </div>
 
         <p className="relative text-xs text-muted-foreground">
-          Free forever · no ads · your data stays yours
+          Free forever · no paywalled features · your data stays yours
         </p>
       </aside>
 

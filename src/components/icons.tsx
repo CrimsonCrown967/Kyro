@@ -672,6 +672,68 @@ export const Bold = (props: IconProps) => (
   </Icon>
 );
 
+export const Italic = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M10 4h8" />
+    <path d="M6 20h8" />
+    <path d="m14 4-4 16" />
+  </Icon>
+);
+
+export const Underline = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M6 3v7a6 6 0 0 0 12 0V3" />
+    <path d="M4 21h16" />
+  </Icon>
+);
+
+export const Strikethrough = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M16 4.5A7 7 0 0 0 12 3c-3.3 0-5 1.5-5 3.6 0 1.8 1.4 2.8 3.7 3.4" />
+    <path d="M8 19.2A8 8 0 0 0 12.4 21c3.1 0 5.1-1.5 5.1-3.8 0-1.5-.9-2.5-2.5-3.2" />
+    <path d="M4 12h16" />
+  </Icon>
+);
+
+export const Code = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="m8.5 7-5 5 5 5" />
+    <path d="m15.5 7 5 5-5 5" />
+  </Icon>
+);
+
+export const Star = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="m12 2.8 2.8 5.7 6.3.9-4.6 4.4 1.1 6.3-5.6-2.9-5.6 2.9 1.1-6.3-4.6-4.4 6.3-.9Z" />
+  </Icon>
+);
+
+export const Bot = (props: IconProps) => (
+  <Icon {...props}>
+    <rect x="4" y="7" width="16" height="13" rx="4" />
+    <path d="M12 3v4" />
+    <circle cx="9" cy="13" r="1" fill="currentColor" stroke="none" />
+    <circle cx="15" cy="13" r="1" fill="currentColor" stroke="none" />
+    <path d="M8.5 17h7" />
+  </Icon>
+);
+
+export const LayoutTemplate = (props: IconProps) => (
+  <Icon {...props}>
+    <rect x="3" y="4" width="18" height="16" rx="3" />
+    <path d="M3 9h18" />
+    <path d="M9 9v11" />
+  </Icon>
+);
+
+export const Upload = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M12 16V4" />
+    <path d="m7 9 5-5 5 5" />
+    <path d="M4 20h16" />
+  </Icon>
+);
+
 export const Eye = (props: IconProps) => (
   <Icon {...props}>
     <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />

@@ -338,6 +338,63 @@ const schema = defineSchema(
       .index("by_server", ["serverId"])
       .index("by_server_name", ["serverId", "name"]),
 
+    /** Per-account recent/favourite emoji library. */
+    emojiPreferences: defineTable({
+      userId: v.id("users"),
+      emoji: v.string(),
+      favorite: v.boolean(),
+      useCount: v.number(),
+      lastUsedAt: v.number(),
+    })
+      .index("by_user", ["userId", "lastUsedAt"])
+      .index("by_user_emoji", ["userId", "emoji"])
+      .index("by_user_favorite", ["userId", "favorite", "lastUsedAt"]),
+
+    /** Saved KLIPY GIFs, synced across the account's devices. */
+    gifFavorites: defineTable({
+      userId: v.id("users"),
+      gifId: v.string(),
+      slug: v.string(),
+      title: v.string(),
+      url: v.string(),
+      previewUrl: v.string(),
+      width: v.number(),
+      height: v.number(),
+      createdAt: v.number(),
+    })
+      .index("by_user", ["userId", "createdAt"])
+      .index("by_user_gif", ["userId", "gifId"]),
+
+    /** Custom slash commands that produce a server bot response. */
+    serverBotCommands: defineTable({
+      serverId: v.id("servers"),
+      name: v.string(),
+      description: v.string(),
+      response: v.string(),
+      enabled: v.boolean(),
+      createdById: v.id("users"),
+      createdAt: v.number(),
+      updatedAt: v.number(),
+    })
+      .index("by_server", ["serverId"])
+      .index("by_server_name", ["serverId", "name"]),
+
+    /** Portable community layouts published by Kyro members. */
+    serverTemplates: defineTable({
+      creatorId: v.id("users"),
+      sourceServerId: v.optional(v.id("servers")),
+      name: v.string(),
+      description: v.string(),
+      snapshotJson: v.string(),
+      isPublic: v.boolean(),
+      uses: v.number(),
+      createdAt: v.number(),
+      updatedAt: v.number(),
+    })
+      .index("by_public", ["isPublic", "uses"])
+      .index("by_creator", ["creatorId", "createdAt"])
+      .index("by_source", ["sourceServerId"]),
+
     /** One row per message in a channel *or* a direct-message conversation. */
     messages: defineTable({
       containerType: v.union(v.literal("channel"), v.literal("conversation")),
@@ -362,6 +419,9 @@ const schema = defineSchema(
       ),
       /** Call messages: `call_missed`, `call_outgoing` or `call_incoming`. */
       kind: v.optional(v.string()),
+      /** Trusted bot presentation fields, written only by the bot runner. */
+      botName: v.optional(v.string()),
+      botCommand: v.optional(v.string()),
       /** Duration of the call this message records, in milliseconds. */
       callDurationMs: v.optional(v.number()),
     })
@@ -610,6 +670,7 @@ const schema = defineSchema(
     })
       .index("by_user", ["userId", "createdAt"])
       .index("by_user_unread", ["userId", "read"])
+      .index("by_user_unread_type", ["userId", "read", "type"])
       .index("by_container", ["containerKey"])
       .index("by_actor", ["actorId"]),
 

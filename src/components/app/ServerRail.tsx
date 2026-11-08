@@ -1,13 +1,14 @@
 import { useMutation, useQuery } from "convex/react";
 import {
+  Bell,
   CheckCheck,
   Compass,
   Copy,
   Loader2,
   LogOut,
   Plus,
+  Settings,
   UserPlus,
-  Volume2,
   VolumeX,
 } from "@/components/icons";
 import { useState } from "react";
@@ -26,9 +27,13 @@ import {
 } from "@/components/ui/dialog";
 import {
   ContextMenu,
+  ContextMenuCheckboxItem,
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { Input } from "@/components/ui/input";
@@ -40,6 +45,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/lib/store";
 import { CreateCommunityDialog, InviteDialog } from "@/components/app/dialogs";
+import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 
 function RailButton({
   label,
@@ -76,7 +82,7 @@ function RailButton({
       {children}
       {mentions !== undefined && mentions > 0 && (
         <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-[11px] font-bold text-white ring-2 ring-rail">
-          {mentions > 9 ? "9+" : mentions}
+          {mentions > 99 ? "99+" : mentions}
         </span>
       )}
       {(!mentions || mentions === 0) && unread && (
@@ -219,13 +225,20 @@ export function ServerRail({ activeServerId }: { activeServerId?: string }) {
               label={server.name}
               active={activeServerId === server.id}
               unread={server.unread && !server.muted}
-              mentions={server.muted ? 0 : server.mentions}
+              mentions={server.mentions}
               to={`/dashboard/s/${server.id}`}
               contextMenu={
                 <ContextMenuContent className="w-56">
-                  <ContextMenuItem onClick={() => setInviteServerId(server.id)}>
-                    <UserPlus className="size-4" /> Invite people
-                  </ContextMenuItem>
+                  {hasPermission(
+                    server.permissions,
+                    PERMISSIONS.CREATE_INVITES,
+                  ) ? (
+                    <ContextMenuItem
+                      onClick={() => setInviteServerId(server.id)}
+                    >
+                      <UserPlus className="size-4" /> Invite people
+                    </ContextMenuItem>
+                  ) : null}
                   <ContextMenuItem
                     onClick={() =>
                       void run(
@@ -238,24 +251,27 @@ export function ServerRail({ activeServerId }: { activeServerId?: string }) {
                   >
                     <CheckCheck className="size-4" /> Mark as read
                   </ContextMenuItem>
-                  <ContextMenuItem
-                    onClick={() =>
-                      void run(
-                        setMuted({
-                          serverId: server.id as Id<"servers">,
-                          muted: !server.muted,
-                        }),
-                        server.muted ? "Server unmuted." : "Server muted.",
-                      )
-                    }
-                  >
-                    {server.muted ? (
-                      <Volume2 className="size-4" />
-                    ) : (
-                      <VolumeX className="size-4" />
-                    )}
-                    {server.muted ? "Unmute server" : "Mute server"}
-                  </ContextMenuItem>
+                  <ContextMenuSub>
+                    <ContextMenuSubTrigger>
+                      <Bell className="size-4" /> Notification settings
+                    </ContextMenuSubTrigger>
+                    <ContextMenuSubContent className="w-52">
+                      <ContextMenuCheckboxItem
+                        checked={server.muted}
+                        onCheckedChange={(muted) =>
+                          void run(
+                            setMuted({
+                              serverId: server.id as Id<"servers">,
+                              muted,
+                            }),
+                            muted ? "Server muted." : "Server unmuted.",
+                          )
+                        }
+                      >
+                        <VolumeX className="size-4" /> Mute server
+                      </ContextMenuCheckboxItem>
+                    </ContextMenuSubContent>
+                  </ContextMenuSub>
                   <ContextMenuSeparator />
                   <ContextMenuItem
                     onClick={() => {
@@ -276,6 +292,18 @@ export function ServerRail({ activeServerId }: { activeServerId?: string }) {
                   >
                     <Compass className="size-4" /> Open server
                   </ContextMenuItem>
+                  {hasPermission(
+                    server.permissions,
+                    PERMISSIONS.MANAGE_SERVER,
+                  ) ? (
+                    <ContextMenuItem
+                      onClick={() =>
+                        navigate(`/dashboard/s/${server.id}/settings/overview`)
+                      }
+                    >
+                      <Settings className="size-4" /> Server settings
+                    </ContextMenuItem>
+                  ) : null}
                   {!server.isOwner ? (
                     <>
                       <ContextMenuSeparator />

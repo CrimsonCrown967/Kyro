@@ -439,6 +439,7 @@ function ChannelRow({
     isRules: boolean;
     readOnly: boolean;
     unread: boolean;
+    mentionCount: number;
     notificationLevel: "all" | "mentions" | "none";
   };
   active: boolean;
@@ -511,12 +512,15 @@ function ChannelRow({
           >
             {channel.name}
           </span>
-          {muted && (
+          {channel.mentionCount > 0 ? (
+            <span className="ml-auto flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-white">
+              {channel.mentionCount > 99 ? "99+" : channel.mentionCount}
+            </span>
+          ) : muted ? (
             <BellOff className="ml-auto size-3.5 shrink-0 opacity-60" />
-          )}
-          {!muted && channel.unread && !active && (
+          ) : channel.unread && !active ? (
             <span className="ml-auto size-1.5 shrink-0 rounded-full bg-foreground" />
-          )}
+          ) : null}
         </Link>
       </ContextMenuTrigger>
       <ContextMenuContent className="w-56">

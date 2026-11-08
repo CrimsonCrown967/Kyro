@@ -112,24 +112,24 @@
 
 .dark {
   color-scheme: dark;
-  --base-background: #313338;
+  --base-background: #15171c;
   --background: var(--base-background);
   --foreground: #f2f3f5;
-  --base-card: #2b2d31;
+  --base-card: #1d2026;
   --card: var(--base-card);
   --card-foreground: #f2f3f5;
-  --base-popover: #232428;
+  --base-popover: #17191e;
   --popover: var(--base-popover);
   --popover-foreground: #f2f3f5;
   --primary: #5865f2;
   --primary-foreground: #ffffff;
-  --base-secondary: #383a40;
+  --base-secondary: #282b33;
   --secondary: var(--base-secondary);
   --secondary-foreground: #f2f3f5;
-  --base-muted: #383a40;
+  --base-muted: #282b33;
   --muted: var(--base-muted);
   --muted-foreground: #b5bac1;
-  --base-accent: #404249;
+  --base-accent: #30343d;
   --accent: var(--base-accent);
   --accent-foreground: #f2f3f5;
   --destructive: #f23f42;
@@ -141,20 +141,20 @@
   --chart-3: #22c55e;
   --chart-4: #f59e0b;
   --chart-5: #ec4899;
-  --base-sidebar: #2b2d31;
+  --base-sidebar: #191c21;
   --sidebar: var(--base-sidebar);
   --sidebar-foreground: #f2f3f5;
   --sidebar-primary: #5865f2;
   --sidebar-primary-foreground: #ffffff;
-  --base-sidebar-accent: #404249;
+  --base-sidebar-accent: #292d35;
   --sidebar-accent: var(--base-sidebar-accent);
   --sidebar-accent-foreground: #f2f3f5;
   --sidebar-border: rgba(255, 255, 255, 0.08);
   --sidebar-ring: rgba(88, 101, 242, 0.72);
 
-  --base-rail: #1e1f22;
-  --base-panel: #2b2d31;
-  --base-surface: #404249;
+  --base-rail: #0f1115;
+  --base-panel: #1b1e24;
+  --base-surface: #292d35;
   --rail: var(--base-rail);
   --panel: var(--base-panel);
   --surface: var(--base-surface);
@@ -162,6 +162,23 @@
   --cyan: #67e8f9;
   --success: #22c55e;
   --warning: #f59e0b;
+}
+
+::selection {
+  background: color-mix(in oklab, var(--primary) 62%, #ffffff 8%);
+  color: #ffffff;
+}
+
+textarea::selection,
+input::selection {
+  background: color-mix(in oklab, var(--primary) 72%, #ffffff 8%);
+  color: #ffffff;
+}
+
+/* Skip paint/layout work for off-screen history while preserving scroll size. */
+.message-virtual-row {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 4.5rem;
 }
 
 /* Accent overrides applied to <html> from the appearance settings. */

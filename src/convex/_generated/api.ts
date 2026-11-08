@@ -17,6 +17,7 @@ import type * as auth_config from "../auth.config.js";
 import type * as auth_emailOtp from "../auth/emailOtp.js";
 import type * as auth_passwordWithTwoFactor from "../auth/passwordWithTwoFactor.js";
 import type * as automod from "../automod.js";
+import type * as bots from "../bots.js";
 import type * as bugReports from "../bugReports.js";
 import type * as channels from "../channels.js";
 import type * as cleanup from "../cleanup.js";
@@ -50,6 +51,7 @@ import type * as securityRefs from "../securityRefs.js";
 import type * as servers from "../servers.js";
 import type * as sha256 from "../sha256.js";
 import type * as social from "../social.js";
+import type * as templates from "../templates.js";
 import type * as tempResetPassword from "../tempResetPassword.js";
 import type * as threads from "../threads.js";
 import type * as totp from "../totp.js";
@@ -78,6 +80,7 @@ const fullApi: ApiFromModules<{
   "auth/emailOtp": typeof auth_emailOtp,
   "auth/passwordWithTwoFactor": typeof auth_passwordWithTwoFactor,
   "automod": typeof automod,
+  "bots": typeof bots,
   "bugReports": typeof bugReports,
   "channels": typeof channels,
   "cleanup": typeof cleanup,
@@ -111,6 +114,7 @@ const fullApi: ApiFromModules<{
   "servers": typeof servers,
   "sha256": typeof sha256,
   "social": typeof social,
+  "templates": typeof templates,
   "tempResetPassword": typeof tempResetPassword,
   "threads": typeof threads,
   "totp": typeof totp,

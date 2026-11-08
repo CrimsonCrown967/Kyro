@@ -1,6 +1,7 @@
 import { useConvex, useMutation, useQuery } from "convex/react";
 import {
   AlertTriangle,
+  Bot,
   BarChart3,
   Check,
   Copy,
@@ -99,7 +100,9 @@ export interface MessageDto {
   id: string;
   content: string;
   /** Call records render as their own system row instead of a chat bubble. */
-  kind?: "call_missed" | "call_ended" | null;
+  kind?: "call_missed" | "call_ended" | "bot_command" | "bot_response" | null;
+  botName?: string | null;
+  botCommand?: string | null;
   callDurationMs?: number | null;
   createdAt: number;
   editedAt: number | null;
@@ -120,7 +123,12 @@ export interface MessageDto {
     /** Resolved URL when the reaction is a server's custom emoji. */
     url?: string | null;
   }[];
-  replyTo: { id: string; excerpt: string; author: MessageAuthor | null } | null;
+  replyTo: {
+    id: string;
+    excerpt: string;
+    author: MessageAuthor | null;
+    botName?: string | null;
+  } | null;
   customEmojis?: CustomEmoji[];
   pinnedAt?: number | null;
   thread?: {
@@ -341,6 +349,7 @@ export function MessageList({
                 const grouped =
                   !newDay &&
                   previous?.authorId === message.authorId &&
+                  previous?.kind === message.kind &&
                   message.createdAt - previous.createdAt < 5 * 60_000 &&
                   !previous.replyTo;
                 const showUnreadDivider = unreadFrom === index && !grouped;
@@ -350,7 +359,7 @@ export function MessageList({
                     key={message.id}
                     id={`message-${message.id}`}
                     className={cn(
-                      "scroll-mt-20 rounded-xl transition-shadow",
+                      "message-virtual-row scroll-mt-20 rounded-xl transition-shadow",
                       linkedMessageId === message.id &&
                         "ring-2 ring-primary/70 ring-offset-2 ring-offset-background",
                     )}
@@ -522,7 +531,8 @@ function MessageRow({
       .then((rows) => setReactionCustomEmojis(rows))
       .catch(() => setReactionCustomEmojis([]));
   };
-  const isAuthor = message.authorId === currentUserId;
+  const isBotResponse = message.kind === "bot_response";
+  const isAuthor = message.authorId === currentUserId && !isBotResponse;
   const author = message.author;
   // Any invite link pasted into chat gets a community preview underneath it.
   const inviteCodes = useMemo(
@@ -672,7 +682,9 @@ function MessageRow({
       onSelect: () =>
         onReply({
           id: message.id,
-          author: author?.name ?? "Unknown",
+          author: isBotResponse
+            ? (message.botName ?? "Kyro Bot")
+            : (author?.name ?? "Unknown"),
           excerpt: message.content.slice(0, 80),
         }),
     },
@@ -835,12 +847,16 @@ function MessageRow({
         <div
           className={cn(
             "message-row group relative rounded-xl px-3 py-1.5 transition-colors hover:bg-panel/45",
-            grouped ? "mt-0 py-0.5" : "mt-3",
+            grouped ? "mt-0 py-0.5" : "mt-1.5",
           )}
         >
           <div className="flex gap-3">
             <div className="w-10 shrink-0">
-              {!grouped && author && (
+              {!grouped && isBotResponse ? (
+                <span className="mt-0.5 flex size-10 items-center justify-center rounded-full bg-primary/15 text-primary ring-1 ring-primary/30">
+                  <Bot className="size-5" />
+                </span>
+              ) : !grouped && author ? (
                 <button
                   type="button"
                   onClick={openProfile}
@@ -849,33 +865,46 @@ function MessageRow({
                 >
                   <UserAvatar user={author} size="md" showStatus={false} />
                 </button>
-              )}
+              ) : null}
             </div>
 
             <div className="min-w-0 flex-1">
               {!grouped && (
                 <div className="flex flex-wrap items-baseline gap-2">
-                  <button
-                    type="button"
-                    onClick={openProfile}
-                    className="text-sm hover:underline"
-                  >
-                    {author ? (
-                      <StyledDisplayName
-                        user={author}
-                        roleColor={roleColors?.[author.id]}
-                      />
-                    ) : (
-                      "Unknown user"
-                    )}
-                  </button>
-                  {author?.serverTag && (
+                  {isBotResponse ? (
+                    <span className="text-sm font-semibold text-primary">
+                      {message.botName ?? "Kyro Bot"}
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={openProfile}
+                      className="text-sm hover:underline"
+                    >
+                      {author ? (
+                        <StyledDisplayName
+                          user={author}
+                          roleColor={roleColors?.[author.id]}
+                        />
+                      ) : (
+                        "Unknown user"
+                      )}
+                    </button>
+                  )}
+                  {isBotResponse ? (
+                    <span className="rounded bg-primary px-1 py-0.5 text-[8px] font-black uppercase leading-none text-primary-foreground">
+                      Bot
+                    </span>
+                  ) : null}
+                  {!isBotResponse && author?.serverTag ? (
                     <ServerTagChip
                       tag={author.serverTag}
                       ownerName={author.name}
                     />
-                  )}
-                  <DeviceBadge device={author?.device} />
+                  ) : null}
+                  {!isBotResponse ? (
+                    <DeviceBadge device={author?.device} />
+                  ) : null}
                   <span className="text-[11px] text-muted-foreground">
                     {dayLabel(message.createdAt)}{" "}
                     {formatTime(message.createdAt)}
@@ -917,7 +946,11 @@ function MessageRow({
               {message.replyTo && (
                 <div className="mb-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
                   <CornerUpLeft className="size-3" />
-                  {message.replyTo.author ? (
+                  {message.replyTo.botName ? (
+                    <span className="font-semibold text-primary/90">
+                      {message.replyTo.botName}
+                    </span>
+                  ) : message.replyTo.author ? (
                     <StyledDisplayName
                       user={message.replyTo.author}
                       className="text-foreground/80"
@@ -969,7 +1002,7 @@ function MessageRow({
                   </p>
                 </div>
               ) : (
-                <div className="whitespace-pre-wrap break-words text-sm leading-6 text-foreground/95">
+                <div className="whitespace-pre-wrap break-words text-sm leading-[1.375rem] text-foreground/95">
                   {renderMessage(message.content, {
                     customEmojis: message.customEmojis,
                     onMention: openMention,

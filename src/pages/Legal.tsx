@@ -62,6 +62,7 @@ const PRIVACY: Section[] = [
       "Account data: the email address used to sign in, the @username and display name you choose, avatar, bio, status and preferences.",
       "Content data: messages, replies, attachments, reactions and community membership records you create.",
       "Operational data: session records used to keep you signed in and to let you review or revoke active devices, plus basic timestamps needed for read state and notifications.",
+      "Advertising data: on screens where a banner is enabled, Google AdSense may process device and browser information, IP address, cookie identifiers and consent signals to serve, secure and measure ads, subject to your region and consent choices.",
     ],
   },
   {
@@ -69,7 +70,7 @@ const PRIVACY: Section[] = [
     body: [
       "To run the product: deliver messages, show presence, count unread items, moderate communities and keep the service reliable.",
       "To protect the service: enforce bans, blocks, privacy settings and rate limits, and to investigate abuse reports.",
-      "We do not sell your data, we do not run advertising, and we do not read your private messages to build advertising profiles.",
+      "Limited banner advertising helps fund the free service. Kyro does not sell your private messages or read them to build advertising profiles.",
     ],
   },
   {
@@ -77,6 +78,7 @@ const PRIVACY: Section[] = [
     body: [
       "Other users see what you choose to make visible: your display name, handle, avatar, status, messages in communities you join, and whether you are online if you allow presence to be shown.",
       "Community moderators can see your messages in their communities and manage your membership. Server audit logs record moderator actions.",
+      "When an advertising placement is enabled, Google receives the request, device and consent information needed to serve and measure that placement under Google's own privacy terms.",
       "We do not disclose your data to third parties except where required by law or to operate core infrastructure (for example, message and file storage).",
     ],
   },
@@ -112,7 +114,10 @@ function LegalPage({
     <div className="min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-4xl items-center justify-between px-4 sm:px-6">
-          <Link to="/" className="flex items-center gap-2.5 text-lg font-bold tracking-tight">
+          <Link
+            to="/"
+            className="flex items-center gap-2.5 text-lg font-bold tracking-tight"
+          >
             <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-sm font-black text-white">
               K
             </span>
@@ -129,8 +134,12 @@ function LegalPage({
 
       <main className="mx-auto max-w-3xl px-4 py-14 sm:px-6">
         <h1 className="text-3xl font-bold tracking-tight">{title}</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Last updated {updated}</p>
-        <p className="mt-6 text-sm leading-relaxed text-muted-foreground">{intro}</p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Last updated {updated}
+        </p>
+        <p className="mt-6 text-sm leading-relaxed text-muted-foreground">
+          {intro}
+        </p>
 
         <div className="mt-10 space-y-9">
           {sections.map((section) => (
@@ -172,7 +181,7 @@ export function PrivacyPage() {
   return (
     <LegalPage
       title="Privacy Policy"
-      updated="October 2026"
+      updated="November 2026"
       intro="This policy explains what Kyro stores, why it is stored, and the controls you have over it."
       sections={PRIVACY}
     />

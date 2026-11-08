@@ -1,5 +1,6 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, type MutationCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 import { PERMISSIONS } from "../lib/permissions";
 import { can, requireProfile, requireServerAccess, requireUser } from "./lib";
 import {
@@ -10,6 +11,8 @@ import {
 
 const EMOJI_NAME = /^[a-zA-Z0-9_]{2,32}$/;
 const MAX_SERVER_EMOJIS = 100;
+const MAX_ACCOUNT_EMOJIS = 200;
+const MAX_FAVORITE_EMOJIS = 100;
 const EMOJI_MIME_TYPES = new Set([
   "image/png",
   "image/apng",
@@ -17,6 +20,19 @@ const EMOJI_MIME_TYPES = new Set([
   "image/webp",
   "image/gif",
 ]);
+
+async function makePreferenceRoom(ctx: MutationCtx, userId: Id<"users">) {
+  const rows = await ctx.db
+    .query("emojiPreferences")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .order("asc")
+    .take(MAX_ACCOUNT_EMOJIS);
+  if (rows.length < MAX_ACCOUNT_EMOJIS) return true;
+  const disposable = rows.find((row) => !row.favorite);
+  if (!disposable) return false;
+  await ctx.db.delete(disposable._id);
+  return true;
+}
 
 /** Custom emojis belonging to one community. */
 export const forServer = query({
@@ -78,6 +94,113 @@ export const available = query({
       }),
     );
     return groups.flat().slice(0, 500);
+  },
+});
+
+/** Recent and favourite emoji tokens for the signed-in account. */
+export const preferences = query({
+  args: {},
+  handler: async (ctx) => {
+    const { id } = await requireUser(ctx);
+    const [recentRows, favoriteRows] = await Promise.all([
+      ctx.db
+        .query("emojiPreferences")
+        .withIndex("by_user", (q) => q.eq("userId", id))
+        .order("desc")
+        .take(64),
+      ctx.db
+        .query("emojiPreferences")
+        .withIndex("by_user_favorite", (q) =>
+          q.eq("userId", id).eq("favorite", true),
+        )
+        .order("desc")
+        .take(MAX_FAVORITE_EMOJIS),
+    ]);
+    return {
+      recent: recentRows
+        .filter((row) => row.useCount > 0)
+        .slice(0, 32)
+        .map((row) => row.emoji),
+      favorites: favoriteRows.map((row) => row.emoji),
+    };
+  },
+});
+
+export const recordUse = mutation({
+  args: { emoji: v.string() },
+  handler: async (ctx, { emoji }) => {
+    const { id } = await requireUser(ctx);
+    const clean = emoji.trim().slice(0, 100);
+    if (!clean) return;
+    const existing = await ctx.db
+      .query("emojiPreferences")
+      .withIndex("by_user_emoji", (q) => q.eq("userId", id).eq("emoji", clean))
+      .unique();
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        useCount: existing.useCount + 1,
+        lastUsedAt: Date.now(),
+      });
+      return;
+    }
+    if (!(await makePreferenceRoom(ctx, id))) return;
+    await ctx.db.insert("emojiPreferences", {
+      userId: id,
+      emoji: clean,
+      favorite: false,
+      useCount: 1,
+      lastUsedAt: Date.now(),
+    });
+  },
+});
+
+export const setFavorite = mutation({
+  args: { emoji: v.string(), favorite: v.boolean() },
+  handler: async (ctx, { emoji, favorite }) => {
+    const { id } = await requireUser(ctx);
+    const clean = emoji.trim().slice(0, 100);
+    if (!clean) throw new Error("Choose an emoji first.");
+    const existing = await ctx.db
+      .query("emojiPreferences")
+      .withIndex("by_user_emoji", (q) => q.eq("userId", id).eq("emoji", clean))
+      .unique();
+    if (existing) {
+      if (favorite && !existing.favorite) {
+        const favorites = await ctx.db
+          .query("emojiPreferences")
+          .withIndex("by_user_favorite", (q) =>
+            q.eq("userId", id).eq("favorite", true),
+          )
+          .take(MAX_FAVORITE_EMOJIS);
+        if (favorites.length >= MAX_FAVORITE_EMOJIS) {
+          throw new Error(
+            `You can favorite up to ${MAX_FAVORITE_EMOJIS} emojis.`,
+          );
+        }
+      }
+      await ctx.db.patch(existing._id, { favorite, lastUsedAt: Date.now() });
+      return;
+    }
+    if (!favorite) return;
+    const favorites = await ctx.db
+      .query("emojiPreferences")
+      .withIndex("by_user_favorite", (q) =>
+        q.eq("userId", id).eq("favorite", true),
+      )
+      .take(MAX_FAVORITE_EMOJIS);
+    if (favorites.length >= MAX_FAVORITE_EMOJIS) {
+      throw new Error(`You can favorite up to ${MAX_FAVORITE_EMOJIS} emojis.`);
+    }
+    if (!(await makePreferenceRoom(ctx, id))) {
+      throw new Error("Remove an emoji favorite before adding another.");
+    }
+    await ctx.db.insert("emojiPreferences", {
+      userId: id,
+      emoji: clean,
+      favorite,
+      useCount: 0,
+      lastUsedAt: Date.now(),
+    });
   },
 });
 

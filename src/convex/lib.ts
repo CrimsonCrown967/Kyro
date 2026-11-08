@@ -21,6 +21,8 @@ export const PRESENCE_TIMEOUT_MS = 150_000;
 export const MAX_MESSAGE_LENGTH = 2000;
 export const MAX_ATTACHMENTS = 6;
 export const MAX_ATTACHMENT_BYTES = MAX_UPLOAD_BYTES;
+/** Bounds reactive badge queries while still allowing badges to count to 999+. */
+export const MAX_BADGE_NOTIFICATIONS = 500;
 
 /**
  * Email suffix reserved for seeded/demo accounts. These accounts are not real

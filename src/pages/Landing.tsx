@@ -194,6 +194,8 @@ export default function Landing() {
         </div>
       </header>
 
+      {/* prettier-ignore */}
+      <main>
       {/* ── Hero ────────────────────────────────────────────── */}
       <section className="relative overflow-hidden">
         <div className="kyro-grid pointer-events-none absolute inset-0 opacity-70" />
@@ -475,7 +477,7 @@ export default function Landing() {
               {[
                 "No paid plans, premium tiers or subscriptions",
                 "No feature gates, trial clocks or usage meters",
-                "No selling your messages or attention to advertisers",
+                "No selling private messages or locking communities behind upgrades",
                 "Same permissions for a two-person group and a 10,000-member one",
               ].map((line) => (
                 <li key={line} className="flex items-start gap-3 text-sm">
@@ -688,6 +690,8 @@ export default function Landing() {
         </div>
       </section>
 
+      </main>
+
       {/* ── Footer ─────────────────────────────────────────── */}
       <footer className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
         <div className="flex flex-col gap-8 sm:flex-row sm:items-start sm:justify-between">
@@ -762,7 +766,7 @@ export default function Landing() {
         </div>
         <div className="mt-10 flex flex-col gap-2 border-t border-border/60 pt-6 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
           <p>© {new Date().getFullYear()} Kyro. Free for everyone, always.</p>
-          <p>No ads. No premium tier. No fine print.</p>
+          <p>No premium tier. No paywalled features. No fine print.</p>
         </div>
       </footer>
     </div>

@@ -12,7 +12,9 @@ import {
   configuredFounderId,
   hydrateUsers,
   logAudit,
+  MAX_BADGE_NOTIFICATIONS,
   notify,
+  permissionsFor,
   PRESENCE_TIMEOUT_MS,
   requireActiveUser,
   requireProfile,
@@ -54,36 +56,18 @@ async function topPosition(
   return positions.length > 0 ? Math.max(...positions) : 0;
 }
 
-async function unreadSummaryFor(
+async function hasUnreadChannels(
   ctx: Ctx,
-  userId: Id<"users">,
   server: Doc<"servers">,
   readMap: Map<string, number>,
-): Promise<{ unread: boolean; mentions: number }> {
+): Promise<boolean> {
   const channels = await ctx.db
     .query("channels")
     .withIndex("by_server", (q) => q.eq("serverId", server._id))
     .collect();
-  const unread = channels.some(
+  return channels.some(
     (channel) => (channel.lastMessageAt ?? 0) > (readMap.get(channel._id) ?? 0),
   );
-  const notes = await ctx.db
-    .query("notifications")
-    .withIndex("by_user_unread", (q) =>
-      q.eq("userId", userId).eq("read", false),
-    )
-    .take(50);
-  let mentions = 0;
-  for (const note of notes) {
-    if (
-      !note.containerKey ||
-      (note.type !== "mention" && note.type !== "reply")
-    )
-      continue;
-    const channel = await ctx.db.get(note.containerKey as Id<"channels">);
-    if (channel && channel.serverId === server._id) mentions += 1;
-  }
-  return { unread, mentions };
 }
 
 async function readCursors(
@@ -106,16 +90,53 @@ export const listMine = query({
   args: {},
   handler: async (ctx) => {
     const { id } = await requireUser(ctx);
-    const memberships = await ctx.db
-      .query("serverMembers")
-      .withIndex("by_user", (q) => q.eq("userId", id))
-      .collect();
-    const readMap = await readCursors(ctx, id);
+    const [memberships, readMap, mentionNotes, replyNotes] = await Promise.all([
+      ctx.db
+        .query("serverMembers")
+        .withIndex("by_user", (q) => q.eq("userId", id))
+        .collect(),
+      readCursors(ctx, id),
+      ctx.db
+        .query("notifications")
+        .withIndex("by_user_unread_type", (q) =>
+          q.eq("userId", id).eq("read", false).eq("type", "mention"),
+        )
+        .order("desc")
+        .take(MAX_BADGE_NOTIFICATIONS),
+      ctx.db
+        .query("notifications")
+        .withIndex("by_user_unread_type", (q) =>
+          q.eq("userId", id).eq("read", false).eq("type", "reply"),
+        )
+        .order("desc")
+        .take(MAX_BADGE_NOTIFICATIONS),
+    ]);
+    const mentionCounts = new Map<Id<"servers">, number>();
+    const mentionCountsByChannel = new Map<string, number>();
+    for (const note of [...mentionNotes, ...replyNotes]) {
+      if (!note.containerKey) continue;
+      mentionCountsByChannel.set(
+        note.containerKey,
+        (mentionCountsByChannel.get(note.containerKey) ?? 0) + 1,
+      );
+    }
+    await Promise.all(
+      [...mentionCountsByChannel].map(async ([containerKey, count]) => {
+        const channelId = ctx.db.normalizeId("channels", containerKey);
+        if (!channelId) return;
+        const channel = await ctx.db.get(channelId);
+        if (!channel) return;
+        mentionCounts.set(
+          channel.serverId,
+          (mentionCounts.get(channel.serverId) ?? 0) + count,
+        );
+      }),
+    );
     const results = await Promise.all(
       memberships.map(async (membership) => {
         const server = await ctx.db.get(membership.serverId);
         if (!server) return null;
-        const [iconUrl, memberCount, badges] = await Promise.all([
+        const [iconUrl, memberCount, unread, permissions] = await Promise.all([
           server.iconStorageId
             ? ctx.storage.getUrl(server.iconStorageId)
             : Promise.resolve(null),
@@ -124,7 +145,8 @@ export const listMine = query({
             .withIndex("by_server", (q) => q.eq("serverId", server._id))
             .collect()
             .then((rows) => rows.length),
-          unreadSummaryFor(ctx, id, server, readMap),
+          hasUnreadChannels(ctx, server, readMap),
+          permissionsFor(ctx, server, membership),
         ]);
         return {
           id: server._id as string,
@@ -134,7 +156,9 @@ export const listMine = query({
           muted: membership.muted === true,
           isOwner: server.ownerId === id,
           tag: server.tag ?? null,
-          ...badges,
+          permissions,
+          unread,
+          mentions: mentionCounts.get(server._id) ?? 0,
         };
       }),
     );

@@ -1103,6 +1103,9 @@ export const deleteAccount = mutation({
       emailOutbox,
       verificationCodes,
       livekitTickets,
+      emojiPreferences,
+      gifFavorites,
+      serverTemplates,
     ] = await Promise.all([
       ctx.db
         .query("serverMembers")
@@ -1164,6 +1167,18 @@ export const deleteAccount = mutation({
         .query("livekitTickets")
         .withIndex("by_user", (q) => q.eq("userId", id))
         .collect(),
+      ctx.db
+        .query("emojiPreferences")
+        .withIndex("by_user", (q) => q.eq("userId", id))
+        .collect(),
+      ctx.db
+        .query("gifFavorites")
+        .withIndex("by_user", (q) => q.eq("userId", id))
+        .collect(),
+      ctx.db
+        .query("serverTemplates")
+        .withIndex("by_creator", (q) => q.eq("creatorId", id))
+        .collect(),
     ]);
 
     for (const membership of memberships) await ctx.db.delete(membership._id);
@@ -1181,6 +1196,13 @@ export const deleteAccount = mutation({
     for (const email of emailOutbox) await ctx.db.delete(email._id);
     for (const code of verificationCodes) await ctx.db.delete(code._id);
     for (const ticket of livekitTickets) await ctx.db.delete(ticket._id);
+    for (const row of [
+      ...emojiPreferences,
+      ...gifFavorites,
+      ...serverTemplates,
+    ]) {
+      await ctx.db.delete(row._id);
+    }
     if (user.email) {
       const [verificationRequests, resetCodes, resetRequests] =
         await Promise.all([

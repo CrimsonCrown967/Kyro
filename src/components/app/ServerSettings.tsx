@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   Ban,
+  Bot,
   ChevronDown,
   ChevronRight,
   ChevronUp,
@@ -39,6 +40,7 @@ import {
   ModerationCaseActivity,
 } from "@/components/app/ServerModeration";
 import { ServerConfigurationExport } from "@/components/app/ServerConfigurationExport";
+import { BotSettings } from "@/components/app/BotSettings";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -74,6 +76,7 @@ type TabId =
   | "channels"
   | "roles"
   | "emojis"
+  | "bots"
   | "members"
   | "invites"
   | "bans"
@@ -87,6 +90,7 @@ const SETTINGS_TABS: readonly TabId[] = [
   "channels",
   "roles",
   "emojis",
+  "bots",
   "members",
   "invites",
   "bans",
@@ -215,6 +219,7 @@ export function ServerSettings({ serverId }: { serverId: string }) {
     { id: "channels", label: "Channels", show: canChannels, icon: Hash },
     { id: "roles", label: "Roles", show: canRoles, icon: Shield },
     { id: "emojis", label: "Emojis", show: canEmojis, icon: MessagesSquare },
+    { id: "bots", label: "Bots & commands", show: canManage, icon: Bot },
     {
       id: "members",
       label: "Members",
@@ -1261,6 +1266,7 @@ export function ServerSettings({ serverId }: { serverId: string }) {
           {activeTab === "emojis" && (
             <EmojisTab serverId={serverId} canManage={canEmojis} />
           )}
+          {activeTab === "bots" && <BotSettings serverId={serverId} />}
 
           {activeTab === "theme" && canManage && (
             <ThemeTab
