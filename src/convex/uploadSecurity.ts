@@ -1,6 +1,6 @@
 import type { Doc, Id } from "./_generated/dataModel";
 import type { Ctx } from "./lib";
-import type { MutationCtx } from "./_generated/server";
+import type { MutationCtx } from "./functions";
 import { MAX_UPLOAD_BYTES } from "../lib/uploadLimits";
 
 export { MAX_UPLOAD_BYTES };
@@ -11,7 +11,10 @@ export type UploadClaim =
   | "user_banner"
   | "server_icon"
   | "server_banner"
-  | "server_emoji";
+  | "server_emoji"
+  | "bot_icon"
+  | "bot_banner";
+// Bot assets use the same ownership and single-claim rules as other uploads.
 
 const SAFE_CONTENT_TYPES = new Set([
   "application/json",

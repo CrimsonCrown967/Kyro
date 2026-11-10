@@ -1,4 +1,4 @@
-import { cronJobs } from "convex/server";
+import { cronJobs, makeFunctionReference } from "convex/server";
 import {
   cleanupEmailRecordsRef,
   kickDueEmailsRef,
@@ -6,6 +6,18 @@ import {
 } from "./emailRefs";
 
 const crons = cronJobs();
+crons.interval(
+  "deliver bot webhooks",
+  { minutes: 1 },
+  makeFunctionReference<"action">("botWebhooks:deliverDue"),
+  {},
+);
+crons.interval(
+  "expire bot events",
+  { hours: 1 },
+  makeFunctionReference<"mutation">("botDelivery:cleanup"),
+  {},
+);
 
 crons.interval(
   "retry transactional emails",

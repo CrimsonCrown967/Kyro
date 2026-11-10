@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation } from "./_generated/server";
+import { mutation } from "./functions";
 import { sha256Hex } from "./sha256";
 
 /** Consumed only by Kyro's Vercel Functions; possession is the one-time proof. */

@@ -1,5 +1,14 @@
 ## Overview
 
+KyroFree is a React community chat application with a Convex backend. Start with
+the [technical architecture overview](docs/architecture.md) for the framework,
+database/schema, authentication, API structure, features and dependencies.
+
+The [Bot Developer Platform guide](docs/bot-platform.md) documents application
+creation, installation consent, permissions, REST endpoints, slash commands,
+signed webhooks and deployment. The [kyro.js SDK](sdk/kyro.js/README.md) is
+distributed from this repository and has not been published to npm.
+
 This project uses the following tech stack:
 
 - Vite
@@ -12,9 +21,9 @@ This project uses the following tech stack:
 - Convex (for backend & database)
 - Convex Auth (for authentication)
 - Framer Motion (for animations)
-- Three js (for 3d models)
 
-All relevant files live in the 'src' directory.
+Frontend and Convex functions live in `src/`; Vercel functions are in `api/`,
+supporting Node services in `server/`, and the bot SDK in `sdk/kyro.js/`.
 
 Use bun for the package manager. `package-lock.json` is the source of truth
 for npm-based environments (CI, Vercel); run `bun install` only after a
@@ -89,9 +98,10 @@ You must follow these conventions when using authentication.
 
 ## Auth is already set up.
 
-All convex authentication functions are already set up. The auth currently uses email OTP and anonymous users, but can support more.
-
-The email OTP configuration is defined in `src/convex/auth/emailOtp.ts`. DO NOT MODIFY THIS FILE.
+Authentication uses Convex Auth with a custom password provider, optional TOTP
+and recovery codes, and optional email verification. The active provider is
+`src/convex/auth/passwordWithTwoFactor.ts`; account creation is implemented in
+`src/convex/users/createAccount.ts`.
 
 Also, DO NOT MODIFY THESE AUTH FILES: `src/convex/auth.config.ts` and `src/convex/auth.ts`.
 

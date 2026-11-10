@@ -1,0 +1,26 @@
+{
+  "name": "kyro.js",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Official TypeScript client for the Kyro Bot API; distributed from the KyroFree repository.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20.19"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepare": "npm run build"
+  }
+}

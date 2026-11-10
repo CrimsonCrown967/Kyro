@@ -13,7 +13,7 @@ export function StyledDisplayName({
   style,
   children,
 }: {
-  user: DisplayNameStyledUser;
+  user: DisplayNameStyledUser & { botApplicationId?: string | null };
   name?: string;
   roleColor?: string | null;
   className?: string;
@@ -26,6 +26,14 @@ export function StyledDisplayName({
       style={{ ...displayNameStyle(user, roleColor), ...style }}
     >
       {children ?? name ?? user.name}
+      {user.botApplicationId && (
+        <span
+          className="ml-1.5 rounded bg-primary/15 px-1 py-0.5 align-middle font-sans text-[9px] font-semibold text-primary"
+          aria-label="Bot account"
+        >
+          BOT
+        </span>
+      )}
     </span>
   );
 }

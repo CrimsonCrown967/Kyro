@@ -6,7 +6,7 @@ import {
 } from "../lib/permissions";
 import { MAX_UPLOAD_BYTES } from "../lib/uploadLimits";
 import type { Doc, Id } from "./_generated/dataModel";
-import type { MutationCtx, QueryCtx } from "./_generated/server";
+import type { MutationCtx, QueryCtx } from "./functions";
 
 export type Ctx = QueryCtx | MutationCtx;
 
@@ -139,6 +139,7 @@ export function visiblePresence(
 }
 
 export interface PublicUser {
+  botApplicationId?: string | null;
   id: string;
   username: string | null;
   name: string;
@@ -392,6 +393,7 @@ export async function hydrateUser(
   const badges = globalBadgesFor(user);
   return {
     id: user._id,
+    botApplicationId: user.botApplicationId ?? null,
     username: user.username ?? null,
     name: user.name ?? user.username ?? "Kyro user",
     avatarUrl,

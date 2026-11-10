@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalMutation, internalQuery } from "../_generated/server";
+import { internalMutation, internalQuery } from "../functions";
 
 const EMAIL_CHANGE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
 

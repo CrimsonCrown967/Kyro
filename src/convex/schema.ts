@@ -1,6 +1,7 @@
 import { authTables } from "@convex-dev/auth/server";
 import { defineSchema, defineTable } from "convex/server";
 import { Infer, v } from "convex/values";
+import { botTables } from "./botSchema";
 
 // default user roles. can add / remove based on the project as needed
 export const ROLES = {
@@ -29,9 +30,11 @@ const schema = defineSchema(
   {
     // default auth tables using convex auth.
     ...authTables, // do not remove or modify
+    ...botTables,
 
     // the users table is the default users table that is brought in by the authTables
     users: defineTable({
+      botApplicationId: v.optional(v.id("botApplications")),
       name: v.optional(v.string()), // name of the user. do not remove
       image: v.optional(v.string()), // image of the user. do not remove
       email: v.optional(v.string()), // email of the user. do not remove
@@ -274,6 +277,7 @@ const schema = defineSchema(
       .index("by_server_user", ["serverId", "userId"]),
 
     serverRoles: defineTable({
+      botApplicationId: v.optional(v.id("botApplications")),
       serverId: v.id("servers"),
       name: v.string(),
       color: v.optional(v.string()),
@@ -401,6 +405,19 @@ const schema = defineSchema(
 
     /** One row per message in a channel *or* a direct-message conversation. */
     messages: defineTable({
+      embeds: v.optional(
+        v.array(
+          v.object({
+            title: v.optional(v.string()),
+            description: v.optional(v.string()),
+            url: v.optional(v.string()),
+            color: v.optional(v.string()),
+            fields: v.optional(
+              v.array(v.object({ name: v.string(), value: v.string() })),
+            ),
+          }),
+        ),
+      ),
       containerType: v.union(v.literal("channel"), v.literal("conversation")),
       containerId: v.string(),
       authorId: v.id("users"),
@@ -534,6 +551,8 @@ const schema = defineSchema(
           v.literal("server_icon"),
           v.literal("server_banner"),
           v.literal("server_emoji"),
+          v.literal("bot_icon"),
+          v.literal("bot_banner"),
         ),
       ),
       /** String form of the message, user, or server id that owns the claim. */

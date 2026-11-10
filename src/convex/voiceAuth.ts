@@ -1,6 +1,6 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
-import { action } from "./_generated/server";
+import { action } from "./functions";
 import {
   createVoiceJoinTicketRef,
   createVoiceModerationTicketRef,

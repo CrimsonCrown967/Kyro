@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { toast } from "sonner";
+import { InstalledBots } from "./InstalledBots";
 
 export function BotSettings({ serverId }: { serverId: string }) {
   const data = useQuery(api.bots.listForServer, {
@@ -54,6 +55,7 @@ export function BotSettings({ serverId }: { serverId: string }) {
 
   return (
     <div className="space-y-5">
+      {data.canManage && <InstalledBots serverId={serverId as Id<"servers">} />}
       <section className="rounded-xl border border-border/70 bg-panel p-5">
         <div className="flex items-start gap-3">
           <span className="flex size-10 items-center justify-center rounded-xl bg-primary/15 text-primary">

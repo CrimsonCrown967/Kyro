@@ -25,6 +25,11 @@ export const PERMISSIONS = {
   MENTION_EVERYONE: "mention_everyone",
   MANAGE_EMOJIS: "manage_emojis",
   VIEW_AUDIT_LOG: "view_audit_log",
+  READ_MESSAGE_HISTORY: "read_message_history",
+  ADD_REACTIONS: "add_reactions",
+  UPLOAD_ATTACHMENTS: "upload_attachments",
+  USE_EXTERNAL_EMOJIS: "use_external_emojis",
+  CREATE_POLLS: "create_polls",
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -42,6 +47,11 @@ export const CHANNEL_PERMISSIONS: Permission[] = [
   PERMISSIONS.MANAGE_VOICE,
   PERMISSIONS.MANAGE_MESSAGES,
   PERMISSIONS.MENTION_EVERYONE,
+  PERMISSIONS.READ_MESSAGE_HISTORY,
+  PERMISSIONS.ADD_REACTIONS,
+  PERMISSIONS.UPLOAD_ATTACHMENTS,
+  PERMISSIONS.USE_EXTERNAL_EMOJIS,
+  PERMISSIONS.CREATE_POLLS,
 ];
 
 /** What the default @everyone role starts with on a new community. */
@@ -96,6 +106,26 @@ export const PERMISSION_META: Record<
   Permission,
   { label: string; description: string }
 > = {
+  read_message_history: {
+    label: "Read message history",
+    description: "Read existing channel messages through the bot API.",
+  },
+  add_reactions: {
+    label: "Add reactions",
+    description: "Add emoji reactions through the bot API.",
+  },
+  upload_attachments: {
+    label: "Upload attachments",
+    description: "Upload files through the bot API.",
+  },
+  use_external_emojis: {
+    label: "Use external emojis",
+    description: "Use custom emoji from other communities the bot has joined.",
+  },
+  create_polls: {
+    label: "Create polls",
+    description: "Create channel polls through the bot API.",
+  },
   administrator: {
     label: "Administrator",
     description: "Grants every permission in this community.",

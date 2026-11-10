@@ -5,7 +5,7 @@ import {
   mutation,
   query,
   type MutationCtx,
-} from "./_generated/server";
+} from "./functions";
 import { deliverEmailRef } from "./emailRefs";
 import {
   isPlatformStaff,

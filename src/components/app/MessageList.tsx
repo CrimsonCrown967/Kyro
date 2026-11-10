@@ -76,6 +76,7 @@ import {
 } from "@/components/ui/dialog";
 
 export interface MessageAuthor {
+  botApplicationId?: string | null;
   id: string;
   name: string;
   username: string | null;
@@ -97,6 +98,13 @@ export interface MessageAuthor {
 }
 
 export interface MessageDto {
+  embeds?: {
+    title?: string;
+    description?: string;
+    url?: string;
+    color?: string;
+    fields?: { name: string; value: string }[];
+  }[];
   id: string;
   content: string;
   /** Call records render as their own system row instead of a chat bubble. */
@@ -1019,6 +1027,44 @@ function MessageRow({
                 </div>
               )}
 
+              {!editing &&
+                message.embeds?.map((embed, index) => (
+                  <div
+                    key={index}
+                    className="mt-2 max-w-lg rounded-lg border border-border border-l-4 bg-muted/40 p-4"
+                    style={{ borderLeftColor: embed.color ?? "#5865F2" }}
+                  >
+                    {embed.title && (
+                      <p className="font-semibold">
+                        {embed.url?.startsWith("https://") ? (
+                          <a
+                            href={embed.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary hover:underline"
+                          >
+                            {embed.title}
+                          </a>
+                        ) : (
+                          embed.title
+                        )}
+                      </p>
+                    )}
+                    {embed.description && (
+                      <p className="mt-2 whitespace-pre-wrap break-words text-sm">
+                        {embed.description}
+                      </p>
+                    )}
+                    {embed.fields?.map((field, i) => (
+                      <div key={i} className="mt-3 text-sm">
+                        <p className="font-semibold">{field.name}</p>
+                        <p className="whitespace-pre-wrap break-words text-muted-foreground">
+                          {field.value}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ))}
               {inviteCodes.length > 0 && !editing && (
                 <div className="mt-2 flex flex-col gap-2">
                   {inviteCodes.slice(0, 2).map((code) => (

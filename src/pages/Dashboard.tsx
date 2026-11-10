@@ -15,6 +15,8 @@ import { ServerSettings } from "@/components/app/ServerSettings";
 import { ServerThemeScope } from "@/components/app/ServerThemeScope";
 import { VoiceChannelPage } from "@/components/app/VoiceChannelPage";
 import { Button } from "@/components/ui/button";
+import Developers from "./Developers";
+import BotDirectory, { BotAuthorization } from "./BotDirectory";
 
 /** The signed-in product: everything lives inside the AppShell frame and is
  *  routed underneath it — friends home, DMs, community channels and the
@@ -30,6 +32,12 @@ export default function Dashboard() {
         <Routes>
           <Route index element={<FriendsView />} />
           <Route path="discover" element={<DiscoverView />} />
+          <Route path="developers/:applicationId?" element={<Developers />} />
+          <Route
+            path="bots/authorize/:applicationId"
+            element={<BotAuthorization />}
+          />
+          <Route path="bots/:applicationId?" element={<BotDirectory />} />
           {/* Staff console — admins and moderators sign in with their Kyro
             account; the page itself gates access server-side. */}
           <Route path="admin" element={<AdminPortal />} />

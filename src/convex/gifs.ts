@@ -1,6 +1,6 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
-import { action, mutation, query } from "./_generated/server";
+import { action, mutation, query } from "./functions";
 import { requireUser } from "./lib";
 
 const KLIPY_BASE = "https://api.klipy.com/api/v1";

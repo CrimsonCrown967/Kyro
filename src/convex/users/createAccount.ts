@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { createAccount as createAuthAccount } from "@convex-dev/auth/server";
-import { action, internalQuery } from "../_generated/server";
+import { action, internalQuery } from "../functions";
 import { internal } from "../_generated/api";
 import {
   isReservedUsername,

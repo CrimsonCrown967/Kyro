@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
-import { mutation, query } from "./_generated/server";
+import { mutation, query } from "./functions";
 import { CUSTOM_EMOJI_TOKEN, customEmojiIds } from "../lib/emoji";
 import {
   channelPermissions,
@@ -350,6 +350,7 @@ export const list = query({
         return {
           id: message._id,
           content: message.content,
+          embeds: message.embeds ?? [],
           /** Call records render as their own system row in the timeline. */
           kind: message.kind ?? null,
           botName: message.botName ?? null,

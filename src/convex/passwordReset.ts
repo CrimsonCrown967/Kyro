@@ -4,7 +4,7 @@ import {
   modifyAccountCredentials,
   retrieveAccount,
 } from "@convex-dev/auth/server";
-import { action } from "./_generated/server";
+import { action } from "./functions";
 import {
   passwordResetAccountRef,
   passwordResetPrepareRef,

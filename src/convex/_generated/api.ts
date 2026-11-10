@@ -17,7 +17,17 @@ import type * as auth_config from "../auth.config.js";
 import type * as auth_emailOtp from "../auth/emailOtp.js";
 import type * as auth_passwordWithTwoFactor from "../auth/passwordWithTwoFactor.js";
 import type * as automod from "../automod.js";
+import type * as botApi from "../botApi.js";
+import type * as botApplications from "../botApplications.js";
+import type * as botCommands from "../botCommands.js";
+import type * as botDelivery from "../botDelivery.js";
+import type * as botEvents from "../botEvents.js";
+import type * as botHttp from "../botHttp.js";
+import type * as botLib from "../botLib.js";
+import type * as botMessages from "../botMessages.js";
 import type * as bots from "../bots.js";
+import type * as botSchema from "../botSchema.js";
+import type * as botWebhooks from "../botWebhooks.js";
 import type * as bugReports from "../bugReports.js";
 import type * as channels from "../channels.js";
 import type * as cleanup from "../cleanup.js";
@@ -31,6 +41,7 @@ import type * as emailVerificationInternal from "../emailVerificationInternal.js
 import type * as emojis from "../emojis.js";
 import type * as files from "../files.js";
 import type * as forums from "../forums.js";
+import type * as functions from "../functions.js";
 import type * as gifs from "../gifs.js";
 import type * as http from "../http.js";
 import type * as lib from "../lib.js";
@@ -80,7 +91,17 @@ const fullApi: ApiFromModules<{
   "auth/emailOtp": typeof auth_emailOtp,
   "auth/passwordWithTwoFactor": typeof auth_passwordWithTwoFactor,
   "automod": typeof automod,
+  "botApi": typeof botApi,
+  "botApplications": typeof botApplications,
+  "botCommands": typeof botCommands,
+  "botDelivery": typeof botDelivery,
+  "botEvents": typeof botEvents,
+  "botHttp": typeof botHttp,
+  "botLib": typeof botLib,
+  "botMessages": typeof botMessages,
   "bots": typeof bots,
+  "botSchema": typeof botSchema,
+  "botWebhooks": typeof botWebhooks,
   "bugReports": typeof bugReports,
   "channels": typeof channels,
   "cleanup": typeof cleanup,
@@ -94,6 +115,7 @@ const fullApi: ApiFromModules<{
   "emojis": typeof emojis,
   "files": typeof files,
   "forums": typeof forums,
+  "functions": typeof functions,
   "gifs": typeof gifs,
   "http": typeof http,
   "lib": typeof lib,

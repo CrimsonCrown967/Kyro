@@ -4,7 +4,7 @@ import {
   modifyAccountCredentials,
   retrieveAccount,
 } from "@convex-dev/auth/server";
-import { action, internalQuery } from "../_generated/server";
+import { action, internalQuery } from "../functions";
 import { internal } from "../_generated/api";
 
 /**

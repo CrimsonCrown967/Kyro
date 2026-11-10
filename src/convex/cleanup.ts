@@ -1,5 +1,5 @@
 import type { Doc, Id } from "./_generated/dataModel";
-import type { MutationCtx } from "./_generated/server";
+import type { MutationCtx } from "./functions";
 import { deleteClaimedUpload } from "./uploadSecurity";
 
 /** Delete a message and every object that exists only because it exists. */

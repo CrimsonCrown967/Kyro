@@ -5,7 +5,7 @@ import {
   internalMutation,
   query,
   type MutationCtx,
-} from "./_generated/server";
+} from "./functions";
 import { DEFAULT_EVERYONE_PERMISSIONS, PERMISSIONS } from "../lib/permissions";
 import {
   can,

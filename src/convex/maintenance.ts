@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
-import { internalMutation } from "./_generated/server";
+import { internalMutation } from "./functions";
 import {
   deleteConversationData,
   deleteMessageData,

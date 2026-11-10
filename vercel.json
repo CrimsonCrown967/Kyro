@@ -4,6 +4,7 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "functions": {
+    "api/bots/**/*.ts": { "maxDuration": 30 },
     "api/email/*.ts": { "maxDuration": 30 },
     "api/livekit/*.ts": { "maxDuration": 30 }
   },

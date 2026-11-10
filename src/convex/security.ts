@@ -1,6 +1,6 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
-import { action, mutation, query } from "./_generated/server";
+import { action, mutation, query } from "./functions";
 import { sha256Hex } from "./sha256";
 import {
   generateRecoveryCodes,

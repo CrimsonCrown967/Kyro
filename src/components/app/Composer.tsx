@@ -42,6 +42,7 @@ import { GifPicker } from "@/components/app/GifPicker";
 import { StyledDisplayName } from "@/components/app/StyledDisplayName";
 import { PollComposerDialog } from "@/components/app/PollComposerDialog";
 import { roleMentionToken } from "@/lib/permissions";
+import { BotCommandDialog, BotInteractionResponses } from "./BotCommandDialog";
 
 export interface MentionUser {
   id: string;
@@ -87,6 +88,18 @@ export function Composer({
   const setDraft = useUiStore((state) => state.setDraft);
   const sendMessage = useMutation(api.messages.send);
   const runBotCommand = useMutation(api.bots.execute);
+  const externalCommands = useQuery(
+    api.botCommands.forChannel,
+    containerType === "channel"
+      ? { channelId: containerId as Id<"channels"> }
+      : "skip",
+  );
+  const [externalCommandId, setExternalCommandId] = useState<string | null>(
+    null,
+  );
+  const externalCommand = externalCommands?.find(
+    (command) => command.id === externalCommandId,
+  );
   const setTyping = useMutation(api.messages.setTyping);
   const botCommands = useQuery(
     api.bots.listForChannel,
@@ -183,14 +196,22 @@ export function Composer({
     })
     .slice(0, 8);
   const commandMatch =
-    containerType === "channel" ? draft.match(/^\/([a-z0-9_-]*)$/i) : null;
+    containerType === "channel" ? draft.match(/^\/([a-z0-9_:-]*)$/i) : null;
   const commandOptions = commandMatch
-    ? (botCommands ?? [])
+    ? [...(botCommands ?? []), ...(externalCommands ?? [])]
         .filter((command) =>
           command.name.toLowerCase().startsWith(commandMatch[1].toLowerCase()),
         )
         .slice(0, 8)
     : [];
+  const chooseCommand = (name: string) => {
+    const installed = externalCommands?.find(
+      (command) => command.name === name,
+    );
+    if (installed) setExternalCommandId(installed.id);
+    else setDraft(draftKey, `/${name} `);
+    setCommandIndex(0);
+  };
 
   const insertMention = (token: string) => {
     const cursor = textareaRef.current?.selectionStart ?? draft.length;
@@ -270,6 +291,14 @@ export function Composer({
     setBusy(true);
     const clientId = crypto.randomUUID();
     try {
+      const installedCommand = externalCommands?.find(
+        (entry) =>
+          content === `/${entry.name}` || content.startsWith(`/${entry.name} `),
+      );
+      if (installedCommand && containerType === "channel") {
+        setExternalCommandId(installedCommand.id);
+        return;
+      }
       const command = content.match(/^\/([a-z0-9_-]+)(?:\s+[\s\S]*)?$/i);
       if (
         containerType === "channel" &&
@@ -465,6 +494,22 @@ export function Composer({
 
   return (
     <div className="bg-transparent px-3 pb-4 pt-2 sm:px-5">
+      {containerType === "channel" && (
+        <BotInteractionResponses channelId={containerId as Id<"channels">} />
+      )}
+      {externalCommand && (
+        <BotCommandDialog
+          key={externalCommand.id}
+          command={externalCommand}
+          channelId={containerId as Id<"channels">}
+          members={mentionUsers}
+          onClose={() => setExternalCommandId(null)}
+          onSent={() => {
+            setDraft(draftKey, "");
+            onSent?.();
+          }}
+        />
+      )}
       {reply && (
         <div className="mb-1 flex items-center justify-between rounded-t-lg border border-b-0 border-border/70 bg-surface px-3 py-1.5 text-xs text-muted-foreground">
           <span className="truncate">
@@ -592,7 +637,7 @@ export function Composer({
                 event.preventDefault();
                 const selected =
                   commandOptions[commandIndex] ?? commandOptions[0];
-                setDraft(draftKey, `/${selected.name} `);
+                chooseCommand(selected.name);
                 setCommandIndex(0);
                 requestAnimationFrame(() => textareaRef.current?.focus());
                 return;
@@ -675,7 +720,7 @@ export function Composer({
                 type="button"
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => {
-                  setDraft(draftKey, `/${command.name} `);
+                  chooseCommand(command.name);
                   setCommandIndex(0);
                   requestAnimationFrame(() => textareaRef.current?.focus());
                 }}

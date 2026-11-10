@@ -101,7 +101,9 @@ const configuredConvexUrl = import.meta.env.VITE_CONVEX_URL as
   | undefined;
 const convexUrl =
   typeof configuredConvexUrl === "string" &&
-  /^https:\/\/[a-z0-9-]+\.convex\.cloud$/.test(configuredConvexUrl)
+  (/^https:\/\/[a-z0-9-]+\.convex\.cloud\/?$/.test(configuredConvexUrl) ||
+    (import.meta.env.DEV &&
+      /^http:\/\/(localhost|127\.0\.0\.1):\d+\/?$/.test(configuredConvexUrl)))
     ? configuredConvexUrl
     : DEFAULT_CONVEX_URL;
 const convex = new ConvexReactClient(convexUrl);

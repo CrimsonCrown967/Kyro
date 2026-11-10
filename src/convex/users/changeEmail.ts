@@ -1,7 +1,7 @@
 import { getAuthUserId, retrieveAccount } from "@convex-dev/auth/server";
 import { makeFunctionReference } from "convex/server";
 import { v } from "convex/values";
-import { action } from "../_generated/server";
+import { action } from "../functions";
 import type { Id } from "../_generated/dataModel";
 
 const EMAIL_CHANGE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;

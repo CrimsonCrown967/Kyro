@@ -260,6 +260,18 @@ export function ProfileCard() {
                     <span className="font-medium text-foreground/90">
                       @{user.username ?? "no username yet"}
                     </span>
+                    {user.botApplicationId && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          close(false);
+                          navigate(`/dashboard/bots/${user.botApplicationId}`);
+                        }}
+                      >
+                        View bot application
+                      </Button>
+                    )}
                     {user.pronouns && (
                       <>
                         <span aria-hidden className="text-border">

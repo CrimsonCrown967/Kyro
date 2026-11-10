@@ -5,4 +5,6 @@ dist
 # stands in for `npx convex codegen`, which needs deployment auth.
 
 .vercel
+.convex/
+test-results/
 .env*

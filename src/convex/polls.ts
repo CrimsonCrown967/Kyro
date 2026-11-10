@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
-import { mutation } from "./_generated/server";
+import { mutation } from "./functions";
 import {
   requireActiveUser,
   requireConversationAccess,

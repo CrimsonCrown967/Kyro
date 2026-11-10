@@ -1,4 +1,4 @@
-import { query } from "./_generated/server";
+import { query } from "./functions";
 import { PRESENCE_TIMEOUT_MS } from "./lib";
 
 /** Public, live counters used by the marketing homepage. */

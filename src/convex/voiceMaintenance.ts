@@ -1,4 +1,4 @@
-import { internalMutation } from "./_generated/server";
+import { internalMutation } from "./functions";
 import { PERMISSIONS } from "../lib/permissions";
 
 /** Backfills new voice grants onto every existing @everyone role. */

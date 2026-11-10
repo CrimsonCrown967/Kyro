@@ -795,6 +795,20 @@ function HomeSection() {
         <Compass className="size-4" />
         Discover
       </Link>
+      <Link
+        to="/dashboard/bots"
+        className="mb-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground"
+      >
+        <Compass className="size-4" />
+        Bot directory
+      </Link>
+      <Link
+        to="/dashboard/developers"
+        className="mb-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground"
+      >
+        <Hash className="size-4" />
+        Developer portal
+      </Link>
 
       {me && me.isPlatformTrialStaff && (
         <Link

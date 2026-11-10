@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query } from "./functions";
 import type { Id } from "./_generated/dataModel";
 import { customEmojiIds } from "../lib/emoji";
 import { channelPermissions, PERMISSIONS } from "../lib/permissions";

@@ -1,6 +1,6 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
-import { action, mutation, query, type MutationCtx } from "./_generated/server";
+import { action, mutation, query, type MutationCtx } from "./functions";
 import type { Id } from "./_generated/dataModel";
 import {
   ALL_PERMISSIONS,

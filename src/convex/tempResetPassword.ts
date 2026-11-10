@@ -3,7 +3,7 @@ import {
   modifyAccountCredentials,
   retrieveAccount,
 } from "@convex-dev/auth/server";
-import { internalAction, internalQuery } from "./_generated/server";
+import { internalAction, internalQuery } from "./functions";
 import { internal } from "./_generated/api";
 
 /** One-off helper: look up an account by handle and its password credential. */
