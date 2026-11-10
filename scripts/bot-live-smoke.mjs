@@ -22,6 +22,22 @@ function setLocalEnv(name, value) {
   if (run.status !== 0) throw new Error(`Failed to configure local ${name}`);
 }
 if (process.argv.includes("--configure-auth")) {
+  const localEnvironment = readFileSync(".env.local", "utf8");
+  const selectedDeployment = localEnvironment.match(
+    /^CONVEX_DEPLOYMENT=["']?([^\s#"']+)/m,
+  )?.[1];
+  assert.equal(
+    selectedDeployment,
+    "anonymous:anonymous-agent",
+    "Auth setup requires the disposable local deployment. It cannot run with a cloud deployment selected.",
+  );
+  assert(
+    !process.env.CONVEX_DEPLOY_KEY &&
+      !process.env.CONVEX_SELF_HOSTED_URL &&
+      (!process.env.CONVEX_DEPLOYMENT ||
+        process.env.CONVEX_DEPLOYMENT === "anonymous:anonymous-agent"),
+    "Remove remote Convex deployment overrides before local auth setup.",
+  );
   const { privateKey, publicKey } = generateKeyPairSync("rsa", {
     modulusLength: 2048,
   });

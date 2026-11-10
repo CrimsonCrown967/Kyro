@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import handler from "../../api/bots/[...path]";
+import handler from "../../api/bots";
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 afterEach(() => {
@@ -26,6 +26,31 @@ const request = (fields: Record<string, unknown>) =>
     ...fields,
   }) as unknown as IncomingMessage;
 describe("Vercel bot API proxy", () => {
+  it("resolves rewritten nested paths and preserves pagination parameters", async () => {
+    vi.stubEnv("BOT_CONVEX_SITE_URL", "https://test.convex.site");
+    const fetcher = vi.fn<typeof fetch>(async () =>
+      Response.json({ ok: true, data: {} }),
+    );
+    vi.stubGlobal("fetch", fetcher);
+    const r = response();
+    await handler(
+      request({
+        url: "/api/bots?botPath=channels%2Fabc123%2Fmessages&limit=10&cursor=page%2B2",
+      }),
+      r.res,
+    );
+    expect(r.value.statusCode).toBe(200);
+    expect(String(fetcher.mock.calls[0][0])).toBe(
+      "https://test.convex.site/api/bots/v1/channels/abc123/messages?limit=10&cursor=page%2B2",
+    );
+    const invalid = response();
+    await handler(
+      request({ url: "/api/bots?botPath=..%2Fother" }),
+      invalid.res,
+    );
+    expect(invalid.value.statusCode).toBe(404);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
   it("forwards the method, path, credential and response to the configured Convex HTTP origin", async () => {
     vi.stubEnv("BOT_CONVEX_SITE_URL", "https://test.convex.site");
     const fetcher = vi.fn<typeof fetch>(async () =>

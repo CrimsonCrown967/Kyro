@@ -4,11 +4,17 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "functions": {
-    "api/bots/**/*.ts": { "maxDuration": 30 },
+    "api/bots.ts": { "maxDuration": 30 },
     "api/email/*.ts": { "maxDuration": 30 },
     "api/livekit/*.ts": { "maxDuration": 30 }
   },
-  "rewrites": [{ "source": "/((?!api/).*)", "destination": "/index.html" }],
+  "rewrites": [
+    {
+      "source": "/api/bots/v1/:path*",
+      "destination": "/api/bots?botPath=:path*"
+    },
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ],
   "headers": [
     {
       "source": "/assets/(.*)",

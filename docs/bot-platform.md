@@ -237,6 +237,16 @@ Analytics record accepted API requests, successful command invocations, installa
 
 ## Deployment and verification
 
+If the portal reports `Could not find public function for 'botApplications:list'`, the frontend has shipped before its Convex backend. A GitHub/Vercel deployment does not publish Convex functions. Deploy this repository to the **same Convex URL used by the live frontend**.
+
+The current `kyro-chat.cyou` site uses `giant-cricket-958`, which Convex classifies as a development deployment. To update that exact backend, put `CONVEX_DEPLOYMENT=dev:giant-cricket-958` in an ignored `.env.bot-deployment.local` file and run:
+
+```sh
+npx convex dev --once --env-file .env.bot-deployment.local --codegen disable --typecheck enable --tail-logs disable
+```
+
+Check the CLI's announced target before continuing. `npx convex deploy` normally chooses the project's default production deployment, which may be different from the backend the website uses. The explicit Vercel rewrite maps nested `/api/bots/v1/*` routes to `api/bots.ts`; keep it when changing SPA routes.
+
 1. Install dependencies, generate the committed Convex API types, and run the checks below.
 2. Deploy the functions/schema to the intended Convex deployment with `npx convex deploy`. Use the project's existing auth configuration and production credentials. Do not run the local test-account harness against a production deployment.
 3. In Vercel, set `VITE_CONVEX_URL` to that deployment's `.convex.cloud` URL. The API proxy derives the `.convex.site` URL, or accepts server-side `BOT_CONVEX_SITE_URL` for an explicit/custom HTTP endpoint. Redeploy the frontend/functions after configuration changes.

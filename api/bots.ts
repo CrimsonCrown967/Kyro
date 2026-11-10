@@ -29,6 +29,15 @@ export default async function handler(
     )
       throw new Error();
     const incoming = new URL(req.url ?? "/", "https://kyro-chat.cyou");
+    // Vercel's Vite adapter needs an explicit rewrite for nested API paths.
+    // Support both the original URL and the rewritten function URL.
+    const rewrittenPath = incoming.searchParams.get("botPath");
+    if (incoming.pathname === "/api/bots" && rewrittenPath) {
+      if (!/^[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9_-]+)*$/.test(rewrittenPath))
+        return fail(404, "NOT_FOUND", "Unknown bot API path.");
+      incoming.pathname = `/api/bots/v1/${rewrittenPath}`;
+    }
+    incoming.searchParams.delete("botPath");
     if (!incoming.pathname.startsWith("/api/bots/v1/"))
       return fail(404, "NOT_FOUND", "Unknown API version.");
     let body: string | undefined;
