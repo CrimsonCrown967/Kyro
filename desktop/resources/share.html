@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self'; img-src data:; base-uri 'none'; form-action 'none'"
+    />
+    <title>Share your screen — Kyro</title>
+    <link rel="stylesheet" href="shell.css" />
+  </head>
+  <body>
+    <main class="picker">
+      <p class="eyebrow">SCREEN SHARING</p>
+      <h1>Choose what to share.</h1>
+      <p>Select a screen or window. Only the item you choose will be shared.</p>
+      <div
+        id="sources"
+        class="sources"
+        role="group"
+        aria-label="Available screens and windows"
+      ></div>
+      <p id="status" role="status">Loading your screens and windows…</p>
+      <footer>
+        <label id="audio-label" hidden
+          ><input id="audio" type="checkbox" /> Include all system audio</label
+        >
+        <div class="actions">
+          <button id="cancel">Cancel</button
+          ><button id="share" class="primary" disabled>Share</button>
+        </div>
+      </footer>
+    </main>
+    <script src="share.js"></script>
+  </body>
+</html>

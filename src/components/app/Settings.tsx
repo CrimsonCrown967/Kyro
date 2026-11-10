@@ -2780,7 +2780,7 @@ function AppearanceTab() {
 
       <Section
         title="Desktop & mobile app"
-        description="Kyro can run as an installable web app without an app store download."
+        description="Download Kyro for Windows or install the web app through your browser."
       >
         <InstallAppButton />
       </Section>

@@ -1,0 +1,130 @@
+:root {
+  color-scheme: dark;
+  font-family:
+    Segoe UI,
+    system-ui,
+    sans-serif;
+  background: #111318;
+  color: #f6f7fb;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+main {
+  padding: 32px;
+}
+.eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: #a6afff;
+}
+h1 {
+  font-size: 30px;
+  letter-spacing: -0.035em;
+  margin: 10px 0;
+}
+p {
+  color: #a0a6b5;
+  line-height: 1.6;
+}
+button,
+a.primary {
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 11px 20px;
+  border-radius: 10px;
+  border: 1px solid #343947;
+  background: #1b1e27;
+  color: white;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+}
+button:focus-visible,
+a:focus-visible {
+  outline: 3px solid #aab1ff;
+  outline-offset: 3px;
+}
+.primary {
+  background: #5865f2 !important;
+  border-color: #5865f2 !important;
+}
+button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.offline {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  text-align: center;
+}
+.offline main {
+  max-width: 530px;
+}
+.offline .primary {
+  margin-top: 15px;
+}
+.hint {
+  font-size: 12px;
+  margin-top: 24px;
+}
+.picker {
+  padding-bottom: 90px;
+}
+.sources {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 14px;
+  margin-top: 24px;
+}
+.source {
+  padding: 8px;
+  text-align: left;
+  overflow: hidden;
+}
+.source img {
+  display: block;
+  width: 100%;
+  height: 125px;
+  object-fit: contain;
+  background: #090a0d;
+  border-radius: 6px;
+}
+.source span {
+  display: block;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  margin: 10px 4px 4px;
+}
+.source[aria-pressed="true"] {
+  border-color: #8b93ff;
+  box-shadow: 0 0 0 2px #5865f2;
+}
+footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #111318;
+  border-top: 1px solid #343947;
+  padding: 18px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+footer label {
+  font-size: 13px;
+}
+.actions {
+  display: flex;
+  gap: 10px;
+  margin-left: auto;
+}

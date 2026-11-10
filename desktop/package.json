@@ -1,0 +1,52 @@
+{
+  "name": "kyro-desktop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Kyro for Windows — communities, messaging and voice on your desktop.",
+  "author": "Kyro",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "npm run build && electron .",
+    "test": "npm run build && node --test tests/*.test.cjs",
+    "pack": "npm run build && electron-builder --win --x64 --dir --publish never",
+    "dist:win": "npm run build && electron-builder --win nsis --x64 --publish never"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "electron": "45.2.3",
+    "electron-builder": "26.18.0",
+    "typescript": "~5.9.3"
+  },
+  "build": {
+    "appId": "org.kyro.chat",
+    "productName": "Kyro",
+    "copyright": "Copyright © 2026 Kyro",
+    "asar": true,
+    "directories": {
+      "output": "release",
+      "buildResources": "resources"
+    },
+    "files": [
+      "dist/**/*",
+      "resources/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "resources/icon.ico",
+      "artifactName": "Kyro-Setup-${version}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Kyro",
+      "uninstallDisplayName": "Kyro",
+      "deleteAppDataOnUninstall": false
+    }
+  }
+}

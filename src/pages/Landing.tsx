@@ -15,7 +15,6 @@ import {
   Smile,
   Sparkles,
   Users,
-  Zap,
 } from "@/components/icons";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
@@ -553,6 +552,7 @@ export default function Landing() {
               <KyroWordmark className="text-white [&_span]:font-black" />
             </Link>
             <nav className="mx-auto hidden items-center gap-7 text-sm font-bold text-white/85 lg:flex">
+              <Link className="transition hover:text-white" to="/download">Download</Link>
               <a className="transition hover:text-white" href="#features">
                 Features
               </a>
@@ -607,10 +607,10 @@ export default function Landing() {
               </p>
               <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
                 <Link
-                  to="/auth"
+                  to="/download"
                   className="inline-flex h-14 w-full items-center justify-center rounded-full bg-white px-8 text-base font-black text-[#242650] shadow-[0_12px_35px_rgba(15,18,70,.24)] transition hover:-translate-y-1 hover:shadow-[0_18px_45px_rgba(15,18,70,.3)] sm:w-auto"
                 >
-                  <Zap className="mr-2 size-5" /> Start chatting free
+                  <Download className="mr-2 size-5" /> Download for Windows
                 </Link>
                 <Link
                   to="/dashboard"
@@ -863,6 +863,7 @@ export default function Landing() {
                 Product
               </p>
               <div className="mt-4 space-y-3 text-sm text-white/60">
+                <Link className="block hover:text-white" to="/download">Download for Windows</Link>
                 <a className="block hover:text-white" href="#features">
                   Features
                 </a>
