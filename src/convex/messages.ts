@@ -19,7 +19,7 @@ import {
   MAX_ATTACHMENTS,
   MAX_MESSAGE_LENGTH,
   notify,
-  PRESENCE_TIMEOUT_MS,
+  visiblePresence,
   isBlockedBetween,
   requireActiveUser,
   requireConversationAccess,
@@ -61,8 +61,9 @@ async function requireReadAccess(
     const access = await requireServerAccess(ctx, channel.serverId, userId);
     const defaultRole = await ctx.db
       .query("serverRoles")
-      .withIndex("by_server", (q) => q.eq("serverId", channel.serverId))
-      .filter((q) => q.eq(q.field("isDefault"), true))
+      .withIndex("by_server_default", (q) =>
+        q.eq("serverId", channel.serverId).eq("isDefault", true),
+      )
       .first();
     const permissions =
       access.server.ownerId === userId
@@ -775,7 +776,6 @@ export const send = mutation({
           .query("serverMembers")
           .withIndex("by_server", (q) => q.eq("serverId", serverId!))
           .take(1000);
-        const now = Date.now();
         for (const membership of memberships) {
           if (
             membership.userId === userId ||
@@ -795,13 +795,7 @@ export const send = mutation({
           }
           const target = await ctx.db.get(membership.userId);
           if (!target || target.deletedAt !== undefined) continue;
-          if (
-            mentionHere &&
-            (target.status === "invisible" ||
-              target.status === "offline" ||
-              target.lastSeen === undefined ||
-              now - target.lastSeen > PRESENCE_TIMEOUT_MS)
-          ) {
+          if (mentionHere && visiblePresence(target, false) === "offline") {
             continue;
           }
           notified.add(target._id);
@@ -1187,18 +1181,27 @@ export const markContainerRead = mutation({
   },
   handler: async (ctx, { containerType, containerId }) => {
     const { id: userId } = await requireUser(ctx);
-    await requireReadAccess(ctx, userId, containerType, containerId);
-    await markRead(ctx, userId, containerId);
+    const access = await requireReadAccess(
+      ctx,
+      userId,
+      containerType,
+      containerId,
+    );
+    const lastMessageAt =
+      access.kind === "channel"
+        ? access.channel.lastMessageAt
+        : access.conversation.lastMessageAt;
+    await markRead(ctx, userId, containerId, lastMessageAt ?? 0);
     const notes = await ctx.db
       .query("notifications")
-      .withIndex("by_user_unread", (q) =>
-        q.eq("userId", userId).eq("read", false),
+      .withIndex("by_user_container_unread", (q) =>
+        q
+          .eq("userId", userId)
+          .eq("containerKey", containerId)
+          .eq("read", false),
       )
       .collect();
-    for (const note of notes) {
-      if (note.containerKey === containerId)
-        await ctx.db.patch(note._id, { read: true });
-    }
+    for (const note of notes) await ctx.db.patch(note._id, { read: true });
   },
 });
 
@@ -1213,21 +1216,17 @@ export const markServerRead = mutation({
       .withIndex("by_server", (q) => q.eq("serverId", serverId))
       .collect();
     for (const channel of channels) {
-      await markRead(ctx, userId, channel._id);
-    }
-    const channelIds = new Set(
-      channels.map((channel) => channel._id as string),
-    );
-    const notes = await ctx.db
-      .query("notifications")
-      .withIndex("by_user_unread", (q) =>
-        q.eq("userId", userId).eq("read", false),
-      )
-      .collect();
-    for (const note of notes) {
-      if (note.containerKey && channelIds.has(note.containerKey)) {
-        await ctx.db.patch(note._id, { read: true });
-      }
+      await markRead(ctx, userId, channel._id, channel.lastMessageAt ?? 0);
+      const notes = await ctx.db
+        .query("notifications")
+        .withIndex("by_user_container_unread", (q) =>
+          q
+            .eq("userId", userId)
+            .eq("containerKey", channel._id)
+            .eq("read", false),
+        )
+        .collect();
+      for (const note of notes) await ctx.db.patch(note._id, { read: true });
     }
   },
 });
@@ -1242,19 +1241,28 @@ export const setTyping = mutation({
     const { id: userId } = await requireActiveUser(ctx);
     await requireReadAccess(ctx, userId, containerType, containerId);
     const now = Date.now();
-    const rows = await ctx.db
+    const existing = await ctx.db
       .query("typing")
-      .withIndex("by_key", (q) => q.eq("key", containerId))
-      .collect();
-    for (const row of rows) {
-      if (row.expiresAt < now || row.userId === userId)
-        await ctx.db.delete(row._id);
-    }
-    await ctx.db.insert("typing", {
-      key: containerId,
-      userId,
-      expiresAt: now + 6_000,
-    });
+      .withIndex("by_key_user", (q) =>
+        q.eq("key", containerId).eq("userId", userId),
+      )
+      .first();
+    if (existing && existing.expiresAt > now + 4_000) return;
+    const stale = await ctx.db
+      .query("typing")
+      .withIndex("by_key_expiry", (q) =>
+        q.eq("key", containerId).lt("expiresAt", now),
+      )
+      .take(100);
+    for (const row of stale)
+      if (row._id !== existing?._id) await ctx.db.delete(row._id);
+    if (existing) await ctx.db.patch(existing._id, { expiresAt: now + 6_000 });
+    else
+      await ctx.db.insert("typing", {
+        key: containerId,
+        userId,
+        expiresAt: now + 6_000,
+      });
   },
 });
 
@@ -1269,7 +1277,9 @@ export const typingList = query({
     const now = Date.now();
     const rows = await ctx.db
       .query("typing")
-      .withIndex("by_key", (q) => q.eq("key", containerId))
+      .withIndex("by_key_expiry", (q) =>
+        q.eq("key", containerId).gt("expiresAt", now),
+      )
       .collect();
     const users = await hydrateUsers(
       ctx,

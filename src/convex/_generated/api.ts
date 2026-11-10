@@ -44,15 +44,18 @@ import type * as forums from "../forums.js";
 import type * as functions from "../functions.js";
 import type * as gifs from "../gifs.js";
 import type * as http from "../http.js";
+import type * as ioMaintenance from "../ioMaintenance.js";
 import type * as lib from "../lib.js";
 import type * as maintenance from "../maintenance.js";
 import type * as messages from "../messages.js";
+import type * as metricsLib from "../metricsLib.js";
 import type * as moderation from "../moderation.js";
 import type * as notifications from "../notifications.js";
 import type * as passwordReset from "../passwordReset.js";
 import type * as passwordResetInternal from "../passwordResetInternal.js";
 import type * as platformStats from "../platformStats.js";
 import type * as polls from "../polls.js";
+import type * as presence from "../presence.js";
 import type * as reports from "../reports.js";
 import type * as roles from "../roles.js";
 import type * as schema from "../schema.js";
@@ -118,15 +121,18 @@ const fullApi: ApiFromModules<{
   "functions": typeof functions,
   "gifs": typeof gifs,
   "http": typeof http,
+  "ioMaintenance": typeof ioMaintenance,
   "lib": typeof lib,
   "maintenance": typeof maintenance,
   "messages": typeof messages,
+  "metricsLib": typeof metricsLib,
   "moderation": typeof moderation,
   "notifications": typeof notifications,
   "passwordReset": typeof passwordReset,
   "passwordResetInternal": typeof passwordResetInternal,
   "platformStats": typeof platformStats,
   "polls": typeof polls,
+  "presence": typeof presence,
   "reports": typeof reports,
   "roles": typeof roles,
   "schema": typeof schema,

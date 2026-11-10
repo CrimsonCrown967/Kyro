@@ -5,7 +5,10 @@ import { PERMISSIONS } from "../lib/permissions";
 export const backfillDefaultVoicePermissions = internalMutation({
   args: {},
   handler: async (ctx) => {
-    const roles = await ctx.db.query("serverRoles").collect();
+    const roles = await ctx.db
+      .query("serverRoles")
+      .withIndex("by_default", (q) => q.eq("isDefault", true))
+      .collect();
     const additions = [
       PERMISSIONS.CONNECT_VOICE,
       PERMISSIONS.SPEAK_VOICE,

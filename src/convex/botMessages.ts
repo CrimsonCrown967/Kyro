@@ -16,7 +16,7 @@ import {
   notify,
   requireServerAccess,
   isBlockedBetween,
-  PRESENCE_TIMEOUT_MS,
+  visiblePresence,
 } from "./lib";
 
 export async function validateBotMessage(
@@ -221,10 +221,7 @@ export async function sendBotMessage(
       if (
         mass ||
         member.roleIds.some((id) => roleIds.includes(id)) ||
-        (here &&
-          user?.status !== "offline" &&
-          user?.status !== "invisible" &&
-          (user?.lastSeen ?? 0) > now - PRESENCE_TIMEOUT_MS)
+        (here && user && visiblePresence(user, false) !== "offline")
       )
         targets.add(member.userId);
     }

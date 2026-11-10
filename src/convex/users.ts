@@ -26,6 +26,7 @@ import {
   PROFILE_DECORATION_IDS,
 } from "../lib/decorations";
 import { joinKyroHq } from "./servers";
+import { renewPresence } from "./presence";
 import {
   claimUpload,
   deleteClaimedUpload,
@@ -239,7 +240,6 @@ export const updateProfile = mutation({
     }
     if (args.status !== undefined) {
       patch.status = args.status;
-      patch.lastSeen = Date.now();
     }
     if (args.avatarStorageId !== undefined) {
       if (args.avatarStorageId === null) {
@@ -375,6 +375,8 @@ export const updateProfile = mutation({
       }
     }
     await ctx.db.patch(id, patch);
+    if (args.status !== undefined)
+      await renewPresence(ctx, (await ctx.db.get(id))!, undefined, args.status);
   },
 });
 
@@ -513,8 +515,8 @@ export const setPresence = mutation({
     ),
   },
   handler: async (ctx, { status }) => {
-    const { id } = await requireActiveUser(ctx);
-    await ctx.db.patch(id, { status, lastSeen: Date.now() });
+    const { user } = await requireActiveUser(ctx);
+    await renewPresence(ctx, user, undefined, status);
   },
 });
 
@@ -526,34 +528,15 @@ export const heartbeat = mutation({
   },
   handler: async (ctx, { device }) => {
     const { id, user } = await requireActiveUser(ctx);
-    const status =
-      user.status === "idle" ||
-      user.status === "dnd" ||
-      user.status === "invisible"
-        ? user.status
-        : "online";
-    const now = Date.now();
-    const patch: {
-      lastSeen: number;
-      status: "online" | "idle" | "dnd" | "invisible";
-      device?: "desktop" | "mobile" | "tablet";
-      lastIp?: string;
-      lastIpAt?: number;
-    } = { lastSeen: now, status, ...(device ? { device } : {}) };
-
-    // Record the IP of real accounts only, for the two-person staff IP
-    // detector. Seeded accounts must never contribute an IP. Scheduled/CLI
-    // executions have no request metadata and simply leave the last value.
+    await renewPresence(ctx, user, device);
+    // Capture changes, not a new timestamp every heartbeat on the same network.
     if (!isSyntheticUser(user)) {
       const metadata = await ctx.meta.getRequestMetadata();
-      const ip = metadata.ip?.trim();
-      if (ip) {
-        patch.lastIp = ip.startsWith("::ffff:") ? ip.slice(7) : ip;
-        patch.lastIpAt = now;
-      }
+      const raw = metadata.ip?.trim();
+      const ip = raw?.startsWith("::ffff:") ? raw.slice(7) : raw;
+      if (ip && ip !== user.lastIp)
+        await ctx.db.patch(id, { lastIp: ip, lastIpAt: Date.now() });
     }
-
-    await ctx.db.patch(id, patch);
   },
 });
 

@@ -19,6 +19,7 @@ import { registerCommand } from "./botCommands";
 import { deleteChannelData, deleteMessageData } from "./cleanup";
 import { isAllowedUploadType, MAX_UPLOAD_BYTES } from "./uploadSecurity";
 import { eventDto, eventVisible } from "./botEvents";
+import { renewPresence } from "./presence";
 
 function parse<T>(schema: z.ZodType<T>, body: unknown): T {
   const result = schema.safeParse(body);
@@ -40,10 +41,8 @@ export const authorize = internalMutation({
       apiRequests: app.apiRequests + 1,
       lastActiveAt: Date.now(),
     });
-    await ctx.db.patch(app.botUserId, {
-      status: "online",
-      lastSeen: Date.now(),
-    });
+    const botUser = await ctx.db.get(app.botUserId);
+    if (botUser) await renewPresence(ctx, botUser);
     return { allowed: true as const };
   },
 });

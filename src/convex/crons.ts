@@ -7,6 +7,12 @@ import {
 
 const crons = cronJobs();
 crons.interval(
+  "expire presence leases",
+  { minutes: 1 },
+  makeFunctionReference<"mutation">("presence:expire"),
+  {},
+);
+crons.interval(
   "deliver bot webhooks",
   { minutes: 1 },
   makeFunctionReference<"action">("botWebhooks:deliverDue"),

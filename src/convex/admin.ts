@@ -2,8 +2,7 @@ import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, query, type MutationCtx } from "./functions";
 import {
-  BUG_LIST_LIMIT,
-  PRESENCE_TIMEOUT_MS,
+  isPresenceOnline,
   activeSiteBan,
   canViewIpDirectory,
   globalBadgesFor,
@@ -20,6 +19,7 @@ import {
   requireUser,
   type Ctx,
 } from "./lib";
+import { metricValue } from "./metricsLib";
 import { enqueueUserEmail } from "./emailOutbox";
 import { deleteMessageData, deleteServerData } from "./cleanup";
 
@@ -125,27 +125,67 @@ export const overview = query({
       return { allowed: false as const };
     }
 
-    const [users, servers, messages, reports, bugs, bans, warnings, actions] =
-      await Promise.all([
-        ctx.db.query("users").take(2000),
-        ctx.db.query("servers").take(1000),
-        ctx.db.query("messages").take(5000),
-        ctx.db.query("reports").take(500),
-        ctx.db.query("bugReports").order("desc").take(BUG_LIST_LIMIT),
-        ctx.db.query("siteBans").take(500),
-        ctx.db.query("warnings").take(500),
-        ctx.db.query("adminActions").order("desc").take(12),
-      ]);
-
     const now = Date.now();
-    const activeBans = bans.filter(
-      (ban) =>
-        ban.liftedAt === undefined &&
-        (ban.expiresAt === undefined || ban.expiresAt > now),
-    );
-    const activeWarnings = warnings.filter(
-      (warning) => warning.expiresAt > now,
-    );
+    const [
+      userCount,
+      onlineCount,
+      serverCount,
+      messageCount,
+      adminCount,
+      moderatorCount,
+      openReports,
+      reviewingReports,
+      openBugs,
+      acknowledgedBugs,
+      permanentBans,
+      temporaryBans,
+      activeWarnings,
+      actions,
+    ] = await Promise.all([
+      metricValue(ctx, "users"),
+      metricValue(ctx, "online"),
+      metricValue(ctx, "servers"),
+      metricValue(ctx, "messages"),
+      metricValue(ctx, "admins"),
+      metricValue(ctx, "moderators"),
+      ctx.db
+        .query("reports")
+        .withIndex("by_status", (q) => q.eq("status", "open"))
+        .collect(),
+      ctx.db
+        .query("reports")
+        .withIndex("by_status", (q) => q.eq("status", "reviewing"))
+        .collect(),
+      ctx.db
+        .query("bugReports")
+        .withIndex("by_status", (q) => q.eq("status", "open"))
+        .collect(),
+      ctx.db
+        .query("bugReports")
+        .withIndex("by_status", (q) => q.eq("status", "acknowledged"))
+        .collect(),
+      ctx.db
+        .query("siteBans")
+        .withIndex("by_lifted_expiry", (q) =>
+          q.eq("liftedAt", undefined).eq("expiresAt", undefined),
+        )
+        .collect(),
+      ctx.db
+        .query("siteBans")
+        .withIndex("by_lifted_expiry", (q) =>
+          q.eq("liftedAt", undefined).gt("expiresAt", now),
+        )
+        .collect(),
+      ctx.db
+        .query("warnings")
+        .withIndex("by_expiry", (q) => q.gt("expiresAt", now))
+        .collect(),
+      ctx.db
+        .query("adminActions")
+        .withIndex("by_created")
+        .order("desc")
+        .take(12),
+    ]);
     const actors = await hydrateUsers(
       ctx,
       actions.map((action) => action.actorId),
@@ -166,22 +206,16 @@ export const overview = query({
         isModerator: user.siteModerator === true,
       },
       counts: {
-        users: users.length,
-        online: users.filter(
-          (row) => row.lastSeen !== undefined && now - row.lastSeen < 150_000,
-        ).length,
-        servers: servers.length,
-        messages: messages.length,
-        openReports: reports.filter(
-          (report) => report.status === "open" || report.status === "reviewing",
-        ).length,
-        openBugs: bugs.filter(
-          (bug) => bug.status === "open" || bug.status === "acknowledged",
-        ).length,
-        activeBans: activeBans.length,
+        users: userCount,
+        online: onlineCount,
+        servers: serverCount,
+        messages: messageCount,
+        openReports: openReports.length + reviewingReports.length,
+        openBugs: openBugs.length + acknowledgedBugs.length,
+        activeBans: permanentBans.length + temporaryBans.length,
         activeWarnings: activeWarnings.length,
-        admins: users.filter((row) => isAdmin(row)).length,
-        moderators: users.filter((row) => row.siteModerator === true).length,
+        admins: adminCount,
+        moderators: moderatorCount,
       },
       recentActions: actions.map((action) => ({
         id: action._id as string,
@@ -212,7 +246,11 @@ export const ipDirectory = query({
     }
 
     const now = Date.now();
-    const users = await ctx.db.query("users").take(2000);
+    const users = await ctx.db
+      .query("users")
+      .withIndex("by_active_recent", (q) => q.eq("deletedAt", undefined))
+      .order("desc")
+      .take(2000);
     const rows = users
       .filter(
         (row) =>
@@ -239,9 +277,7 @@ export const ipDirectory = query({
         lastIp: row.lastIp ?? null,
         lastIpAt: row.lastIpAt ?? null,
         lastSeen: row.lastSeen ?? null,
-        online:
-          row.lastSeen !== undefined &&
-          now - row.lastSeen < PRESENCE_TIMEOUT_MS,
+        online: isPresenceOnline(row),
         device: row.device ?? null,
         memberSince: row.createdAt ?? row._creationTime,
       })),
@@ -255,54 +291,70 @@ export const searchMembers = query({
   handler: async (ctx, { term }) => {
     await requirePortalAccess(ctx);
     const needle = (term ?? "").trim().toLowerCase();
-    const users = await ctx.db.query("users").take(1000);
-    const matches = users
-      .filter((user) => {
-        if (!needle) return true;
-        return (
-          (user.name ?? "").toLowerCase().includes(needle) ||
-          (user.username ?? "").toLowerCase().includes(needle)
-        );
-      })
-      .sort((a, b) => (b.lastSeen ?? 0) - (a.lastSeen ?? 0))
-      .slice(0, 30);
-
-    const bans = await ctx.db.query("siteBans").take(500);
-    const warnings = await ctx.db.query("warnings").take(500);
-    const now = Date.now();
-
-    return matches.map((user) => {
-      const ban =
-        bans.find(
-          (row) =>
-            row.userId === user._id &&
-            row.liftedAt === undefined &&
-            (row.expiresAt === undefined || row.expiresAt > now),
-        ) ?? null;
-      return {
-        id: user._id as string,
-        name: user.name ?? user.username ?? "Kyro user",
-        username: user.username ?? null,
-        avatarUrl: null,
-        createdAt: user.createdAt ?? null,
-        lastSeen: user.lastSeen ?? null,
-        presence: user.status ?? "offline",
-        isFounder: isFounder(user),
-        isStaff: isStaff(user),
-        badges: badgeFlags(user),
-        ban: ban
-          ? {
-              id: ban._id as string,
-              reason: ban.reason,
-              createdAt: ban.createdAt,
-              expiresAt: ban.expiresAt ?? null,
-            }
-          : null,
-        activeWarnings: warnings.filter(
-          (warning) => warning.userId === user._id && warning.expiresAt > now,
-        ).length,
-      };
-    });
+    const candidates = needle
+      ? await Promise.all([
+          ctx.db
+            .query("users")
+            .withIndex("by_username", (q) =>
+              q.gte("username", needle).lt("username", needle + "\uffff"),
+            )
+            .take(30),
+          ctx.db
+            .query("users")
+            .withSearchIndex("search_name", (q) =>
+              q.search("name", needle).eq("deletedAt", undefined),
+            )
+            .take(30),
+        ])
+      : [
+          await ctx.db
+            .query("users")
+            .withIndex("by_active_recent", (q) => q.eq("deletedAt", undefined))
+            .order("desc")
+            .take(30),
+        ];
+    const matches = [
+      ...new Map(
+        candidates
+          .flat()
+          .filter((user) => user.deletedAt === undefined)
+          .map((user) => [user._id, user]),
+      ).values(),
+    ].slice(0, 30);
+    return await Promise.all(
+      matches.map(async (user) => {
+        const [ban, warnings] = await Promise.all([
+          activeSiteBan(ctx, user._id),
+          ctx.db
+            .query("warnings")
+            .withIndex("by_user_expiry", (q) =>
+              q.eq("userId", user._id).gt("expiresAt", Date.now()),
+            )
+            .collect(),
+        ]);
+        return {
+          id: user._id as string,
+          name: user.name ?? user.username ?? "Kyro user",
+          username: user.username ?? null,
+          avatarUrl: null,
+          createdAt: user.createdAt ?? null,
+          lastSeen: user.lastSeen ?? null,
+          presence: user.status ?? "offline",
+          isFounder: isFounder(user),
+          isStaff: isStaff(user),
+          badges: badgeFlags(user),
+          ban: ban
+            ? {
+                id: ban._id as string,
+                reason: ban.reason,
+                createdAt: ban.createdAt,
+                expiresAt: ban.expiresAt ?? null,
+              }
+            : null,
+          activeWarnings: warnings.length,
+        };
+      }),
+    );
   },
 });
 
@@ -328,7 +380,10 @@ export const reportQueue = query({
           .take(100)
       : ctx.db.query("reports").order("desc").take(100));
 
-    const people = await ctx.db.query("users").take(1000);
+    const people = await loadPeople(
+      ctx,
+      reports.flatMap((report) => [report.reporterId, report.reportedUserId]),
+    );
     const peopleById = new Map(people.map((person) => [person._id, person]));
     const nameOf = (userId: Id<"users"> | undefined) => {
       if (!userId) return null;
@@ -340,6 +395,10 @@ export const reportQueue = query({
       reports.map(async (report) => {
         const message = report.messageId
           ? await ctx.db.get(report.messageId)
+          : null;
+        const messageAuthor = message
+          ? (peopleById.get(message.authorId) ??
+            (await ctx.db.get(message.authorId)))
           : null;
         const server = report.serverId
           ? await ctx.db.get(report.serverId)
@@ -359,7 +418,9 @@ export const reportQueue = query({
           serverName: server?.name ?? null,
           messageId: (report.messageId as string | undefined) ?? null,
           messageContent: message?.content ?? null,
-          messageAuthorName: message ? nameOf(message.authorId) : null,
+          messageAuthorName: message
+            ? (messageAuthor?.name ?? messageAuthor?.username ?? "Deleted user")
+            : null,
         };
       }),
     );
@@ -376,7 +437,10 @@ export const banList = query({
       .withIndex("by_created")
       .order("desc")
       .take(100);
-    const people = await ctx.db.query("users").take(1000);
+    const people = await loadPeople(
+      ctx,
+      bans.flatMap((ban) => [ban.userId, ban.bannedById]),
+    );
     const byId = new Map(people.map((person) => [person._id, person]));
     const nameOf = (userId: Id<"users">) => {
       const person = byId.get(userId);
@@ -521,8 +585,14 @@ export const warningList = query({
   args: {},
   handler: async (ctx) => {
     await requirePortalAccess(ctx);
-    const warnings = await ctx.db.query("warnings").take(300);
-    const people = await ctx.db.query("users").take(1000);
+    const warnings = await ctx.db
+      .query("warnings")
+      .withIndex("by_expiry", (q) => q.gt("expiresAt", Date.now()))
+      .take(300);
+    const people = await loadPeople(
+      ctx,
+      warnings.flatMap((warning) => [warning.userId, warning.issuedById]),
+    );
     const byId = new Map(people.map((person) => [person._id, person]));
     const now = Date.now();
     return warnings
@@ -643,3 +713,12 @@ export const restoreMyAdminBadge = mutation({
     });
   },
 });
+
+async function loadPeople(ctx: Ctx, ids: (Id<"users"> | undefined)[]) {
+  const docs = await Promise.all(
+    [...new Set(ids.filter((id): id is Id<"users"> => id !== undefined))].map(
+      (id) => ctx.db.get(id),
+    ),
+  );
+  return docs.filter((doc): doc is Doc<"users"> => doc !== null);
+}

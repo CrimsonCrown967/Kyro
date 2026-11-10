@@ -3,6 +3,11 @@ import type { DataModel, Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { botChannel, botServer, messageDto } from "./botLib";
 import type { Ctx } from "./lib";
+import {
+  syncMetricEntry,
+  syncUserMetrics,
+  syncMemberMetrics,
+} from "./metricsLib";
 
 export async function queueBotEvent(
   ctx: MutationCtx,
@@ -97,6 +102,26 @@ export function eventDto(event: Doc<"botEvents">) {
 // All application mutations use this wrapper, including existing messaging,
 // membership and moderation paths. Events commit atomically with their source.
 export const botTriggers = new Triggers<DataModel>();
+botTriggers.register("users", async (ctx, change) => {
+  await syncUserMetrics(ctx, change.newDoc, change.id);
+});
+botTriggers.register("servers", async (ctx, change) => {
+  await syncMetricEntry(
+    ctx,
+    `servers:${change.id}`,
+    change.newDoc ? { servers: 1 } : {},
+  );
+});
+botTriggers.register("messages", async (ctx, change) => {
+  await syncMetricEntry(
+    ctx,
+    `messages:${change.id}`,
+    change.newDoc ? { messages: 1 } : {},
+  );
+});
+botTriggers.register("serverMembers", async (ctx, change) => {
+  await syncMemberMetrics(ctx, change.newDoc, change.id);
+});
 botTriggers.register("messages", async (ctx, change) => {
   const message = change.newDoc ?? change.oldDoc;
   if (message.containerType !== "channel") return;

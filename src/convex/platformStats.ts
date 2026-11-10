@@ -1,28 +1,15 @@
 import { query } from "./functions";
-import { PRESENCE_TIMEOUT_MS } from "./lib";
+import { metricValue } from "./metricsLib";
 
-/** Public, live counters used by the marketing homepage. */
+/** Three tiny counter reads instead of scanning profiles on each heartbeat. */
 export const get = query({
   args: {},
   handler: async (ctx) => {
-    const [users, communities] = await Promise.all([
-      ctx.db.query("users").take(10_000),
-      ctx.db.query("servers").take(10_000),
+    const [users, communities, onlineMembers] = await Promise.all([
+      metricValue(ctx, "users"),
+      metricValue(ctx, "servers"),
+      metricValue(ctx, "publicOnline"),
     ]);
-    const activeUsers = users.filter((user) => user.deletedAt === undefined);
-    const now = Date.now();
-    const onlineMembers = activeUsers.filter(
-      (user) =>
-        user.showPresence !== false &&
-        user.status !== "offline" &&
-        user.status !== "invisible" &&
-        user.lastSeen !== undefined &&
-        now - user.lastSeen < PRESENCE_TIMEOUT_MS,
-    ).length;
-    return {
-      users: activeUsers.length,
-      communities: communities.length,
-      onlineMembers,
-    };
+    return { users, communities, onlineMembers };
   },
 });

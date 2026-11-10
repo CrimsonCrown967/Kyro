@@ -297,7 +297,7 @@ export function ProfileCard() {
                     />
                     <span>{user.customStatus || presenceMeta?.label}</span>
                     <DeviceBadge device={user.device} />
-                    {user.lastSeen != null && (
+                    {user.presence === "offline" && user.lastSeen != null && (
                       <span className="text-muted-foreground/80">
                         · last seen {formatRelative(user.lastSeen)}
                       </span>

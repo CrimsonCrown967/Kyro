@@ -92,8 +92,10 @@ const schema = defineSchema(
       /** Chosen status. `invisible` renders as offline to everybody else. */
       status: v.optional(presenceValidator),
       customStatus: v.optional(v.string()),
-      /** Heartbeat timestamp; drives "online" for clients that never set a status. */
+      /** Last connection/disconnection timestamp; live leases are stored separately. */
       lastSeen: v.optional(v.number()),
+      /** Updated only on connection transitions; heartbeat leases live separately. */
+      presenceOnline: v.optional(v.boolean()),
       /**
        * Last client IP captured from an authenticated heartbeat. Restricted to
        * the staff-only IP detector; never exposed through public profiles.
@@ -151,7 +153,29 @@ const schema = defineSchema(
       deletedAt: v.optional(v.number()),
     })
       .index("email", ["email"]) // index for the email. do not remove or modify
-      .index("by_username", ["username"]),
+      .index("by_username", ["username"])
+      .index("by_active_recent", ["deletedAt", "lastSeen"])
+      .searchIndex("search_name", {
+        searchField: "name",
+        filterFields: ["deletedAt"],
+      }),
+
+    userPresence: defineTable({
+      userId: v.id("users"),
+      lastHeartbeatAt: v.number(),
+      expiresAt: v.number(),
+    })
+      .index("by_user", ["userId"])
+      .index("by_expiry", ["expiresAt"]),
+
+    metricEntries: defineTable({
+      source: v.string(),
+      values: v.record(v.string(), v.number()),
+    }).index("by_source", ["source"]),
+    metrics: defineTable({
+      key: v.string(),
+      value: v.number(),
+    }).index("by_key", ["key"]),
 
     /** Friend requests in either direction; `accepted` rows are friendships. */
     connections: defineTable({
@@ -256,6 +280,8 @@ const schema = defineSchema(
       .index("by_created", ["createdAt"])
       .index("by_vanity", ["vanityCode"])
       .index("by_platform_home", ["isPlatformHome"])
+      .index("by_tag", ["tag"])
+      .index("by_public_created", ["isPublic", "createdAt"])
       .searchIndex("search_name", {
         searchField: "name",
         filterFields: ["isPublic"],
@@ -290,6 +316,8 @@ const schema = defineSchema(
       mentionable: v.optional(v.boolean()),
     })
       .index("by_server", ["serverId"])
+      .index("by_server_default", ["serverId", "isDefault"])
+      .index("by_default", ["isDefault"])
       .index("by_server_position", ["serverId", "position"]),
 
     categories: defineTable({
@@ -655,9 +683,17 @@ const schema = defineSchema(
       liftedAt: v.optional(v.number()),
       liftedById: v.optional(v.id("users")),
       liftReason: v.optional(v.string()),
+      expiryNotifiedAt: v.optional(v.number()),
     })
       .index("by_user", ["userId"])
-      .index("by_created", ["createdAt"]),
+      .index("by_created", ["createdAt"])
+      .index("by_user_lifted_expiry", ["userId", "liftedAt", "expiresAt"])
+      .index("by_lifted_expiry", ["liftedAt", "expiresAt"])
+      .index("by_notified_lifted_expiry", [
+        "expiryNotifiedAt",
+        "liftedAt",
+        "expiresAt",
+      ]),
 
     /** Audit trail for every staff action taken in the Admin Portal. */
     adminActions: defineTable({
@@ -693,6 +729,7 @@ const schema = defineSchema(
     })
       .index("by_user", ["userId", "createdAt"])
       .index("by_user_unread", ["userId", "read"])
+      .index("by_user_container_unread", ["userId", "containerKey", "read"])
       .index("by_user_unread_type", ["userId", "read", "type"])
       .index("by_container", ["containerKey"])
       .index("by_actor", ["actorId"]),
@@ -761,6 +798,8 @@ const schema = defineSchema(
       expiresAt: v.number(),
     })
       .index("by_key", ["key"])
+      .index("by_key_user", ["key", "userId"])
+      .index("by_key_expiry", ["key", "expiresAt"])
       .index("by_expires", ["expiresAt"]),
 
     /** Someone asking to join a community that reviews applications. */
@@ -819,7 +858,8 @@ const schema = defineSchema(
       expiresAt: v.number(),
     })
       .index("by_user", ["userId"])
-      .index("by_user_expiry", ["userId", "expiresAt"]),
+      .index("by_user_expiry", ["userId", "expiresAt"])
+      .index("by_expiry", ["expiresAt"]),
 
     /** Authenticator-app state. Secrets never leave private auth functions. */
     accountSecurity: defineTable({

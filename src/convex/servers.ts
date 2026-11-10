@@ -15,7 +15,6 @@ import {
   MAX_BADGE_NOTIFICATIONS,
   notify,
   permissionsFor,
-  PRESENCE_TIMEOUT_MS,
   requireActiveUser,
   requireProfile,
   requireServerAccess,
@@ -23,6 +22,7 @@ import {
   restrictionLevel,
   type Ctx,
 } from "./lib";
+import { metricValue } from "./metricsLib";
 import { deleteServerData } from "./cleanup";
 import {
   claimUpload,
@@ -140,11 +140,7 @@ export const listMine = query({
           server.iconStorageId
             ? ctx.storage.getUrl(server.iconStorageId)
             : Promise.resolve(null),
-          ctx.db
-            .query("serverMembers")
-            .withIndex("by_server", (q) => q.eq("serverId", server._id))
-            .collect()
-            .then((rows) => rows.length),
+          metricValue(ctx, `members:${server._id}`),
           hasUnreadChannels(ctx, server, readMap),
           permissionsFor(ctx, server, membership),
         ]);
@@ -187,7 +183,7 @@ export const discover = query({
       : [];
     const recent = await ctx.db
       .query("servers")
-      .withIndex("by_created")
+      .withIndex("by_public_created", (q) => q.eq("isPublic", true))
       .order("desc")
       .take(100);
     const servers = [
@@ -215,32 +211,16 @@ export const discover = query({
         .slice(0, 24)
         .map(async (server) => {
           const isJoined = joined.has(server._id);
-          const [iconUrl, bannerUrl, memberRows] = await Promise.all([
+          const [iconUrl, bannerUrl, memberCount, online] = await Promise.all([
             server.iconStorageId
               ? ctx.storage.getUrl(server.iconStorageId)
               : Promise.resolve(null),
             server.bannerStorageId
               ? ctx.storage.getUrl(server.bannerStorageId)
               : Promise.resolve(null),
-            ctx.db
-              .query("serverMembers")
-              .withIndex("by_server", (q) => q.eq("serverId", server._id))
-              .collect(),
+            metricValue(ctx, `members:${server._id}`),
+            metricValue(ctx, `onlineMembers:${server._id}`),
           ]);
-          // Presence for every member, so cards can show who's online now.
-          const memberDocs = await Promise.all(
-            memberRows.slice(0, 200).map((row) => ctx.db.get(row.userId)),
-          );
-          const now = Date.now();
-          const online = memberDocs.filter(
-            (member) =>
-              member &&
-              member.lastSeen !== undefined &&
-              now - member.lastSeen < PRESENCE_TIMEOUT_MS &&
-              member.showPresence !== false &&
-              member.status !== "invisible" &&
-              member.status !== "offline",
-          ).length;
           return {
             id: server._id as string,
             name: server.name,
@@ -248,7 +228,7 @@ export const discover = query({
             iconUrl,
             bannerUrl,
             tags: server.tags ?? [],
-            memberCount: memberRows.length,
+            memberCount,
             onlineCount: online,
             createdAt: server.createdAt,
             // Joined servers stay listed so cards can offer "Open" instead
@@ -272,20 +252,17 @@ export const previewByTag = query({
     await requireUser(ctx);
     const clean = tag.trim().toUpperCase();
     if (!clean) return null;
-    const servers = await ctx.db.query("servers").collect();
-    const server = servers.find(
-      (candidate) => (candidate.tag ?? "").toUpperCase() === clean,
-    );
+    const server = await ctx.db
+      .query("servers")
+      .withIndex("by_tag", (q) => q.eq("tag", clean))
+      .first();
     if (!server) return null;
     const [iconUrl, owner, members] = await Promise.all([
       server.iconStorageId
         ? ctx.storage.getUrl(server.iconStorageId)
         : Promise.resolve(null),
       ctx.db.get(server.ownerId),
-      ctx.db
-        .query("serverMembers")
-        .withIndex("by_server", (q) => q.eq("serverId", server._id))
-        .collect(),
+      metricValue(ctx, `members:${server._id}`),
     ]);
     return {
       id: server._id as string,
@@ -294,7 +271,7 @@ export const previewByTag = query({
       tag: server.tag ?? null,
       iconUrl,
       isPublic: server.isPublic,
-      memberCount: members.length,
+      memberCount: members,
       ownerName: owner?.name ?? owner?.username ?? "Unknown",
       ownerId: server.ownerId as string,
       createdAt: server.createdAt ?? null,
@@ -342,10 +319,7 @@ export const joinState = query({
             q.eq("serverId", serverId).eq("userId", id),
           )
           .unique(),
-        ctx.db
-          .query("serverMembers")
-          .withIndex("by_server", (q) => q.eq("serverId", serverId))
-          .collect(),
+        metricValue(ctx, `members:${serverId}`),
         server.iconStorageId
           ? ctx.storage.getUrl(server.iconStorageId)
           : Promise.resolve(null),
@@ -365,7 +339,7 @@ export const joinState = query({
       name: server.name,
       description: server.description ?? null,
       iconUrl,
-      memberCount: memberRows.length,
+      memberCount: memberRows,
       ownerId: server.ownerId as string,
       applyToJoin: server.applyToJoin === true && server.isPublic,
       applicationQuestions:
@@ -399,36 +373,21 @@ export const get = query({
   handler: async (ctx, { serverId }) => {
     const { id } = await requireUser(ctx);
     const access = await requireServerAccess(ctx, serverId, id);
-    const [iconUrl, bannerUrl, memberRows, roles] = await Promise.all([
-      access.server.iconStorageId
-        ? ctx.storage.getUrl(access.server.iconStorageId)
-        : Promise.resolve(null),
-      access.server.bannerStorageId
-        ? ctx.storage.getUrl(access.server.bannerStorageId)
-        : Promise.resolve(null),
-      ctx.db
-        .query("serverMembers")
-        .withIndex("by_server", (q) => q.eq("serverId", serverId))
-        .collect(),
-      ctx.db
-        .query("serverRoles")
-        .withIndex("by_server_position", (q) => q.eq("serverId", serverId))
-        .collect(),
-    ]);
-    // Presence over this community's members, for the settings stats row.
-    const memberDocs = await Promise.all(
-      memberRows.slice(0, 200).map((row) => ctx.db.get(row.userId)),
-    );
-    const now = Date.now();
-    const onlineCount = memberDocs.filter(
-      (member) =>
-        member &&
-        member.lastSeen !== undefined &&
-        now - member.lastSeen < PRESENCE_TIMEOUT_MS &&
-        member.showPresence !== false &&
-        member.status !== "invisible" &&
-        member.status !== "offline",
-    ).length;
+    const [iconUrl, bannerUrl, memberCount, onlineCount, roles] =
+      await Promise.all([
+        access.server.iconStorageId
+          ? ctx.storage.getUrl(access.server.iconStorageId)
+          : Promise.resolve(null),
+        access.server.bannerStorageId
+          ? ctx.storage.getUrl(access.server.bannerStorageId)
+          : Promise.resolve(null),
+        metricValue(ctx, `members:${serverId}`),
+        metricValue(ctx, `onlineMembers:${serverId}`),
+        ctx.db
+          .query("serverRoles")
+          .withIndex("by_server_position", (q) => q.eq("serverId", serverId))
+          .collect(),
+      ]);
     return {
       id: access.server._id as string,
       name: access.server.name,
@@ -443,7 +402,7 @@ export const get = query({
       ownerId: access.server.ownerId as string,
       iconUrl,
       bannerUrl,
-      memberCount: memberRows.length,
+      memberCount,
       onlineCount,
       tags: access.server.tags ?? [],
       vanityCode: access.server.vanityCode ?? null,

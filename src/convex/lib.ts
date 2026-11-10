@@ -12,7 +12,7 @@ export type Ctx = QueryCtx | MutationCtx;
 
 /**
  * A user is considered online if they heartbeated within this window.
- * The client heartbeats every 15s, so this comfortably survives a couple of
+ * The client heartbeats every 60s, so this comfortably survives a couple of
  * missed ticks (background tab throttling, flaky networks) before dropping
  * someone to offline.
  */
@@ -44,8 +44,7 @@ export function isSyntheticUser(
 }
 
 /**
- * Most recent bug reports the Admin Portal reads. The overview badge and the
- * Bugs tab both count over exactly this slice so they can never disagree.
+ * Bounds the recent bug-report feed. Overview counts use status-indexed reads.
  */
 export const BUG_LIST_LIMIT = 200;
 
@@ -71,19 +70,27 @@ export async function activeSiteBan(
   ctx: Ctx,
   userId: Id<"users">,
 ): Promise<Doc<"siteBans"> | null> {
-  const rows = await ctx.db
-    .query("siteBans")
-    .withIndex("by_user", (q) => q.eq("userId", userId))
-    .collect();
   const now = Date.now();
-  return (
-    rows
-      .filter(
-        (row) =>
-          row.liftedAt === undefined &&
-          (row.expiresAt === undefined || row.expiresAt > now),
+  const [permanent, temporary] = await Promise.all([
+    ctx.db
+      .query("siteBans")
+      .withIndex("by_user_lifted_expiry", (q) =>
+        q
+          .eq("userId", userId)
+          .eq("liftedAt", undefined)
+          .eq("expiresAt", undefined),
       )
-      .sort((a, b) => b.createdAt - a.createdAt)[0] ?? null
+      .collect(),
+    ctx.db
+      .query("siteBans")
+      .withIndex("by_user_lifted_expiry", (q) =>
+        q.eq("userId", userId).eq("liftedAt", undefined).gt("expiresAt", now),
+      )
+      .collect(),
+  ]);
+  return (
+    [...permanent, ...temporary].sort((a, b) => b.createdAt - a.createdAt)[0] ??
+    null
   );
 }
 
@@ -119,18 +126,24 @@ export async function requireActiveUser(
 
 export type PresenceState = "online" | "idle" | "dnd" | "invisible" | "offline";
 
+export function isPresenceOnline(user: Doc<"users">): boolean {
+  return (
+    user.presenceOnline ??
+    (user.lastSeen !== undefined &&
+      Date.now() - user.lastSeen < PRESENCE_TIMEOUT_MS)
+  );
+}
+
 /** Resolves the presence a given viewer is allowed to see. */
 export function visiblePresence(
   user: Doc<"users">,
   viewerIsSelf: boolean,
 ): PresenceState {
-  const now = Date.now();
   if (user.showPresence === false && !viewerIsSelf) return "offline";
   if (user.status === "invisible")
     return viewerIsSelf ? "invisible" : "offline";
   if (user.status === "offline") return "offline";
-  const recentlyActive =
-    user.lastSeen !== undefined && now - user.lastSeen < PRESENCE_TIMEOUT_MS;
+  const recentlyActive = isPresenceOnline(user);
   if (!recentlyActive) return "offline";
   // An explicit online/idle/dnd choice wins over the inferred default, and a
   // record that is merely missing `status` (older accounts) is online.
@@ -365,10 +378,11 @@ export async function restrictionLevel(
 ): Promise<number> {
   const rows = await ctx.db
     .query("warnings")
-    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .withIndex("by_user_expiry", (q) =>
+      q.eq("userId", userId).gt("expiresAt", Date.now()),
+    )
     .collect();
-  const now = Date.now();
-  return rows.filter((row) => row.expiresAt > now).length;
+  return rows.length;
 }
 
 export async function hydrateUser(
@@ -582,10 +596,22 @@ export async function permissionsFor(
   member: Doc<"serverMembers">,
 ): Promise<string[]> {
   if (server.ownerId === member.userId) return [...ALL_PERMISSIONS];
-  const roles = await ctx.db
-    .query("serverRoles")
-    .withIndex("by_server", (q) => q.eq("serverId", server._id))
-    .collect();
+  const [defaults, assigned] = await Promise.all([
+    ctx.db
+      .query("serverRoles")
+      .withIndex("by_server_default", (q) =>
+        q.eq("serverId", server._id).eq("isDefault", true),
+      )
+      .collect(),
+    Promise.all([...new Set(member.roleIds)].map((id) => ctx.db.get(id))),
+  ]);
+  const roles = [
+    ...defaults,
+    ...assigned.filter(
+      (role): role is Doc<"serverRoles"> =>
+        role !== null && role.serverId === server._id,
+    ),
+  ];
   const permissions = new Set<string>();
   for (const role of roles) {
     if (role.isDefault || member.roleIds.includes(role._id)) {
@@ -676,7 +702,7 @@ export async function markRead(
     .withIndex("by_user_key", (q) => q.eq("userId", userId).eq("key", key))
     .unique();
   if (existing) {
-    if (at >= existing.lastReadAt) {
+    if (at > existing.lastReadAt) {
       await ctx.db.patch(existing._id, {
         lastReadAt: at,
         updatedAt: Date.now(),

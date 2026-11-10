@@ -96,17 +96,29 @@ export function AppShell({ children }: { children: ReactNode }) {
   const settingsOpen = searchParams.get("settings") !== null;
 
   // Presence heartbeat: keeps this account visible as online for others.
-  // Fires immediately, every 15s, and whenever the tab comes back to the
+  // Fires immediately, every 60s, and whenever the tab comes back to the
   // foreground so idle background tabs never look offline to other people.
   // Each tick also reports which device we're on, powering the platform
   // indicator (phone / tablet / desktop) shown next to every profile.
   useEffect(() => {
     if (!isAuthenticated) return;
+    let inFlight = false;
+    let lastSent = 0;
     const tick = () => {
-      void heartbeat({ device: detectDevice() }).catch(() => undefined);
+      const now = Date.now();
+      if (inFlight || now - lastSent < 45_000) return;
+      inFlight = true;
+      lastSent = now;
+      void heartbeat({ device: detectDevice() })
+        .catch(() => {
+          lastSent = 0;
+        })
+        .finally(() => {
+          inFlight = false;
+        });
     };
     tick();
-    const interval = window.setInterval(tick, 15_000);
+    const interval = window.setInterval(tick, 60_000);
     const onVisible = () => {
       if (document.visibilityState === "visible") tick();
     };

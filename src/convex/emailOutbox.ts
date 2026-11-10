@@ -256,12 +256,12 @@ export const notifyExpiredBans = internalMutation({
     const now = Date.now();
     const bans = await ctx.db
       .query("siteBans")
-      .filter((q) =>
-        q.and(
-          q.neq(q.field("expiresAt"), undefined),
-          q.lte(q.field("expiresAt"), now),
-          q.eq(q.field("liftedAt"), undefined),
-        ),
+      .withIndex("by_notified_lifted_expiry", (q) =>
+        q
+          .eq("expiryNotifiedAt", undefined)
+          .eq("liftedAt", undefined)
+          .gt("expiresAt", 0)
+          .lte("expiresAt", now),
       )
       .take(100);
     let queued = 0;
@@ -276,6 +276,7 @@ export const notifyExpiredBans = internalMutation({
         },
       });
       if (result) queued += 1;
+      await ctx.db.patch(ban._id, { expiryNotifiedAt: now });
     }
     return { queued };
   },

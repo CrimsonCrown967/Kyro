@@ -12,6 +12,7 @@
     "test:email": "tsx --test tests/email/*.test.ts",
     "test:voice": "tsx --test tests/voice/*.test.ts",
     "test:desktop": "npm --prefix desktop test",
+    "test:io": "vitest run tests/io",
     "build:desktop": "npm --prefix desktop run dist:win",
     "test:bots": "npm run build:sdk && vitest run",
     "build:sdk": "npm --prefix sdk/kyro.js run build",

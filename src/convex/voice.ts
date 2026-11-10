@@ -48,8 +48,9 @@ async function requireVoiceAccess(
     const access = await requireServerAccess(ctx, channel.serverId, userId);
     const defaultRole = await ctx.db
       .query("serverRoles")
-      .withIndex("by_server", (q) => q.eq("serverId", channel.serverId))
-      .filter((q) => q.eq(q.field("isDefault"), true))
+      .withIndex("by_server_default", (q) =>
+        q.eq("serverId", channel.serverId).eq("isDefault", true),
+      )
       .first();
     const permissions =
       access.server.ownerId === userId

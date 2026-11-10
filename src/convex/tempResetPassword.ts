@@ -9,7 +9,10 @@ import { internal } from "./_generated/api";
 /** One-off helper: look up an account by handle and its password credential. */
 export const lookup = internalQuery({
   args: { username: v.string() },
-  handler: async (ctx, { username }): Promise<{
+  handler: async (
+    ctx,
+    { username },
+  ): Promise<{
     userId: string;
     name: string | null;
     email: string | null;
@@ -38,10 +41,13 @@ export const lookup = internalQuery({
   },
 });
 
-/** One-off helper: find candidate accounts by loose text. */
+/** One-off helper: find accounts by handle/email prefix or indexed name. */
 export const find = internalQuery({
   args: { text: v.string() },
-  handler: async (ctx, { text }): Promise<
+  handler: async (
+    ctx,
+    { text },
+  ): Promise<
     Array<{
       userId: string;
       username: string | null;
@@ -51,7 +57,43 @@ export const find = internalQuery({
     }>
   > => {
     const needle = text.trim().toLowerCase();
-    const rows = await ctx.db.query("users").collect();
+    const rows =
+      needle === "*"
+        ? await ctx.db.query("users").withIndex("by_creation_time").take(50)
+        : [
+            ...new Map(
+              (
+                await Promise.all([
+                  ctx.db
+                    .query("users")
+                    .withIndex("by_username", (q) =>
+                      q
+                        .gte("username", needle)
+                        .lt("username", needle + "\uffff"),
+                    )
+                    .take(10),
+                  ctx.db
+                    .query("users")
+                    .withIndex("email", (q) =>
+                      q.gte("email", needle).lt("email", needle + "\uffff"),
+                    )
+                    .take(10),
+                  ...(needle
+                    ? [
+                        ctx.db
+                          .query("users")
+                          .withSearchIndex("search_name", (q) =>
+                            q.search("name", needle),
+                          )
+                          .take(10),
+                      ]
+                    : []),
+                ])
+              )
+                .flat()
+                .map((user) => [user._id, user]),
+            ).values(),
+          ];
     if (needle === "*") {
       return rows.slice(0, 50).map((u) => ({
         userId: u._id as string,

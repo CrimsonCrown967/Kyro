@@ -36,6 +36,7 @@ export const list = query({
   },
 });
 
+/** Badge value, capped at 10 because both consumers display 9+. */
 export const unreadCount = query({
   args: {},
   handler: async (ctx) => {
@@ -46,7 +47,7 @@ export const unreadCount = query({
         .withIndex("by_user_unread", (q) =>
           q.eq("userId", id).eq("read", false),
         )
-        .collect()
+        .take(10)
     ).length;
   },
 });
@@ -180,7 +181,8 @@ export const setChannelPreference = mutation({
       return;
     }
     if (existing) {
-      await ctx.db.patch(existing._id, { level, updatedAt: Date.now() });
+      if (existing.level !== level)
+        await ctx.db.patch(existing._id, { level, updatedAt: Date.now() });
     } else {
       await ctx.db.insert("channelNotificationSettings", {
         userId: id,
