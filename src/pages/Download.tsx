@@ -61,6 +61,10 @@ export default function DownloadPage() {
             <p className="mt-3 text-xs text-[#A0A6B5]">
               Windows 10 / 11 · 64-bit (x64) · Version {DESKTOP_VERSION}
             </p>
+            <p className="mt-2 max-w-md text-xs leading-5 text-[#A0A6B5]">
+              Downloads currently require a GitHub account with access to the
+              private Kyro repository.
+            </p>
             <div className="mt-7 flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-300">
               {[
                 "Free to download",

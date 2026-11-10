@@ -1,6 +1,6 @@
 ## Overview
 
-KyroFree is a React community chat application with a Convex backend. Start with
+Kyro is a React community chat application with a Convex backend. Start with
 the [technical architecture overview](docs/architecture.md) for the framework,
 database/schema, authentication, API structure, features and dependencies.
 
@@ -8,6 +8,21 @@ The [Bot Developer Platform guide](docs/bot-platform.md) documents application
 creation, installation consent, permissions, REST endpoints, slash commands,
 signed webhooks and deployment. The [kyro.js SDK](sdk/kyro.js/README.md) is
 distributed from this repository and has not been published to npm.
+
+The private source repository is [CrimsonCrown967/Kyro](https://github.com/CrimsonCrown967/Kyro).
+`main` contains the latest bot platform, Windows desktop app and Convex I/O fixes.
+The `codex/f-drive-snapshot` branch preserves the earlier, uncommitted work from
+`F:\Kyro` before the latest version was restored there on 2026-11-10.
+
+Download the Windows installer and SHA-256 checksum from the
+[desktop release](https://github.com/CrimsonCrown967/Kyro/releases/tag/desktop-v1.0.0).
+Source and release downloads require GitHub access to this private repository.
+See [desktop setup and build instructions](desktop/README.md).
+
+Environment credentials, installed dependencies, caches and generated builds stay
+local. `.env.example` and the lockfiles provide configuration and installation
+templates. Live Convex records and uploaded media remain in their cloud services;
+this source repository is not a database or media backup.
 
 This project uses the following tech stack:
 

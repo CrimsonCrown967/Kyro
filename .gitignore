@@ -9,3 +9,7 @@ dist
 test-results/
 desktop/release/
 .env*
+!.env.example
+
+# Windows installers are uploaded as GitHub release assets.
+/Kyro-Setup-*.exe
