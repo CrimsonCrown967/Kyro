@@ -223,7 +223,7 @@ export default function DownloadPage() {
           <p className="mt-6 border-t border-white/5 pt-5 text-xs leading-6 text-[#A0A6B5]">
             Internet connection required. This first release is not code signed,
             so Windows may identify the publisher as unknown. Download only from
-            this page or the official KyroFree GitHub release.{" "}
+            this page or the official Kyro GitHub download release.{" "}
             <a
               href={DESKTOP_RELEASE_URL}
               className="text-indigo-300 underline underline-offset-4"

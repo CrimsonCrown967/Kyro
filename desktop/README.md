@@ -7,7 +7,7 @@ community and voice features. An internet connection is required.
 ## Install
 
 Download `Kyro-Setup-1.0.0-x64.exe` from the
-[official release](https://github.com/adrianeosyne/KyroFree/releases/tag/desktop-v1.0.0).
+[official release](https://github.com/adrianeosyne/KyroDownloads/releases/tag/desktop-v1.0.0).
 Supports Windows 10 and 11, x64. Installation is per user, without administrator
 rights, with an installation directory chooser and desktop/Start menu shortcuts.
 Uninstall through Windows Settings. Account data is retained for reinstalling.
@@ -70,7 +70,7 @@ and offline recovery without creating accounts or joining calls.
 2. Run desktop tests, the installer build and packaged smoke checks; run the web
    typecheck, lint and production build when changing download links.
 3. Generate `SHA256SUMS.txt` alongside the installer using SHA-256.
-4. Publish a GitHub release tagged `desktop-v<version>` with the installer and
+4. Publish a release in the public `adrianeosyne/KyroDownloads` repository tagged `desktop-v<version>` with the installer and
    checksum. Publish assets before deploying the matching website download link.
 5. Verify `/download` and the GitHub asset URL in production.
 
