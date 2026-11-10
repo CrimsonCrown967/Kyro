@@ -78,6 +78,7 @@ export function Sidebar({
           <HomeSection />
         )}
       </div>
+      <nav aria-label="Developer tools" className="flex gap-3 border-t border-border px-4 py-3 text-xs text-muted-foreground"><Link to="/developers" className="hover:text-foreground">Developer Portal</Link><Link to="/bots" className="hover:text-foreground">Bot directory</Link></nav>
       <UserBar onOpenSettings={onOpenSettings} />
     </div>
   );

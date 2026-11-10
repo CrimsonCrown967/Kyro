@@ -39,6 +39,8 @@ import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 
 type Member = {
   user: {
+    isBot?: boolean;
+    botApplicationId?: string | null;
     id: string;
     name: string;
     username: string | null;
@@ -94,6 +96,8 @@ export function MemberList({ serverId }: { serverId: string }) {
   const navigate = useNavigate();
 
   const openProfile = (userId: string) => {
+    const bot = [...(data?.online ?? []), ...(data?.offline ?? [])].find(row => row.user.id === userId)?.user;
+    if (bot?.botApplicationId) { navigate(`/bots/${bot.botApplicationId}`); return; }
     setParams((previous) => {
       const next = new URLSearchParams(previous);
       next.set("previewUser", userId);
@@ -128,7 +132,7 @@ export function MemberList({ serverId }: { serverId: string }) {
 
   const groupedOnline = new Map<string, Member[]>();
   for (const member of data.online) {
-    const label = member.isOwner
+    const label = member.user.isBot ? "Bots" : member.isOwner
       ? "Owner"
       : (member.topHoistedRoleName ?? "Online");
     const group = groupedOnline.get(label) ?? [];
@@ -195,7 +199,7 @@ export function MemberList({ serverId }: { serverId: string }) {
                     ownerName={member.user.name}
                   />
                 )}
-                <DeviceBadge device={member.user.device} />
+                {member.user.isBot ? <span className="rounded bg-primary px-1 py-0.5 text-[9px] font-bold text-primary-foreground">BOT</span> : <DeviceBadge device={member.user.device} />}
               </span>
               {member.user.customStatus && (
                 <span className="block truncate text-xs text-muted-foreground">

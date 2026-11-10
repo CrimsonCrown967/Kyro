@@ -1,4 +1,4 @@
-import { cronJobs } from "convex/server";
+import { cronJobs, makeFunctionReference } from "convex/server";
 import {
   cleanupEmailRecordsRef,
   kickDueEmailsRef,
@@ -6,6 +6,7 @@ import {
 } from "./emailRefs";
 
 const crons = cronJobs();
+crons.interval("retry and retain bot events", { minutes: 1 }, makeFunctionReference<"mutation">("botEvents:maintain"), {});
 
 crons.interval(
   "retry transactional emails",

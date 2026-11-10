@@ -344,3 +344,14 @@ When using convex, make sure:
 - This includes importing generated files like `@/convex/_generated/server`, `@/convex/_generated/api`
 - Remember to import functions like useQuery, useMutation, useAction, etc. from `convex/react`
 - NEVER have return type validators.
+# Bot developer platform
+
+Open `/developers` to create and manage bot applications, `/bots` for discovery,
+and Server Settings → Bots & commands to manage installations. Bots run on the
+developer's external Node.js host using the repository's unpublished TypeScript SDK.
+
+See [the Bot API, deployment and security reference](docs/bot-platform.md) and
+[SDK setup and examples](packages/kyro.js/README.md). Run `npm run test:bots` for
+backend/SDK tests and `npm run test:bots:live` against a configured disposable
+local Convex backend for real authentication, storage and event tests.
+

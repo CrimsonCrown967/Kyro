@@ -1,3 +1,4 @@
+import { InstalledBots } from "./InstalledBots";
 import { useConvex, useMutation, useQuery } from "convex/react";
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
@@ -1274,7 +1275,7 @@ export function ServerSettings({ serverId }: { serverId: string }) {
           {activeTab === "emojis" && (
             <EmojisTab serverId={serverId} canManage={canEmojis} />
           )}
-          {activeTab === "bots" && <BotSettings serverId={serverId} />}
+          {activeTab === "bots" && <><InstalledBots serverId={serverId} /><BotSettings serverId={serverId} /></>}
 
           {activeTab === "theme" && canManage && (
             <ThemeTab

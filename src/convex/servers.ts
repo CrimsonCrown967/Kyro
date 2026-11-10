@@ -1316,6 +1316,7 @@ export const transferOwnership = mutation({
       .unique();
     if (!target)
       throw new Error("That person isn't a member of this community.");
+    if ((await ctx.db.get(userId))?.isBot) throw new Error("Bots cannot own servers.");
     await ctx.db.patch(serverId, { ownerId: userId, updatedAt: Date.now() });
     await logAudit(ctx, {
       serverId,
@@ -1537,6 +1538,7 @@ export const setNickname = mutation({
     await ctx.db.patch(membership._id, {
       nickname: nickname?.trim().slice(0, 64) || undefined,
     });
+    await logAudit(ctx, { serverId, actorId: id, action: "member.nickname", targetId: userId });
   },
 });
 

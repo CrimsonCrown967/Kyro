@@ -17,6 +17,11 @@ export const PERMISSIONS = {
   CREATE_INVITES: "create_invites",
   VIEW_CHANNEL: "view_channel",
   SEND_MESSAGES: "send_messages",
+  READ_MESSAGE_HISTORY: "read_message_history",
+  ADD_REACTIONS: "add_reactions",
+  ATTACH_FILES: "attach_files",
+  USE_EXTERNAL_EMOJIS: "use_external_emojis",
+  CREATE_POLLS: "create_polls",
   CONNECT_VOICE: "connect_voice",
   SPEAK_VOICE: "speak_voice",
   VIDEO: "video",
@@ -33,6 +38,11 @@ export const ALL_PERMISSIONS = Object.values(PERMISSIONS) as Permission[];
 
 /** Permission bits that make sense as a per-channel override. */
 export const CHANNEL_PERMISSIONS: Permission[] = [
+  PERMISSIONS.READ_MESSAGE_HISTORY,
+  PERMISSIONS.ADD_REACTIONS,
+  PERMISSIONS.ATTACH_FILES,
+  PERMISSIONS.USE_EXTERNAL_EMOJIS,
+  PERMISSIONS.CREATE_POLLS,
   PERMISSIONS.VIEW_CHANNEL,
   PERMISSIONS.SEND_MESSAGES,
   PERMISSIONS.CONNECT_VOICE,
@@ -46,6 +56,11 @@ export const CHANNEL_PERMISSIONS: Permission[] = [
 
 /** What the default @everyone role starts with on a new community. */
 export const DEFAULT_EVERYONE_PERMISSIONS: Permission[] = [
+  PERMISSIONS.READ_MESSAGE_HISTORY,
+  PERMISSIONS.ADD_REACTIONS,
+  PERMISSIONS.ATTACH_FILES,
+  PERMISSIONS.USE_EXTERNAL_EMOJIS,
+  PERMISSIONS.CREATE_POLLS,
   PERMISSIONS.CREATE_INVITES,
   PERMISSIONS.VIEW_CHANNEL,
   PERMISSIONS.SEND_MESSAGES,
@@ -96,6 +111,11 @@ export const PERMISSION_META: Record<
   Permission,
   { label: string; description: string }
 > = {
+  read_message_history: { label: "Read message history", description: "Retrieve previous channel messages." },
+  add_reactions: { label: "Add reactions", description: "React to messages." },
+  attach_files: { label: "Upload attachments", description: "Attach files to channel messages." },
+  use_external_emojis: { label: "Use external emojis", description: "Use custom emojis from other communities." },
+  create_polls: { label: "Create polls", description: "Create polls in text channels." },
   administrator: {
     label: "Administrator",
     description: "Grants every permission in this community.",

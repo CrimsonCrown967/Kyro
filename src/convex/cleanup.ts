@@ -1,12 +1,18 @@
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { deleteClaimedUpload } from "./uploadSecurity";
+import { emitBotEvent } from "./botEventHooks";
 
 /** Delete a message and every object that exists only because it exists. */
 export async function deleteMessageData(
   ctx: MutationCtx,
   message: Doc<"messages">,
 ): Promise<void> {
+  if (message.containerType === "channel") {
+    const channelId = ctx.db.normalizeId("channels", message.containerId);
+    const channel = channelId ? await ctx.db.get(channelId) : null;
+    if (channel) await emitBotEvent(ctx, { type: "messageDelete", serverId: channel.serverId, channelId: channel._id, data: { id: message._id, channelId: channel._id, serverId: channel.serverId } });
+  }
   const reactions = await ctx.db
     .query("reactions")
     .withIndex("by_message", (q) => q.eq("messageId", message._id))
@@ -94,6 +100,7 @@ export async function deleteChannelData(
   ctx: MutationCtx,
   channel: Doc<"channels">,
 ): Promise<void> {
+  await emitBotEvent(ctx, { type: "channelDelete", serverId: channel.serverId, channelId: channel._id, data: { id: channel._id, serverId: channel.serverId, name: channel.name } });
   const messages = await ctx.db
     .query("messages")
     .withIndex("by_container", (q) => q.eq("containerId", channel._id))
@@ -153,6 +160,12 @@ export async function deleteServerData(
   server: Doc<"servers">,
 ): Promise<void> {
   const serverId = server._id;
+  const installations = await ctx.db.query("botInstallations").withIndex("by_server", q => q.eq("serverId", serverId)).collect();
+  for (const installation of installations) {
+    const scoped = await ctx.db.query("botCommands").withIndex("by_application", q => q.eq("applicationId", installation.applicationId).eq("serverId", serverId)).collect();
+    for (const command of scoped) await ctx.db.delete(command._id);
+    await ctx.db.delete(installation._id);
+  }
   const [
     channels,
     categories,

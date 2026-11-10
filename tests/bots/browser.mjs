@@ -1,0 +1,65 @@
+import assert from "node:assert/strict";
+import { readFile, mkdir } from "node:fs/promises";
+import { randomBytes } from "node:crypto";
+import { chromium } from "playwright-core";
+import { ConvexHttpClient } from "convex/browser";
+
+const config = JSON.parse(await readFile(new URL("../../.convex/local/default/config.json", import.meta.url), "utf8"));
+assert.ok(config.deploymentName?.startsWith("anonymous-"), "Browser tests require a disposable local backend");
+const cloud = `http://127.0.0.1:${config.ports.cloud}`;
+const suffix = randomBytes(5).toString("hex");
+const client = new ConvexHttpClient(cloud, { logger: false });
+const { tokens } = await client.action("auth:signIn", { provider: "password", params: { flow: "signUp", email: `browser_${suffix}@kyro-seed.invalid`, password: randomBytes(24).toString("hex") } });
+client.setAuth(tokens.token);
+await client.mutation("users:claimProfile", { username: `browser_${suffix}`, name: "Browser test developer" });
+const browser = await chromium.launch({ headless: true, executablePath: process.env.KYRO_TEST_BROWSER ?? "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe" });
+const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+await context.addInitScript(({ cloud, tokens }) => {
+  const namespace = cloud.replace(/[^a-zA-Z0-9]/g, "");
+  localStorage.setItem(`__convexAuthJWT_${namespace}`, tokens.token);
+  localStorage.setItem(`__convexAuthRefreshToken_${namespace}`, tokens.refreshToken);
+}, { cloud, tokens });
+const page = await context.newPage();
+const errors = [];
+page.on("pageerror", error => errors.push(error.message));
+const origin = "http://127.0.0.1:5173";
+let applicationId;
+const shotDir = new URL("../../.screenshots/bots/", import.meta.url);
+await mkdir(shotDir, { recursive: true });
+try {
+  await page.goto(`${origin}/developers`);
+  await page.getByRole("heading", { name: "Your applications" }).waitFor();
+  await page.getByRole("button", { name: "New application" }).click();
+  await page.getByLabel("Application name", { exact: true }).fill(`Browser Bot ${suffix}`);
+  await page.getByLabel("Bot username", { exact: false }).fill(`ui_bot_${suffix}`);
+  await page.getByLabel("Application description", { exact: true }).fill("Created through the real developer portal.");
+  await page.getByRole("button", { name: "Create application", exact: true }).click();
+  await page.getByRole("button", { name: "I saved my token", exact: true }).click();
+  await page.getByRole("heading", { name: "Overview", exact: true }).waitFor();
+  applicationId = (await client.query("botApplications:list", {}))[0].id;
+  await page.screenshot({ path: new URL("desktop.png", shotDir).pathname.replace(/^\/([A-Z]:)/, "$1"), fullPage: true });
+  await page.getByRole("link", { name: "Bot Configuration", exact: true }).click();
+  await page.getByRole("switch", { name: "Make bot publicly discoverable" }).click();
+  await page.getByRole("button", { name: "Save changes", exact: true }).click();
+  await page.getByText("Bot configuration updated.", { exact: true }).waitFor();
+  await page.getByRole("link", { name: "Bot directory", exact: true }).click();
+  await page.getByRole("heading", { name: `Browser Bot ${suffix}`, exact: true }).waitFor();
+  await page.setViewportSize({ width: 390, height: 844 });
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), "Mobile directory must not overflow horizontally");
+  await page.screenshot({ path: new URL("mobile.png", shotDir).pathname.replace(/^\/([A-Z]:)/, "$1"), fullPage: true });
+  await page.goto(`${origin}/developers/applications/${applicationId}/commands`);
+  await page.getByRole("button", { name: "Create command", exact: true }).click();
+  await page.getByLabel("Command name", { exact: true }).fill("ping");
+  await page.getByLabel("Description", { exact: true }).fill("Browser registered command");
+  await page.getByRole("button", { name: "Save command", exact: true }).click();
+  await page.getByRole("heading", { name: "/ping", exact: true }).waitFor();
+  assert.equal((await client.query("botCommands:list", { applicationId }))[0].name, "ping");
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), "Mobile application settings must not overflow horizontally");
+  await page.goto(`${origin}/bots/invalid-id`);
+  await page.getByRole("heading", { name: "Bot unavailable" }).waitFor();
+  assert.deepEqual(errors, []);
+  console.log("PASS: real browser application creation, token dialog, profile settings, directory, command registration, mobile layout and invalid-link handling");
+} finally {
+  await browser.close();
+  if (applicationId) await client.mutation("botApplications:remove", { applicationId, confirmation: `Browser Bot ${suffix}` });
+}

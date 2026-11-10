@@ -1,3 +1,4 @@
+import { emitMessageEvent } from "./botEventHooks";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
@@ -354,6 +355,7 @@ export const list = query({
           kind: message.kind ?? null,
           botName: message.botName ?? null,
           botCommand: message.botCommand ?? null,
+          embeds: message.embeds,
           callDurationMs: message.callDurationMs ?? null,
           createdAt: message.createdAt,
           editedAt: message.editedAt ?? null,
@@ -984,6 +986,7 @@ export const send = mutation({
       }
     }
 
+    await emitMessageEvent(ctx, "messageCreate", messageId);
     return { messageId, deduped: false, blocked: null };
   },
 });
@@ -1045,6 +1048,7 @@ export const edit = mutation({
       );
     }
     await ctx.db.patch(messageId, { content: trimmed, editedAt: Date.now() });
+    await emitMessageEvent(ctx, "messageUpdate", messageId);
   },
 });
 

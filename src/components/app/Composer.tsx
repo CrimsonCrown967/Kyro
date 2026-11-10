@@ -1,3 +1,4 @@
+import { BotCommandDialog, type InstalledCommand } from "./BotInteractions";
 import { useAction, useConvex, useMutation, useQuery } from "convex/react";
 import {
   BarChart3,
@@ -94,6 +95,13 @@ export function Composer({
       ? { channelId: containerId as Id<"channels"> }
       : "skip",
   );
+  const installedCommands = useQuery(api.botCommands.listForChannel, containerType === "channel" ? { channelId: containerId as Id<"channels"> } : "skip");
+  const [selectedCommand, setSelectedCommand] = useState<InstalledCommand | null>(null);
+  const chooseCommand = (command: { name: string; id?: string }) => {
+    const installed = installedCommands?.find(row => row.id === command.id);
+    if (installed) setSelectedCommand(installed);
+    else { setDraft(draftKey, `/${command.name} `); setCommandIndex(0); requestAnimationFrame(() => textareaRef.current?.focus()); }
+  };
   const upload = useUploadFile();
   const convex = useConvex();
   const registerGifShare = useAction(api.gifs.registerShare);
@@ -185,11 +193,11 @@ export function Composer({
   const commandMatch =
     containerType === "channel" ? draft.match(/^\/([a-z0-9_-]*)$/i) : null;
   const commandOptions = commandMatch
-    ? (botCommands ?? [])
+    ? [...(installedCommands ?? []), ...(botCommands ?? [])]
         .filter((command) =>
           command.name.toLowerCase().startsWith(commandMatch[1].toLowerCase()),
         )
-        .slice(0, 8)
+        .slice(0, 30)
     : [];
 
   const insertMention = (token: string) => {
@@ -275,9 +283,15 @@ export function Composer({
         containerType === "channel" &&
         command &&
         attachments.length === 0 &&
-        botCommands === undefined
+        (botCommands === undefined || installedCommands === undefined)
       ) {
         toast.error("Commands are still loading. Try again in a moment.");
+        return;
+      }
+      const external = command && containerType === "channel" && !attachments.length ? installedCommands?.filter(row => row.name === command[1].toLowerCase()) : [];
+      if (external?.length) {
+        if (external.length > 1) { toast.error("Choose a bot from the command suggestions to resolve this name."); setDraft(draftKey, `/${command![1]}`); }
+        else setSelectedCommand(external[0]);
         return;
       }
       const knownCommand = command
@@ -592,9 +606,7 @@ export function Composer({
                 event.preventDefault();
                 const selected =
                   commandOptions[commandIndex] ?? commandOptions[0];
-                setDraft(draftKey, `/${selected.name} `);
-                setCommandIndex(0);
-                requestAnimationFrame(() => textareaRef.current?.focus());
+                chooseCommand(selected);
                 return;
               }
             }
@@ -665,19 +677,17 @@ export function Composer({
         ) : null}
 
         {commandOptions.length > 0 ? (
-          <div className="absolute bottom-full left-2 right-2 z-30 mb-2 overflow-hidden rounded-xl border border-border/70 bg-popover p-1 shadow-xl">
+          <div className="absolute bottom-full left-2 right-2 z-30 mb-2 max-h-72 overflow-y-auto rounded-xl border border-border/70 bg-popover p-1 shadow-xl">
             <p className="flex items-center gap-1.5 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
               <Bot className="size-3" /> Commands
             </p>
             {commandOptions.map((command, index) => (
               <button
-                key={command.name}
+                key={"id" in command ? command.id : `kyro:${command.name}`}
                 type="button"
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => {
-                  setDraft(draftKey, `/${command.name} `);
-                  setCommandIndex(0);
-                  requestAnimationFrame(() => textareaRef.current?.focus());
+                  chooseCommand(command);
                 }}
                 className={cn(
                   "flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left",
@@ -688,7 +698,7 @@ export function Composer({
                   /{command.name}
                 </span>
                 <span className="truncate text-xs text-muted-foreground">
-                  {command.description}
+                  {"applicationName" in command ? `${command.applicationName} · ` : "Kyro · "}{command.description}
                 </span>
               </button>
             ))}
@@ -696,7 +706,7 @@ export function Composer({
         ) : null}
 
         {mentionQuery !== null && mentionOptions.length > 0 && (
-          <div className="absolute bottom-full left-2 right-2 z-30 mb-2 overflow-hidden rounded-xl border border-border/70 bg-popover p-1 shadow-xl">
+          <div className="absolute bottom-full left-2 right-2 z-30 mb-2 max-h-72 overflow-y-auto rounded-xl border border-border/70 bg-popover p-1 shadow-xl">
             <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
               Mentions
             </p>
@@ -880,6 +890,7 @@ export function Composer({
         </span>{" "}
         for a new line · Markdown and code blocks supported
       </p>
+      {selectedCommand && <BotCommandDialog key={selectedCommand.id} command={selectedCommand} channelId={containerId} users={mentionUsers} onClose={() => setSelectedCommand(null)} onSent={() => { setDraft(draftKey, ""); onSent?.(); }} />}
       <PollComposerDialog
         open={pollOpen}
         onOpenChange={setPollOpen}

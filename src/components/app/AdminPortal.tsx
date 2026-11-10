@@ -40,11 +40,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { BUG_CATEGORY_LABELS } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { BotModeration } from "./BotModeration";
 
 type AdminTab =
   | "overview"
   | "badges"
   | "reports"
+  | "bots"
   | "bugs"
   | "bans"
   | "warnings"
@@ -57,6 +59,7 @@ const TABS: { id: AdminTab; label: string; icon: typeof ShieldCheck }[] = [
   { id: "ips", label: "IP detector", icon: Globe },
   { id: "badges", label: "Badges", icon: Shield },
   { id: "reports", label: "Reports", icon: AlertTriangle },
+  { id: "bots", label: "Bots", icon: ShieldCheck },
   { id: "bugs", label: "Bugs", icon: Wrench },
   { id: "bans", label: "Bans", icon: Ban },
   { id: "warnings", label: "Warnings", icon: ShieldAlert },
@@ -263,6 +266,7 @@ export function AdminPortal() {
         {tab === "warnings" && <WarningsTab canModerate={data.me.isStaff} />}
         {tab === "email" && <EmailDeliveryTab canModerate={data.me.isStaff} />}
         {tab === "activity" && <ActivityTab />}
+        {tab === "bots" && <BotModeration isAdmin={data.me.isAdmin} isStaff={data.me.isStaff} />}
       </div>
     </div>
   );

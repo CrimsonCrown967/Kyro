@@ -11,7 +11,10 @@ export type UploadClaim =
   | "user_banner"
   | "server_icon"
   | "server_banner"
-  | "server_emoji";
+  | "server_emoji"
+  | "application_icon"
+  | "application_banner";
+// Application media uses the same ownership and lifecycle validation.
 
 const SAFE_CONTENT_TYPES = new Set([
   "application/json",

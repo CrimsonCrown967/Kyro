@@ -1,3 +1,6 @@
+import { BotEmbeds } from "./BotEmbeds";
+import type { z } from "zod";
+import type { botEmbedSchema } from "@/lib/botContracts";
 import { useConvex, useMutation, useQuery } from "convex/react";
 import {
   AlertTriangle,
@@ -76,6 +79,7 @@ import {
 } from "@/components/ui/dialog";
 
 export interface MessageAuthor {
+  isBot?: boolean;
   id: string;
   name: string;
   username: string | null;
@@ -97,6 +101,7 @@ export interface MessageAuthor {
 }
 
 export interface MessageDto {
+  embeds?: z.infer<typeof botEmbedSchema>[];
   id: string;
   content: string;
   /** Call records render as their own system row instead of a chat bubble. */
@@ -853,7 +858,7 @@ function MessageRow({
         >
           <div className="flex gap-3">
             <div className="w-10 shrink-0">
-              {!grouped && isBotResponse ? (
+              {!grouped && isBotResponse && !author?.isBot ? (
                 <span className="mt-0.5 flex size-10 items-center justify-center rounded-full bg-primary/15 text-primary ring-1 ring-primary/30">
                   <Bot className="size-5" />
                 </span>
@@ -872,7 +877,7 @@ function MessageRow({
             <div className="min-w-0 flex-1">
               {!grouped && (
                 <div className="flex flex-wrap items-baseline gap-2">
-                  {isBotResponse ? (
+                  {isBotResponse && !author?.isBot ? (
                     <span className="text-sm font-semibold text-primary">
                       {message.botName ?? "Kyro Bot"}
                     </span>
@@ -929,6 +934,7 @@ function MessageRow({
                 </div>
               )}
 
+              {!editing && <BotEmbeds embeds={message.embeds} />}
               {message.poll && !editing && <PollCard poll={message.poll} />}
 
               {message.thread && !editing && (

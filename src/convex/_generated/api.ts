@@ -17,7 +17,18 @@ import type * as auth_config from "../auth.config.js";
 import type * as auth_emailOtp from "../auth/emailOtp.js";
 import type * as auth_passwordWithTwoFactor from "../auth/passwordWithTwoFactor.js";
 import type * as automod from "../automod.js";
+import type * as botApi from "../botApi.js";
+import type * as botApplications from "../botApplications.js";
+import type * as botApplicationSchema from "../botApplicationSchema.js";
+import type * as botCommands from "../botCommands.js";
+import type * as botCore from "../botCore.js";
+import type * as botEventHooks from "../botEventHooks.js";
+import type * as botEvents from "../botEvents.js";
+import type * as botHttp from "../botHttp.js";
+import type * as botRuntimeLib from "../botRuntimeLib.js";
+import type * as botRuntimeSchema from "../botRuntimeSchema.js";
 import type * as bots from "../bots.js";
+import type * as botWebhooks from "../botWebhooks.js";
 import type * as bugReports from "../bugReports.js";
 import type * as channels from "../channels.js";
 import type * as cleanup from "../cleanup.js";
@@ -80,7 +91,18 @@ const fullApi: ApiFromModules<{
   "auth/emailOtp": typeof auth_emailOtp,
   "auth/passwordWithTwoFactor": typeof auth_passwordWithTwoFactor,
   "automod": typeof automod,
+  "botApi": typeof botApi,
+  "botApplications": typeof botApplications,
+  "botApplicationSchema": typeof botApplicationSchema,
+  "botCommands": typeof botCommands,
+  "botCore": typeof botCore,
+  "botEventHooks": typeof botEventHooks,
+  "botEvents": typeof botEvents,
+  "botHttp": typeof botHttp,
+  "botRuntimeLib": typeof botRuntimeLib,
+  "botRuntimeSchema": typeof botRuntimeSchema,
   "bots": typeof bots,
+  "botWebhooks": typeof botWebhooks,
   "bugReports": typeof bugReports,
   "channels": typeof channels,
   "cleanup": typeof cleanup,

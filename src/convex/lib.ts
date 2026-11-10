@@ -1,3 +1,4 @@
+import { emitAuditedBotEvent } from "./botEventHooks";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import {
   ALL_PERMISSIONS,
@@ -59,7 +60,7 @@ export async function requireUser(
   const id = await getAuthUserId(ctx);
   if (id === null) throw new Error("You need to sign in to do that.");
   const user = await ctx.db.get(id);
-  if (!user) throw new Error("You need to sign in to do that.");
+  if (!user || user.isBot) throw new Error("You need to sign in to do that.");
   if (user.deletedAt !== undefined) {
     throw new Error("This account has been deleted.");
   }
@@ -139,6 +140,8 @@ export function visiblePresence(
 }
 
 export interface PublicUser {
+  isBot?: boolean;
+  botApplicationId?: string | null;
   id: string;
   username: string | null;
   name: string;
@@ -392,6 +395,8 @@ export async function hydrateUser(
   const badges = globalBadgesFor(user);
   return {
     id: user._id,
+    isBot: user.isBot === true,
+    botApplicationId: user.botApplicationId ?? null,
     username: user.username ?? null,
     name: user.name ?? user.username ?? "Kyro user",
     avatarUrl,
@@ -617,6 +622,7 @@ export async function logAudit(
     details?: string;
   },
 ): Promise<void> {
+  await emitAuditedBotEvent(ctx, args);
   await ctx.db.insert("auditLogs", {
     serverId: args.serverId,
     actorId: args.actorId,

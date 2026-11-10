@@ -1,6 +1,8 @@
 import { authTables } from "@convex-dev/auth/server";
 import { defineSchema, defineTable } from "convex/server";
 import { Infer, v } from "convex/values";
+import { botApplicationTables } from "./botApplicationSchema";
+import { botRuntimeTables, botEmbedValidator } from "./botRuntimeSchema";
 
 // default user roles. can add / remove based on the project as needed
 export const ROLES = {
@@ -29,9 +31,14 @@ const schema = defineSchema(
   {
     // default auth tables using convex auth.
     ...authTables, // do not remove or modify
+    ...botApplicationTables,
+    ...botRuntimeTables,
 
     // the users table is the default users table that is brought in by the authTables
     users: defineTable({
+      /** Bot identities share membership/profile storage but have no login account. */
+      isBot: v.optional(v.boolean()),
+      botApplicationId: v.optional(v.id("botApplications")),
       name: v.optional(v.string()), // name of the user. do not remove
       image: v.optional(v.string()), // image of the user. do not remove
       email: v.optional(v.string()), // email of the user. do not remove
@@ -426,6 +433,7 @@ const schema = defineSchema(
       /** Trusted bot presentation fields, written only by the bot runner. */
       botName: v.optional(v.string()),
       botCommand: v.optional(v.string()),
+      embeds: v.optional(v.array(botEmbedValidator)),
       /** Duration of the call this message records, in milliseconds. */
       callDurationMs: v.optional(v.number()),
     })
@@ -534,6 +542,8 @@ const schema = defineSchema(
           v.literal("server_icon"),
           v.literal("server_banner"),
           v.literal("server_emoji"),
+          v.literal("application_icon"),
+          v.literal("application_banner"),
         ),
       ),
       /** String form of the message, user, or server id that owns the claim. */

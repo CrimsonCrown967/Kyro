@@ -1,3 +1,4 @@
+import { BotInteractionResponses } from "./BotInteractions";
 import { useMutation, useQuery } from "convex/react";
 import { Bell, Check, Hash, Loader2, MessagesSquare } from "@/components/icons";
 import { useEffect, useState, type ReactNode } from "react";
@@ -198,6 +199,7 @@ function ChatSurface({
         mentionUsers={mentionUsers}
       />
 
+      {containerType === "channel" && <BotInteractionResponses key={containerId} channelId={containerId} />}
       {canSendMessages ? (
         <>
           <div className="h-5 shrink-0 px-4 text-xs text-muted-foreground">

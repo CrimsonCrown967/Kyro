@@ -9,6 +9,9 @@ export function KyroMark({ className }: { className?: string }) {
   return (
     <img
       src={KYRO_LOGO_URL}
+      onError={(event) => {
+        if (!event.currentTarget.src.endsWith("/logo-64.png")) event.currentTarget.src = "/logo-64.png";
+      }}
       alt="Kyro"
       className={cn("size-8 object-contain", className)}
     />

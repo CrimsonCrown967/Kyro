@@ -222,6 +222,7 @@ export const decide = mutation({
         roleIds: [],
         joinedAt: Date.now(),
       });
+      await logAudit(ctx, { serverId: application.serverId, actorId: reviewerId, action: "member.join", targetId: application.userId });
     }
 
     const now = Date.now();

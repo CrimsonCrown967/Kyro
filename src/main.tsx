@@ -9,6 +9,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter, Route, Routes, useLocation } from "react-router";
 import "./index.css";
 import "@/lib/installApp";
+import { CONVEX_URL } from "@/lib/backend";
 
 // Lazy load route components for better code splitting
 const Landing = lazy(() => import("./pages/Landing.tsx"));
@@ -21,6 +22,9 @@ const TermsPage = lazy(() =>
 const PrivacyPage = lazy(() =>
   import("./pages/Legal.tsx").then((m) => ({ default: m.PrivacyPage })),
 );
+const DeveloperPortal = lazy(() => import("./pages/DeveloperPortal"));
+const BotDirectory = lazy(() => import("./pages/BotDirectory"));
+const BotAuthorize = lazy(() => import("./pages/BotAuthorize"));
 const InviteRoute = lazy(() => import("./pages/Invite.tsx"));
 
 // Simple loading fallback for route transitions
@@ -95,16 +99,7 @@ class RootErrorBoundary extends React.Component<
  * which is what produced the runtime errors and the failed join requests on
  * kyro-chat.cyou. Fall back to this project's known deployment so Kyro boots.
  */
-const DEFAULT_CONVEX_URL = "https://giant-cricket-958.convex.cloud";
-const configuredConvexUrl = import.meta.env.VITE_CONVEX_URL as
-  | string
-  | undefined;
-const convexUrl =
-  typeof configuredConvexUrl === "string" &&
-  /^https:\/\/[a-z0-9-]+\.convex\.cloud$/.test(configuredConvexUrl)
-    ? configuredConvexUrl
-    : DEFAULT_CONVEX_URL;
-const convex = new ConvexReactClient(convexUrl);
+const convex = new ConvexReactClient(CONVEX_URL);
 
 function RouteSyncer() {
   const location = useLocation();
@@ -158,6 +153,9 @@ createRoot(document.getElementById("root")!).render(
                   </RequireAuth>
                 }
               />
+              <Route path="/developers/*" element={<RequireAuth title="Sign in to Kyro Developers" description="Create and manage your bot applications."><DeveloperPortal /></RequireAuth>} />
+              <Route path="/bots/:applicationId?" element={<BotDirectory />} />
+              <Route path="/oauth2/authorize" element={<RequireAuth title="Sign in to install this bot" description="Choose a server and review the bot permissions."><BotAuthorize /></RequireAuth>} />
               <Route path="/terms" element={<TermsPage />} />
               <Route path="/privacy" element={<PrivacyPage />} />
               <Route path="/invite/:code" element={<InviteRoute />} />

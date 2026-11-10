@@ -6,3 +6,8 @@ dist
 
 .vercel
 .env*
+
+# Local runtime data and release assets
+.convex/
+test-results/
+/Kyro-Setup-*.exe
