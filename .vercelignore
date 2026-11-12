@@ -1,0 +1,11 @@
+.git
+.env*
+.convex
+.screenshots
+tmp_shots
+test-results
+tests
+desktop
+dist
+node_modules
+Kyro-Setup-*.exe

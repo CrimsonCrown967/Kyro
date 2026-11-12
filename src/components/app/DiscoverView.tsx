@@ -30,6 +30,8 @@ export function DiscoverView() {
   const navigate = useNavigate();
   const [term, setTerm] = useState("");
   const [debounced, setDebounced] = useState("");
+  const [tag, setTag] = useState("");
+  const [sort, setSort] = useState("active");
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebounced(term), 250);
@@ -37,17 +39,32 @@ export function DiscoverView() {
   }, [term]);
 
   const results = useQuery(api.servers.discover, { term: debounced });
+  const tags = [...new Set((results ?? []).flatMap((server) => server.tags))]
+    .sort()
+    .slice(0, 8);
+  const visible = (results ?? [])
+    .filter((server) => !tag || server.tags.includes(tag))
+    .sort((a, b) =>
+      sort === "newest"
+        ? b.createdAt - a.createdAt
+        : b.onlineCount - a.onlineCount || b.memberCount - a.memberCount,
+    );
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="mx-auto max-w-5xl px-6 py-8">
-        <header className="mb-6">
+      <div className="mx-auto max-w-6xl p-4 sm:p-7">
+        <header className="discovery-welcome relative mb-7 overflow-hidden rounded-3xl border border-primary/15 px-6 py-9 sm:px-9 sm:py-12">
           <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-primary">
             <Compass className="size-4" /> Discover
           </p>
-          <h1 className="mt-2 text-2xl font-bold">Find your people</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Public servers on Kyro. Search by name, topic or tag.
+          <h1 className="mt-4 max-w-md text-3xl font-bold tracking-tight sm:text-4xl">
+            A place for every
+            <br />
+            <span className="text-primary">side of you.</span>
+          </h1>
+          <p className="mt-3 max-w-sm text-sm leading-6 text-muted-foreground">
+            Find people who share your interests. A new conversation is closer
+            than you think.
           </p>
           <div className="relative mt-4 max-w-md">
             <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -55,24 +72,70 @@ export function DiscoverView() {
               value={term}
               onChange={(event) => setTerm(event.target.value)}
               placeholder="Search servers…"
-              className="pl-9"
+              className="h-12 rounded-xl border-border bg-background/80 pl-10"
               aria-label="Search servers"
             />
           </div>
+          <Compass
+            aria-hidden="true"
+            className="pointer-events-none absolute -right-10 top-9 hidden size-64 rotate-12 text-primary/10 lg:block"
+          />
         </header>
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <div
+            className="flex max-w-full gap-2 overflow-x-auto pb-1"
+            role="group"
+            aria-label="Community interests"
+          >
+            {["", ...tags].map((value) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={tag === value}
+                onClick={() => setTag(value)}
+                className={`shrink-0 rounded-full border px-3 py-2 text-xs transition-colors ${tag === value ? "border-primary/30 bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-surface"}`}
+              >
+                {value || "All communities"}
+              </button>
+            ))}
+          </div>
+          <select
+            aria-label="Sort communities"
+            value={sort}
+            onChange={(event) => setSort(event.target.value)}
+            className="rounded-xl border border-border bg-panel px-3 py-2 text-xs"
+          >
+            <option value="active">Most active</option>
+            <option value="newest">Newest first</option>
+          </select>
+        </div>
 
         {results === undefined ? (
           <div className="flex items-center justify-center py-16 text-muted-foreground">
             <Loader2 className="size-5 animate-spin" />
           </div>
-        ) : results.length === 0 ? (
+        ) : visible.length === 0 ? (
           <div className="flex flex-col items-center gap-2 py-16 text-center">
             <Compass className="size-8 text-muted-foreground" />
             <p className="text-sm font-medium">
-              {debounced
-                ? `Nothing matches “${debounced}”.`
-                : "No public servers yet."}
+              {tag
+                ? `No matching communities tagged “${tag}”.`
+                : debounced
+                  ? `Nothing matches “${debounced}”.`
+                  : "No public servers yet."}
             </p>
+            {(tag || term) && (
+              <Button
+                variant="outline"
+                className="mt-3"
+                onClick={() => {
+                  setTag("");
+                  setTerm("");
+                }}
+              >
+                Clear filters
+              </Button>
+            )}
             <p className="max-w-sm text-sm text-muted-foreground">
               {debounced
                 ? "Try another name, topic or tag."
@@ -81,7 +144,7 @@ export function DiscoverView() {
           </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {results.map((server) => (
+            {visible.map((server) => (
               <ServerCard
                 key={server.id}
                 server={server}
@@ -130,8 +193,11 @@ function ServerCard({
   });
 
   return (
-    <article className="group flex flex-col overflow-hidden rounded-xl border border-border/70 bg-panel transition-colors hover:border-border">
-      <div className="relative h-20 bg-gradient-to-br from-brand/70 to-cyan/70">
+    <article
+      aria-label={server.name}
+      className="group flex flex-col overflow-hidden rounded-2xl border border-border/70 bg-panel transition-all hover:-translate-y-1 hover:border-primary/30 hover:shadow-xl hover:shadow-black/5"
+    >
+      <div className="relative h-32 bg-gradient-to-br from-brand/40 via-brand/15 to-cyan/30">
         {server.bannerUrl && (
           <img
             src={server.bannerUrl}
@@ -153,7 +219,7 @@ function ServerCard({
       </div>
 
       <div className="flex flex-1 flex-col px-4 pt-8 pb-3">
-        <h2 className="truncate text-sm font-semibold">{server.name}</h2>
+        <h2 className="truncate text-base font-semibold">{server.name}</h2>
         <p className="mt-1 line-clamp-2 min-h-10 text-xs leading-5 text-muted-foreground">
           {server.description || "No description yet."}
         </p>

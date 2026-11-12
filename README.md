@@ -9,15 +9,21 @@ creation, installation consent, permissions, REST endpoints, slash commands,
 signed webhooks and deployment. The [kyro.js SDK](sdk/kyro.js/README.md) is
 distributed from this repository and has not been published to npm.
 
-The private source repository is [CrimsonCrown967/Kyro](https://github.com/CrimsonCrown967/Kyro).
-`main` contains the latest bot platform, Windows desktop app and Convex I/O fixes.
-The `codex/f-drive-snapshot` branch preserves the earlier, uncommitted work from
-`F:\Kyro` before the latest version was restored there on 2026-11-10.
+Application source is maintained in `CrimsonCrown967/Kyro`. Keep credentials,
+local profiles and build outputs out of source control. Distribute Windows
+installers and their SHA-256 checksums through MediaFire or another approved
+download host. See [desktop setup and build instructions](desktop/README.md).
 
-Download the Windows installer and SHA-256 checksum from the
-[desktop release](https://github.com/CrimsonCrown967/Kyro/releases/tag/desktop-v1.0.0).
-Source and release downloads require GitHub access to this private repository.
-See [desktop setup and build instructions](desktop/README.md).
+For the replacement Vercel project, follow [email setup](docs/email-notifications.md).
+Password-reset and warning delivery require production SMTP configuration;
+creating a new Vercel project does not copy the old project's environment.
+
+The local desktop 1.0.1 build fixes startup redirects and adds automatic reconnect.
+Run `npm run build:desktop` to generate its installer. Deploy the root web build
+to ship the refreshed app interface; existing clients load it from the live site.
+Run `npm run test:ui` for isolated browser checks of the friends hub, chat drafts,
+navigation, connection banner, light/dark themes and phone layouts. The fixture
+uses no live accounts or data and is never included in the production entry point.
 
 Environment credentials, installed dependencies, caches and generated builds stay
 local. `.env.example` and the lockfiles provide configuration and installation

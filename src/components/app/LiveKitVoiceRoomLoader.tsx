@@ -12,6 +12,7 @@ export function LiveKitVoiceRoomLoader(props: {
   containerId: string;
   active: boolean;
   onLeave: () => void;
+  onConnectionChange?: (state: string) => void;
 }) {
   return (
     <Suspense

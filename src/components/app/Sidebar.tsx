@@ -20,12 +20,19 @@ import {
   Search,
   Settings,
   ShieldCheck,
+  Star,
   Trash2,
   UserPlus,
   Users,
 } from "@/components/icons";
 import { useMemo, useState } from "react";
-import { Link, useMatch, useNavigate, useSearchParams } from "react-router";
+import {
+  Link,
+  NavLink,
+  useMatch,
+  useNavigate,
+  useSearchParams,
+} from "react-router";
 import { toast } from "sonner";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -60,6 +67,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { PERMISSIONS } from "@/lib/permissions";
 import { useUiStore } from "@/lib/store";
+import { useConversationFavorites } from "@/lib/conversationFavorites";
 import { cn } from "@/lib/utils";
 
 export function Sidebar({
@@ -70,7 +78,7 @@ export function Sidebar({
   onOpenSettings?: () => void;
 }) {
   return (
-    <div className="flex w-[calc(92vw-88px)] max-w-[21rem] shrink-0 flex-col border-r border-border/70 bg-sidebar md:w-[21rem]">
+    <div className="flex h-full w-[calc(92vw-76px)] max-w-[264px] shrink-0 flex-col border-r border-border/70 bg-sidebar md:w-[264px]">
       <div className="min-h-0 flex-1 overflow-y-auto">
         {activeServerId ? (
           <ServerSection serverId={activeServerId} />
@@ -199,7 +207,12 @@ function ServerSection({ serverId }: { serverId: string }) {
         {server.bannerUrl ? (
           <span className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/65 via-black/5 to-sidebar/95" />
         ) : null}
-        <div className="relative z-10 flex h-14 items-center gap-1 px-3 text-white drop-shadow">
+        <div
+          className={cn(
+            "relative z-10 flex h-14 items-center gap-1 px-3",
+            server.bannerUrl ? "text-white drop-shadow" : "text-foreground",
+          )}
+        >
           <div className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-1 py-2">
             {server.verified ? (
               <VerifiedCommunityBadge className="size-5" />
@@ -213,7 +226,7 @@ function ServerSection({ serverId }: { serverId: string }) {
               <button
                 type="button"
                 aria-label={`${server.name} menu`}
-                className="rounded-md p-2 text-lg text-white/80 hover:bg-black/20 hover:text-white"
+                className="rounded-md p-2 text-lg opacity-80 hover:bg-foreground/10 hover:opacity-100"
               >
                 ⌄
               </button>
@@ -715,6 +728,10 @@ function HomeSection() {
   const social = useQuery(api.social.list);
   const me = useQuery(api.users.me);
   const [query, setQuery] = useState("");
+  const [conversationFilter, setConversationFilter] = useState("all");
+  const favoritesByUser = useConversationFavorites((state) => state.byUser);
+  const toggleFavorite = useConversationFavorites((state) => state.toggle);
+  const favorites = favoritesByUser[me?.id ?? ""] ?? [];
   const [params] = useSearchParams();
   const [createGroupOpen, setCreateGroupOpen] = useState(false);
   const setSearchOpen = useUiStore((state) => state.setSearchOpen);
@@ -725,22 +742,36 @@ function HomeSection() {
 
   const pending =
     (social?.incoming.length ?? 0) + (social?.outgoing.length ?? 0);
-  const filtered = (conversations ?? []).filter((conversation) => {
-    if (!query.trim()) return true;
-    return conversationLabel(conversation, me?.id)
-      .toLowerCase()
-      .includes(query.toLowerCase());
-  });
+  const unreadCount = (conversations ?? []).filter(
+    (conversation) => conversation.unread,
+  ).length;
+  const filtered = (conversations ?? [])
+    .filter((conversation) => {
+      if (conversationFilter === "unread" && !conversation.unread) return false;
+      if (
+        conversationFilter === "favorites" &&
+        !favorites.includes(conversation.id)
+      )
+        return false;
+      if (!query.trim()) return true;
+      return conversationLabel(conversation, me?.id)
+        .toLowerCase()
+        .includes(query.trim().toLowerCase());
+    })
+    .sort(
+      (a, b) =>
+        Number(favorites.includes(b.id)) - Number(favorites.includes(a.id)),
+    );
 
   return (
     <div className="px-2 py-3">
-      <div className="-mx-2 -mt-3 mb-3 flex h-16 items-center border-b border-border/70 px-3">
+      <div className="-mx-2 -mt-3 mb-3 flex h-16 items-center border-b border-border/70 px-4">
         <button
           type="button"
           onClick={() => setSearchOpen(true)}
-          className="h-10 w-full rounded-md bg-background/70 px-3 text-left text-sm font-semibold text-foreground shadow-inner transition-colors hover:bg-background"
+          className="flex h-9 w-full items-center gap-2 rounded-lg border border-border bg-background/60 px-3 text-left text-xs text-muted-foreground transition-colors hover:border-primary/30 hover:text-foreground"
         >
-          Find or start a conversation
+          <Search className="size-3.5" /> Jump to a conversation
         </button>
       </div>
       <Link
@@ -748,7 +779,7 @@ function HomeSection() {
         className={cn(
           "mb-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm",
           friendsMatch && !findPeopleMatch
-            ? "bg-sidebar-accent font-medium text-foreground"
+            ? "bg-primary/12 font-semibold text-primary"
             : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground",
         )}
       >
@@ -795,20 +826,34 @@ function HomeSection() {
         <Compass className="size-4" />
         Discover
       </Link>
-      <Link
+      <NavLink
         to="/dashboard/bots"
-        className="mb-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground"
+        className={({ isActive }) =>
+          cn(
+            "mb-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm hover:bg-sidebar-accent/60",
+            isActive
+              ? "bg-primary/12 font-semibold text-primary"
+              : "text-muted-foreground hover:text-foreground",
+          )
+        }
       >
         <Compass className="size-4" />
         Bot directory
-      </Link>
-      <Link
+      </NavLink>
+      <NavLink
         to="/dashboard/developers"
-        className="mb-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground"
+        className={({ isActive }) =>
+          cn(
+            "mb-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm hover:bg-sidebar-accent/60",
+            isActive
+              ? "bg-primary/12 font-semibold text-primary"
+              : "text-muted-foreground hover:text-foreground",
+          )
+        }
       >
         <Hash className="size-4" />
         Developer portal
-      </Link>
+      </NavLink>
 
       {me && me.isPlatformTrialStaff && (
         <Link
@@ -833,12 +878,44 @@ function HomeSection() {
       </div>
 
       <div className="px-1 pb-2">
+        <div
+          role="group"
+          aria-label="Conversation filters"
+          className="mb-2 grid grid-cols-3 gap-0.5 rounded-lg bg-background/60 p-1"
+        >
+          {[
+            { label: "All messages", id: "all" },
+            { label: "Unread", id: "unread" },
+            { label: "Favorites", id: "favorites" },
+          ].map((filter) => (
+            <button
+              key={filter.label}
+              type="button"
+              aria-pressed={conversationFilter === filter.id}
+              onClick={() => setConversationFilter(filter.id)}
+              className={cn(
+                "flex items-center justify-center gap-1 rounded-md px-1 py-2 text-[10px] font-medium transition-colors",
+                conversationFilter === filter.id
+                  ? "bg-sidebar-accent text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {filter.label}
+              {filter.id === "unread" && unreadCount > 0 && (
+                <span className="rounded bg-primary/15 px-1 text-[10px] text-primary">
+                  {unreadCount}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
         <div className="relative">
           <Search className="absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search"
+            aria-label="Search direct messages"
             className="h-7 pl-7 text-xs"
           />
         </div>
@@ -850,7 +927,13 @@ function HomeSection() {
         </div>
       ) : filtered.length === 0 ? (
         <p className="px-2 py-4 text-xs leading-5 text-muted-foreground">
-          No conversations yet. Add a friend and start chatting.
+          {query.trim()
+            ? "No conversations match your search."
+            : conversationFilter === "favorites"
+              ? "Star a conversation to keep your favorite people close. Favorites stay on this device."
+              : conversationFilter === "unread"
+                ? "You're all caught up. New messages will appear here."
+                : "A good conversation starts with hello. Add a friend to get started."}
         </p>
       ) : (
         filtered.map((conversation) => {
@@ -862,54 +945,97 @@ function HomeSection() {
           // A call nobody picked up is called out in the list, not just in chat.
           const missedCall = conversation.lastMessagePreview === "Missed call";
           return (
-            <Link
+            <div
               key={conversation.id}
-              to={`/dashboard/dm/${conversation.id}`}
-              className="mb-1 flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm text-muted-foreground transition-colors hover:bg-sidebar-accent/70 hover:text-foreground"
+              className="group flex min-w-0 items-center gap-0.5"
             >
-              <UserAvatar
-                user={{
-                  id: conversation.id,
-                  name: label,
-                  avatarUrl:
-                    conversation.type === "dm"
-                      ? (other?.avatarUrl ?? null)
-                      : null,
-                  presence:
-                    conversation.type === "dm" && other
-                      ? other.presence
-                      : "offline",
-                }}
-                size="sm"
-                showStatus={conversation.type === "dm"}
-              />
-              <span className="min-w-0 flex-1">
-                {conversation.type === "dm" && other ? (
-                  <span className="flex items-center gap-1.5">
-                    <StyledDisplayName
-                      user={other}
-                      name={label}
-                      className="truncate"
-                    />
-                  </span>
-                ) : (
-                  <span className="block truncate font-semibold">{label}</span>
-                )}
-                {missedCall && (
-                  <span className="flex items-center gap-1 text-[11px] font-medium text-destructive">
-                    <PhoneOff className="size-3" /> Missed call
-                  </span>
-                )}
-              </span>
-              {conversation.unread && (
-                <span
-                  className={cn(
-                    "size-2 shrink-0 rounded-full",
-                    missedCall ? "bg-destructive" : "bg-foreground",
-                  )}
+              <NavLink
+                to={`/dashboard/dm/${conversation.id}`}
+                className={({ isActive }) =>
+                  cn(
+                    "mb-1 flex min-w-0 flex-1 items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-sm transition-colors hover:bg-sidebar-accent/70 hover:text-foreground",
+                    isActive
+                      ? "bg-sidebar-accent text-foreground"
+                      : "text-muted-foreground",
+                  )
+                }
+              >
+                <UserAvatar
+                  user={{
+                    id:
+                      conversation.type === "dm" && other
+                        ? other.id
+                        : conversation.id,
+                    name: label,
+                    avatarUrl:
+                      conversation.type === "dm"
+                        ? (other?.avatarUrl ?? null)
+                        : null,
+                    presence:
+                      conversation.type === "dm" && other
+                        ? other.presence
+                        : "offline",
+                  }}
+                  size="sm"
+                  showStatus={conversation.type === "dm"}
                 />
-              )}
-            </Link>
+                <span className="min-w-0 flex-1">
+                  {conversation.type === "dm" && other ? (
+                    <span className="flex items-center gap-1.5">
+                      <StyledDisplayName
+                        user={other}
+                        name={label}
+                        className="truncate"
+                      />
+                    </span>
+                  ) : (
+                    <span className="block truncate font-semibold">
+                      {label}
+                    </span>
+                  )}
+                  {missedCall && (
+                    <span className="flex items-center gap-1 text-[11px] font-medium text-destructive">
+                      <PhoneOff className="size-3" /> Missed call
+                    </span>
+                  )}
+                  {!missedCall && conversation.lastMessagePreview && (
+                    <span className="block truncate pt-0.5 text-[11px] text-muted-foreground">
+                      {conversation.lastMessagePreview}
+                    </span>
+                  )}
+                </span>
+                {conversation.unread && (
+                  <span
+                    className={cn(
+                      "size-2 shrink-0 rounded-full",
+                      missedCall ? "bg-destructive" : "bg-foreground",
+                    )}
+                  />
+                )}
+              </NavLink>
+              <button
+                type="button"
+                aria-label={`${favorites.includes(conversation.id) ? "Unfavorite" : "Favorite"} ${label}`}
+                aria-pressed={favorites.includes(conversation.id)}
+                title="Favorite on this device"
+                onClick={() => me && toggleFavorite(me.id, conversation.id)}
+                className={cn(
+                  "mr-1 shrink-0 rounded-lg p-1.5 hover:bg-sidebar-accent focus-visible:opacity-100",
+                  favorites.includes(conversation.id)
+                    ? "text-primary"
+                    : "text-muted-foreground/60 hover:text-primary",
+                )}
+              >
+                <Star
+                  className="size-3.5"
+                  fill={
+                    favorites.includes(conversation.id)
+                      ? "currentColor"
+                      : "none"
+                  }
+                />
+              </button>
+            </div>
           );
         })
       )}

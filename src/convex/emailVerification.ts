@@ -41,9 +41,11 @@ export const verifyCode = action({
     if (!EMAIL_RE.test(clean) || !/^\d{6}$/.test(digits)) {
       throw new Error("Enter the 6-digit code from your email.");
     }
-    return await ctx.runMutation(verifyEmailCodeRef, {
+    const verification = await ctx.runMutation(verifyEmailCodeRef, {
       email: clean,
       code: digits,
     });
+    if (!verification.ok) throw new Error(verification.error);
+    return verification;
   },
 });

@@ -1,13 +1,5 @@
 import { useMutation, useQuery } from "convex/react";
-import {
-  Bell,
-  Home,
-  Loader2,
-  Menu,
-  Search,
-  User,
-  Users,
-} from "@/components/icons";
+import { Bell, Home, Loader2, Menu, Search, User } from "@/components/icons";
 import { useEffect, useRef, type ReactNode } from "react";
 import {
   useLocation,
@@ -25,6 +17,8 @@ import { ServerRail } from "@/components/app/ServerRail";
 import { SettingsDialog } from "@/components/app/Settings";
 import { Sidebar } from "@/components/app/Sidebar";
 import { IncomingCallBanner } from "@/components/app/Voice";
+import { ConnectionBanner } from "@/components/app/ConnectionBanner";
+import { QuickAppearance } from "@/components/app/QuickAppearance";
 import { KyroMark } from "@/components/KyroMark";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { useAuth } from "@/hooks/use-auth";
@@ -176,6 +170,11 @@ export function AppShell({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [setSearchOpen]);
 
+  // A selected destination should be visible immediately on phones.
+  useEffect(() => {
+    setMobileNav(false);
+  }, [location.pathname, location.search, setMobileNav]);
+
   if (isLoading || !user) {
     return (
       <div className="flex h-dvh items-center justify-center bg-background">
@@ -199,29 +198,54 @@ export function AppShell({ children }: { children: ReactNode }) {
   );
   const desktopTitle = location.pathname.startsWith("/dashboard/admin")
     ? "Admin Portal"
-    : location.pathname === "/dashboard"
-      ? "Friends"
-      : activeServerId
-        ? "Community"
-        : "Direct Messages";
+    : location.pathname.startsWith("/dashboard/discover")
+      ? "Discover"
+      : location.pathname.startsWith("/dashboard/developers")
+        ? "Developer portal"
+        : location.pathname.startsWith("/dashboard/bots")
+          ? "Bot directory"
+          : location.pathname === "/dashboard"
+            ? "Friends"
+            : activeServerId
+              ? "Community"
+              : "Direct Messages";
 
   return (
     <div className="kyro-app-shell flex h-dvh w-full flex-col overflow-hidden bg-background text-foreground">
-      <div className="relative hidden h-10 shrink-0 items-center justify-center border-b border-border bg-[#232428] px-4 md:flex">
-        <span className="flex items-center gap-2 text-sm font-medium text-foreground">
-          {desktopTitle === "Friends" ? (
-            <Users className="size-4 text-muted-foreground" />
-          ) : (
-            <KyroMark className="size-4" />
-          )}
-          {desktopTitle}
+      <div className="hidden h-14 shrink-0 items-center gap-5 border-b border-border/70 bg-rail px-5 md:flex">
+        <button
+          type="button"
+          onClick={() => navigate("/dashboard")}
+          aria-label="Kyro home"
+          className="flex items-center gap-2.5 text-xl font-extrabold tracking-tight"
+        >
+          <KyroMark className="size-7" /> kyro
+          <span className="text-primary">.</span>
+        </button>
+        <span className="h-4 w-px bg-border" />
+        <span className="text-xs text-muted-foreground">{desktopTitle}</span>
+        <button
+          type="button"
+          onClick={() => setSearchOpen(true)}
+          className="mx-auto flex h-8 w-full max-w-sm items-center gap-2 rounded-lg border border-border bg-background/60 px-3 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+          aria-label="Search Kyro"
+        >
+          <Search className="size-3.5" />
+          <span className="flex-1 text-left">Find your next conversation</span>
+          <kbd className="rounded border border-border px-1.5 py-0.5 text-[10px]">
+            Ctrl K
+          </kbd>
+        </button>
+        <span className="hidden text-[10px] font-medium tracking-[.16em] text-muted-foreground xl:block">
+          YOUR PEOPLE. YOUR PLACE.
         </span>
+        <QuickAppearance />
         <button
           type="button"
           aria-label="Inbox"
           title="Inbox"
           onClick={() => setInboxOpen(!inboxOpen)}
-          className="absolute right-4 rounded-md p-1.5 text-muted-foreground hover:bg-surface hover:text-foreground"
+          className="relative rounded-lg p-2 text-muted-foreground hover:bg-surface hover:text-foreground"
         >
           <Bell className="size-4" />
           {(unread ?? 0) > 0 ? (
@@ -229,6 +253,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           ) : null}
         </button>
       </div>
+      <ConnectionBanner />
       <div className="flex min-h-0 flex-1">
         <div className="hidden md:flex">{rail}</div>
         <div className="hidden md:flex">{sidebar}</div>
@@ -249,6 +274,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </span>
 
             <div className="ml-auto flex items-center gap-1">
+              <QuickAppearance />
               <button
                 type="button"
                 aria-label="Search Kyro"
@@ -338,7 +364,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         >
           <SheetTitle className="sr-only">Navigation</SheetTitle>
           <div className="flex h-full">
-            <div className="w-[88px] shrink-0 overflow-y-auto">{rail}</div>
+            <div className="w-[76px] shrink-0 overflow-y-auto">{rail}</div>
             <div className="min-w-0 flex-1">{sidebar}</div>
           </div>
         </SheetContent>

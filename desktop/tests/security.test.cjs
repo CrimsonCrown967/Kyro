@@ -6,11 +6,13 @@ const {
   canRequestPermission,
 } = require("../dist/security.js");
 
-test("only the exact HTTPS Kyro origin may run in the app", () => {
+test("both exact HTTPS Kyro origins support canonical redirects", () => {
   for (const url of [
     "https://kyro-chat.cyou",
     "https://kyro-chat.cyou/dashboard?invite=abc",
     "https://kyro-chat.cyou:443/auth",
+    "https://www.kyro-chat.cyou/dashboard",
+    "https://www.kyro-chat.cyou:443/auth",
   ]) {
     assert.equal(isKyroUrl(url), true, url);
   }
@@ -21,6 +23,11 @@ test("only the exact HTTPS Kyro origin may run in the app", () => {
     "https://kyro-chat.cyou@evil.test",
     "https://user:pass@kyro-chat.cyou",
     "https://kyro-chat.cyou:444",
+    "https://www.kyro-chat.cyou.evil.test",
+    "https://www.kyro-chat.cyou:444",
+    "http://www.kyro-chat.cyou",
+    "https://user:pass@www.kyro-chat.cyou",
+    "https://preview.kyro-chat.cyou",
     "file:///C:/Windows/system.ini",
     "javascript:alert(1)",
     "about:blank",
@@ -58,6 +65,18 @@ test("sensitive permissions require the Kyro main frame and explicit allowlist",
     "fullscreen",
     "clipboard-sanitized-write",
   ]) {
+    assert.equal(
+      canRequestPermission(
+        "https://www.kyro-chat.cyou/dashboard",
+        true,
+        permission,
+      ),
+      true,
+    );
+    assert.equal(
+      canRequestPermission("https://www.kyro-chat.cyou", false, permission),
+      false,
+    );
     assert.equal(
       canRequestPermission(
         "https://kyro-chat.cyou/dashboard",

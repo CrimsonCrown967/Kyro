@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
+import type { Doc } from "./_generated/dataModel";
 import {
   internalMutation,
   mutation,
@@ -32,6 +33,23 @@ const RETRY_DELAYS = [
   60 * 60_000,
   6 * 60 * 60_000,
 ];
+
+async function codeDeliveryIssue(ctx: MutationCtx, row: Doc<"emailOutbox">) {
+  if (
+    row.template !== "password_reset" &&
+    row.template !== "email_verification"
+  )
+    return null;
+  const reset = row.template === "password_reset";
+  const prefix = reset ? "password-reset:" : "email-verification:";
+  const table = reset ? "passwordResetCodes" : "emailVerificationCodes";
+  const codeId = row.eventKey.startsWith(prefix)
+    ? ctx.db.normalizeId(table, row.eventKey.slice(prefix.length))
+    : null;
+  const record = codeId ? await ctx.db.get(codeId) : null;
+  if (!record || record.email !== row.to) return "CODE_SUPERSEDED";
+  return record.expiresAt <= Date.now() ? "CODE_EXPIRED" : null;
+}
 
 function safeEmail(value: string): string | null {
   const clean = value.trim().toLowerCase();
@@ -125,6 +143,17 @@ export const claim = internalMutation({
     if (row.status === "sending" && (row.lockedAt ?? 0) > now - LOCK_MS) {
       return null;
     }
+    const issue = await codeDeliveryIssue(ctx, row);
+    if (issue) {
+      await ctx.db.patch(outboxId, {
+        status: "dead",
+        lastErrorCode: issue,
+        payload: "{}",
+        lockedAt: undefined,
+        updatedAt: now,
+      });
+      return null;
+    }
     await ctx.db.patch(outboxId, {
       status: "sending",
       attempts: row.attempts + 1,
@@ -154,6 +183,9 @@ export const markSent = internalMutation({
       status: "sent",
       providerMessageId: providerMessageId.slice(0, 300),
       sentAt: now,
+      ...(["password_reset", "email_verification"].includes(row.template)
+        ? { payload: "{}" }
+        : {}),
       lockedAt: undefined,
       lastErrorCode: undefined,
       updatedAt: now,
@@ -339,6 +371,11 @@ export const retry = mutation({
     const row = await ctx.db.get(outboxId);
     if (!row || (row.status !== "failed" && row.status !== "dead")) {
       throw new Error("That email is not available for retry.");
+    }
+    if (await codeDeliveryIssue(ctx, row)) {
+      throw new Error(
+        "This code has expired or was replaced. Request a new code from the sign-in page.",
+      );
     }
     const now = Date.now();
     await ctx.db.patch(outboxId, {

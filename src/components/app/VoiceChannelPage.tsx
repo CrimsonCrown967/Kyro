@@ -4,14 +4,19 @@ import { useNavigate } from "react-router";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
-import { Headphones, Loader2, Volume2 } from "@/components/icons";
+import {
+  Headphones,
+  Loader2,
+  Volume2,
+  Mic,
+  MonitorSmartphone,
+} from "@/components/icons";
 import { VoiceRoster } from "@/components/app/Voice";
 import { LiveKitVoiceRoomLoader as VoiceRoom } from "@/components/app/LiveKitVoiceRoomLoader";
 
 /**
- * A community voice channel: drop in, talk, drop out. The room auto-joins on
- * open — the same feel as clicking a voice channel in any game chat — and the
- * strip at the bottom carries mute, deafen and leave.
+ * Preview a voice room before joining. The transport reports the actual
+ * connection state; choosing a channel never turns on the microphone itself.
  */
 export function VoiceChannelPage({
   serverId,
@@ -24,7 +29,8 @@ export function VoiceChannelPage({
   const channels = useQuery(api.channels.list, {
     serverId: serverId as Id<"servers">,
   });
-  const [joined, setJoined] = useState(true);
+  const [joined, setJoined] = useState(false);
+  const [connection, setConnection] = useState("disconnected");
 
   if (channels === undefined) {
     return (
@@ -67,36 +73,73 @@ export function VoiceChannelPage({
             Live voice channel — everyone here can talk.
           </p>
         </div>
-        <span className="hidden items-center gap-1.5 rounded-full border border-success/40 bg-success/10 px-2.5 py-1 text-xs font-semibold text-success sm:flex">
+        <span
+          className="hidden items-center gap-1.5 rounded-full border border-border bg-surface px-2.5 py-1 text-xs font-semibold text-muted-foreground sm:flex"
+          role="status"
+        >
           <Headphones className="size-3.5" />
-          {joined ? "Connected" : "Not connected"}
+          {!joined
+            ? "Voice preview"
+            : connection === "connected"
+              ? "Connected"
+              : connection.toLowerCase().includes("reconnect")
+                ? "Reconnecting…"
+                : "Connecting…"}
         </span>
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-5 sm:p-6">
+        <section className="voice-welcome mb-8 rounded-3xl border border-primary/15 p-6 sm:p-9">
+          <div className="mb-5 grid size-14 place-items-center rounded-2xl bg-primary/15 text-primary">
+            <Headphones className="size-7" />
+          </div>
+          <p className="text-[10px] font-semibold uppercase tracking-[.2em] text-primary">
+            A little closer, together
+          </p>
+          <h1 className="mt-3 text-3xl font-bold tracking-tight">
+            {channel.name}
+          </h1>
+          <p className="mt-3 max-w-md text-sm leading-6 text-muted-foreground">
+            {channel.topic ||
+              "Good company doesn't need a reason. Drop in, share your screen, or stay and listen."}
+          </p>
+          <div className="mt-5 flex flex-wrap gap-4 text-xs text-muted-foreground">
+            <span className="flex items-center gap-2">
+              <Mic className="size-4" /> Voice & video
+            </span>
+            <span className="flex items-center gap-2">
+              <MonitorSmartphone className="size-4" /> Screen sharing
+            </span>
+          </div>
+          {!joined && (
+            <Button
+              className="mt-7 rounded-xl px-6"
+              onClick={() => setJoined(true)}
+            >
+              <Headphones className="mr-2 size-4" /> Join voice
+            </Button>
+          )}
+          {!joined && (
+            <p className="mt-3 text-xs text-muted-foreground">
+              Previewing the room. Your microphone is off.
+            </p>
+          )}
+        </section>
         <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           In this channel
         </h2>
         <VoiceRoster containerType="channel" containerId={channelId} />
-
-        {!joined && (
-          <div className="mt-6 rounded-xl border border-border/70 bg-surface p-5 text-center">
-            <p className="text-sm text-muted-foreground">
-              You left the voice channel.
-            </p>
-            <Button className="mt-3" onClick={() => setJoined(true)}>
-              Rejoin voice
-            </Button>
-          </div>
-        )}
       </div>
 
-      <VoiceRoom
-        containerType="channel"
-        containerId={channelId}
-        active={joined}
-        onLeave={() => setJoined(false)}
-      />
+      {joined && (
+        <VoiceRoom
+          containerType="channel"
+          containerId={channelId}
+          active={joined}
+          onLeave={() => setJoined(false)}
+          onConnectionChange={setConnection}
+        />
+      )}
     </div>
   );
 }

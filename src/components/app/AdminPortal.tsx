@@ -440,8 +440,8 @@ function EmailDeliveryTab({ canModerate }: { canModerate: boolean }) {
         <h2 className="text-lg font-semibold">Email delivery</h2>
         <p className="mt-1 text-sm text-muted-foreground">
           Failed SMTP deliveries are retained without exposing message content
-          or recipient addresses. Retrying reuses the same event id, preventing
-          duplicate moderation notifications.
+          or recipient addresses. Retrying reuses the original event id so each
+          delivery can be traced to its moderation action.
         </p>
       </div>
       {failures === undefined ? (
@@ -471,7 +471,10 @@ function EmailDeliveryTab({ canModerate }: { canModerate: boolean }) {
               <span className="rounded-full border border-destructive/30 bg-destructive/10 px-2 py-0.5 text-[10px] font-bold uppercase text-destructive">
                 {failure.status}
               </span>
-              {canModerate ? (
+              {canModerate &&
+              !["CODE_EXPIRED", "CODE_SUPERSEDED"].includes(
+                failure.lastErrorCode,
+              ) ? (
                 <Button
                   size="sm"
                   variant="outline"

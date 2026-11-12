@@ -582,12 +582,12 @@ export function Composer({
 
       <div
         className={cn(
-          "relative flex items-end gap-1 rounded-2xl border border-input bg-panel/90 px-2.5 py-2 shadow-[0_8px_30px_rgba(0,0,0,.13)] backdrop-blur-xl focus-within:border-primary/70 focus-within:ring-1 focus-within:ring-primary/25",
+          "relative flex flex-wrap items-end gap-1 rounded-2xl border border-border bg-panel px-2.5 py-2 shadow-[0_4px_20px_rgba(0,0,0,.08)] transition-shadow focus-within:border-primary/60 focus-within:ring-2 focus-within:ring-primary/10 sm:flex-nowrap",
           (attachments.length > 0 || reply) && "rounded-t-none",
         )}
       >
         <label
-          className="cursor-pointer rounded-md p-2 text-muted-foreground hover:bg-background hover:text-foreground"
+          className="cursor-pointer rounded-md p-2 text-muted-foreground hover:bg-background hover:text-foreground focus-within:ring-2 focus-within:ring-primary"
           title="Attach files"
         >
           <Paperclip className="size-4" />
@@ -595,7 +595,8 @@ export function Composer({
             type="file"
             multiple
             accept={ACCEPTED_UPLOAD}
-            className="hidden"
+            aria-label="Attach files"
+            className="sr-only"
             onChange={(event) => {
               void addFiles(event.target.files);
               event.target.value = "";
@@ -682,7 +683,8 @@ export function Composer({
             }
           }}
           placeholder="Message…"
-          className="max-h-56 min-h-9 flex-1 resize-none bg-transparent py-1.5 text-sm leading-6 outline-none placeholder:text-muted-foreground"
+          aria-label="Message"
+          className="order-first max-h-56 min-h-9 min-w-0 flex-1 basis-full resize-none bg-transparent px-1 py-1.5 text-sm leading-6 text-foreground outline-none placeholder:text-muted-foreground sm:order-none sm:basis-0 sm:px-0"
         />
 
         {selection && mentionQuery === null ? (
@@ -911,7 +913,7 @@ export function Composer({
             (!draft.trim() && attachments.length === 0)
           }
           aria-label="Send message"
-          className="text-primary hover:bg-primary/10"
+          className="ml-auto text-primary hover:bg-primary/10 sm:ml-0"
         >
           <Send className="size-4" />
         </Button>

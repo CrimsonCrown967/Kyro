@@ -9,11 +9,7 @@ import {
   MonitorSmartphone,
 } from "@/components/icons";
 import { KyroMark, KyroWordmark } from "@/components/KyroMark";
-import {
-  DESKTOP_VERSION,
-  WINDOWS_DOWNLOAD_URL,
-  DESKTOP_RELEASE_URL,
-} from "@/lib/desktop";
+import { DESKTOP_VERSION, WINDOWS_DOWNLOAD_URL } from "@/lib/desktop";
 
 export default function DownloadPage() {
   const reducedMotion = useReducedMotion();
@@ -62,8 +58,7 @@ export default function DownloadPage() {
               Windows 10 / 11 · 64-bit (x64) · Version {DESKTOP_VERSION}
             </p>
             <p className="mt-2 max-w-md text-xs leading-5 text-[#A0A6B5]">
-              Downloads currently require a GitHub account with access to the
-              private Kyro repository.
+              The download opens on MediaFire. No GitHub account is needed.
             </p>
             <div className="mt-7 flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-300">
               {[
@@ -227,13 +222,7 @@ export default function DownloadPage() {
           <p className="mt-6 border-t border-white/5 pt-5 text-xs leading-6 text-[#A0A6B5]">
             Internet connection required. This first release is not code signed,
             so Windows may identify the publisher as unknown. Download only from
-            this page or the official Kyro GitHub download release.{" "}
-            <a
-              href={DESKTOP_RELEASE_URL}
-              className="text-indigo-300 underline underline-offset-4"
-            >
-              Release notes & checksum
-            </a>
+            the download linked on this page.
           </p>
         </section>
       </main>

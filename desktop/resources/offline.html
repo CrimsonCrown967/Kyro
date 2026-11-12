@@ -5,22 +5,43 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'"
+      content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'"
     />
     <title>Connect to Kyro</title>
     <link rel="stylesheet" href="shell.css" />
+    <script src="offline.js" defer></script>
   </head>
   <body class="offline">
-    <main>
-      <img src="icon.png" width="80" height="80" alt="Kyro" />
-      <p class="eyebrow">KYRO FOR WINDOWS</p>
-      <h1>Let's get you connected.</h1>
-      <p>
-        Kyro couldn't reach the server. Check your internet connection, then try
-        again.
+    <div class="shell-brand">
+      <img src="icon.png" width="32" height="32" alt="" /> kyro
+      <span>FOR WINDOWS</span>
+    </div>
+    <main class="connection-card">
+      <div class="connection-orbit" aria-hidden="true">
+        <img src="icon.png" width="88" height="88" alt="" /><span></span>
+      </div>
+      <p class="eyebrow">A LITTLE PAUSE IN THE CONVERSATION</p>
+      <h1>We'll be right back.</h1>
+      <p id="connection-detail">
+        We couldn't reach Kyro just now. The service may be temporarily
+        unavailable, even if your internet is working.
       </p>
-      <a class="primary" href="https://kyro-chat.cyou/dashboard">Try again</a>
-      <p class="hint">Your account stays signed in on this PC.</p>
+      <div class="connection-status">
+        <span class="status-dot"></span
+        ><span id="retry-status" role="status"
+          >Reconnecting in 15 seconds…</span
+        >
+      </div>
+      <a id="retry" class="primary" href="https://www.kyro-chat.cyou/dashboard"
+        >Try again <span aria-hidden="true">↗</span></a
+      >
+      <p class="hint">Your saved sign-in data stays on this PC.</p>
+      <details class="connection-help">
+        <summary>Connection details</summary>
+        <p id="connection-code">Connecting to www.kyro-chat.cyou</p>
+        <p>If this continues, try opening kyro-chat.cyou in your browser.</p>
+      </details>
     </main>
+    <div class="shell-caption">Your people. Your place. <span>Kyro.</span></div>
   </body>
 </html>

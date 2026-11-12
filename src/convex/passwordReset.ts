@@ -64,10 +64,11 @@ export const resetPassword = action({
     if (!account?.hasPassword) {
       throw new Error("That code is no longer valid. Request a new one.");
     }
-    await ctx.runMutation(passwordResetVerifyRef, {
+    const verification = await ctx.runMutation(passwordResetVerifyRef, {
       email: clean,
       code: digits,
     });
+    if (!verification.ok) throw new Error(verification.error);
     await modifyAccountCredentials(ctx, {
       provider: "password",
       account: { id: clean, secret: newPassword },

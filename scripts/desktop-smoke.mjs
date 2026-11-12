@@ -13,7 +13,12 @@ let app;
 const launch = () =>
   electron.launch({
     executablePath,
-    args: ["--use-fake-device-for-media-stream"],
+    args: [
+      ...(path.basename(executablePath).toLowerCase() === "electron.exe"
+        ? [path.resolve("desktop")]
+        : []),
+      "--use-fake-device-for-media-stream",
+    ],
     env: {
       ...process.env,
       KYRO_DESKTOP_SMOKE_TEST: "1",
@@ -77,6 +82,40 @@ try {
   );
   console.log(
     "PASS: packaged startup, renderer isolation and persistent profile",
+  );
+
+  // Real deployment redirects the apex to www; this was the startup failure.
+  await app.evaluate(async ({ BrowserWindow }) => {
+    await BrowserWindow.getAllWindows()[0].loadURL(
+      "https://kyro-chat.cyou/dashboard",
+    );
+  });
+  await page.waitForURL("https://www.kyro-chat.cyou/dashboard");
+  await expect(
+    page.getByRole("button", { name: /sign in/i }).first(),
+  ).toBeVisible();
+  await app.evaluate(({ BrowserWindow }) => {
+    const contents = BrowserWindow.getAllWindows()[0].webContents;
+    contents.emit(
+      "did-fail-load",
+      {},
+      -3,
+      "ERR_ABORTED",
+      "https://www.kyro-chat.cyou/dashboard",
+      true,
+    );
+    contents.emit(
+      "did-fail-load",
+      {},
+      -105,
+      "ERR_NAME_NOT_RESOLVED",
+      "https://www.kyro-chat.cyou/embed",
+      false,
+    );
+  });
+  assert.match(page.url(), /^https:\/\/www\.kyro-chat\.cyou/);
+  console.log(
+    "PASS: canonical redirect, aborted navigation and subframe failures",
   );
 
   await app.evaluate(({ dialog, desktopCapturer, nativeImage, shell }) => {
@@ -165,6 +204,8 @@ try {
       picker.getByRole("button", { name: "Share", exact: true }),
     ).toBeEnabled();
     await picker.getByRole("button", { name: "Cancel", exact: true }).click();
+    await expect.poll(() => picker.isClosed()).toBe(true);
+    await expect.poll(() => app.windows().length).toBe(1);
     await expect
       .poll(() => page.evaluate(() => window.smokeShareResult))
       .not.toBe("pending");
@@ -182,7 +223,8 @@ try {
       await registration.unregister();
     for (const name of await caches.keys()) await caches.delete(name);
   });
-  await page.route("https://kyro-chat.cyou/**", (route) =>
+  const kyroRequests = /^https:\/\/(www\.)?kyro-chat\.cyou\//;
+  await page.route(kyroRequests, (route) =>
     route.abort("internetdisconnected"),
   );
   await app.evaluate(async ({ BrowserWindow, Menu }) => {
@@ -197,14 +239,101 @@ try {
     Menu.getApplicationMenu().items[0].submenu.items[0].click();
   });
   await expect(
-    page.getByRole("heading", { name: "Let's get you connected." }),
+    page.getByRole("heading", { name: "We'll be right back." }),
   ).toBeVisible({ timeout: 30000 });
-  await page.unroute("https://kyro-chat.cyou/**");
+  await page.screenshot({ path: "test-results/desktop-reconnect.png" });
+  await page.unroute(kyroRequests);
   await page.getByRole("link", { name: "Try again" }).click();
   await expect(
     page.getByRole("button", { name: /sign in/i }).first(),
   ).toBeVisible({ timeout: 60000 });
   console.log("PASS: offline page and retry recovery");
+
+  // Emulate an actual offline network (page interception can be lost when
+  // Chromium swaps renderers between the local recovery file and HTTPS).
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Network.enable");
+  await cdp.send("Network.setBypassServiceWorker", { bypass: true });
+  await page.evaluate(async () => {
+    for (const registration of await navigator.serviceWorker.getRegistrations())
+      await registration.unregister();
+    for (const name of await caches.keys()) await caches.delete(name);
+  });
+  await app.evaluate(async ({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows()[0];
+    await w.loadURL("about:blank");
+    await w.webContents.session.clearStorageData({
+      storages: ["serviceworkers", "cachestorage"],
+    });
+    await w.webContents.session.clearCache();
+    w.webContents.session.enableNetworkEmulation({ offline: true });
+    w.webContents.session.webRequest.onBeforeRequest(
+      { urls: ["https://www.kyro-chat.cyou/*"] },
+      (_details, callback) => callback({ cancel: true }),
+    );
+    globalThis.recoveryFailures = 0;
+    globalThis.recoveryEvents = [];
+    w.webContents.on("did-navigate", (_event, url) =>
+      globalThis.recoveryEvents.push(["navigate", url]),
+    );
+    w.webContents.on(
+      "did-fail-load",
+      (_event, code, _description, _url, mainFrame) => {
+        globalThis.recoveryEvents.push(["fail", code, _url, mainFrame]);
+        if (mainFrame && code !== -3) globalThis.recoveryFailures++;
+      },
+    );
+    await w
+      .loadURL("https://www.kyro-chat.cyou/auth?recovery-smoke=1")
+      .catch(() => {});
+  });
+  await expect(
+    page.getByRole("heading", { name: "We'll be right back." }),
+  ).toBeVisible({ timeout: 30000 });
+  await expect
+    .poll(() => app.evaluate(() => globalThis.recoveryFailures), {
+      timeout: 25000,
+    })
+    .toBeGreaterThanOrEqual(2);
+  await app.evaluate(({ BrowserWindow }) => {
+    const profile = BrowserWindow.getAllWindows()[0].webContents.session;
+    profile.webRequest.onBeforeRequest(null);
+    profile.disableNetworkEmulation();
+  });
+  await expect(page.getByText("Welcome to Kyro", { exact: true })).toBeVisible({
+    timeout: 45000,
+  });
+  assert.match(page.url(), /\/auth\?recovery-smoke=1$/);
+  console.log("PASS: automatic reconnect preserves the failed route");
+  await app.evaluate(({ BrowserWindow }) => {
+    BrowserWindow.getAllWindows()[0].webContents.emit(
+      "did-fail-load",
+      {},
+      -202,
+      "ERR_CERT_AUTHORITY_INVALID",
+      "https://www.kyro-chat.cyou/auth?recovery-smoke=1",
+      true,
+    );
+  });
+  await expect(page.getByText("Waiting for a secure connection")).toBeVisible();
+  await page.getByText("Connection details", { exact: true }).click();
+  await expect(page.locator("#connection-code")).toContainText("-202");
+  await page.clock.install();
+  await page.clock.fastForward(16000);
+  await page.evaluate(() => window.dispatchEvent(new Event("online")));
+  await expect(page.getByText("Waiting for a secure connection")).toBeVisible();
+  await page.getByRole("link", { name: "Try again" }).click();
+  await expect(page.getByText("Welcome to Kyro", { exact: true })).toBeVisible({
+    timeout: 60000,
+  });
+  assert.match(page.url(), /\/auth\?recovery-smoke=1$/);
+  console.log("PASS: certificate guidance, diagnostics and manual recovery");
+} catch (error) {
+  console.error(
+    "Desktop recovery events:",
+    await app?.evaluate(() => globalThis.recoveryEvents ?? []),
+  );
+  throw error;
 } finally {
   if (app) await app.close().catch(() => {});
   // Only remove the dedicated profile created by this invocation.

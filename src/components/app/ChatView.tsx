@@ -126,8 +126,8 @@ function ChatSurface({
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-background">
-      <div className="flex h-[3.75rem] shrink-0 items-center gap-2.5 border-b border-border/70 bg-panel px-4 shadow-sm">
-        <span className="flex size-7 items-center justify-center text-muted-foreground">
+      <div className="flex h-16 shrink-0 items-center gap-2.5 border-b border-border/70 bg-background px-4 sm:px-6">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
           {icon}
         </span>
         <div className="min-w-0 flex-1">
@@ -379,6 +379,7 @@ export function ChannelChat({
     <div className="flex h-full min-h-0">
       <div className="min-w-0 flex-1">
         <ChatSurface
+          key={channel.id}
           containerType="channel"
           containerId={channel.id}
           serverId={serverId}
@@ -436,6 +437,7 @@ export function DirectChat({ conversationId }: { conversationId: string }) {
 
   return (
     <ChatSurface
+      key={conversation.id}
       containerType="conversation"
       containerId={conversation.id}
       title={title}

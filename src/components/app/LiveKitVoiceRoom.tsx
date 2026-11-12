@@ -119,11 +119,13 @@ export function LiveKitVoiceRoom({
   containerId,
   active,
   onLeave,
+  onConnectionChange,
 }: {
   containerType: ContainerType;
   containerId: string;
   active: boolean;
   onLeave: () => void;
+  onConnectionChange?: (state: string) => void;
 }) {
   const me = useQuery(api.users.me);
   const roster = useQuery(
@@ -187,6 +189,9 @@ export function LiveKitVoiceRoom({
   useEffect(() => {
     onLeaveRef.current = onLeave;
   }, [onLeave]);
+  useEffect(() => {
+    onConnectionChange?.(connection);
+  }, [connection, onConnectionChange]);
 
   const refreshDevices = async () => {
     if (!navigator.mediaDevices?.enumerateDevices) return;

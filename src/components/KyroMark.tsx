@@ -1,9 +1,7 @@
 import { cn } from "@/lib/utils";
 
-/** Kyro's official logo, served from the brand CDN. Used everywhere the
- *  product shows its mark — nav, auth, the server rail and the favicon. */
-export const KYRO_LOGO_URL =
-  "https://cdn.phototourl.com/member/2026-10-25-b9fdf73c-e92d-4a0c-aa3e-05b28a0699df.png";
+/** Ship the brand mark with Kyro so a third-party outage cannot break it. */
+export const KYRO_LOGO_URL = "/logo-192.png";
 
 export function KyroMark({ className }: { className?: string }) {
   return (

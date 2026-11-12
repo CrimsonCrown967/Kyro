@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { internalAction } from "./functions";
+import { emailDispatchUrl } from "./emailDispatchUrl";
 import {
   claimEmailRef,
   markEmailFailedRef,
@@ -28,14 +29,7 @@ export const deliver = internalAction({
     }
     let url: URL;
     try {
-      url = new URL(endpoint);
-      if (
-        url.protocol !== "https:" ||
-        url.hostname !== "kyro-chat.cyou" ||
-        url.pathname !== "/api/email/dispatch"
-      ) {
-        throw new Error("unsafe endpoint");
-      }
+      url = emailDispatchUrl(endpoint);
     } catch {
       await ctx.runMutation(markEmailFailedRef, {
         outboxId,
@@ -48,6 +42,7 @@ export const deliver = internalAction({
       const payload = JSON.parse(email.payload) as Record<string, unknown>;
       const response = await fetch(url, {
         method: "POST",
+        redirect: "manual",
         headers: {
           Authorization: `Bearer ${secret}`,
           "Content-Type": "application/json",
@@ -60,6 +55,13 @@ export const deliver = internalAction({
         }),
         signal: AbortSignal.timeout(25_000),
       });
+      if (response.status >= 300 && response.status < 400) {
+        await ctx.runMutation(markEmailFailedRef, {
+          outboxId,
+          errorCode: "DISPATCH_REDIRECT",
+        });
+        return;
+      }
       const result = (await response.json().catch(() => null)) as {
         ok?: boolean;
         messageId?: string;

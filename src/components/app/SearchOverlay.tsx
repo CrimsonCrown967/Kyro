@@ -3,6 +3,8 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import {
   Hash,
+  ArrowRight,
+  Star,
   Loader2,
   MessagesSquare,
   Search,
@@ -25,10 +27,20 @@ import {
 import { Input } from "@/components/ui/input";
 import { formatRelative } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { useConversationFavorites } from "@/lib/conversationFavorites";
+import {
+  Command,
+  CommandInput,
+  CommandList,
+  CommandGroup,
+  CommandItem,
+  CommandEmpty,
+} from "@/components/ui/command";
 
-type Section = "people" | "messages" | "communities";
+type Section = "jump" | "people" | "messages" | "communities";
 
 const SECTIONS: { id: Section; label: string }[] = [
+  { id: "jump", label: "Jump to" },
   { id: "people", label: "People" },
   { id: "messages", label: "Messages" },
   { id: "communities", label: "Communities" },
@@ -47,7 +59,7 @@ export function SearchOverlay({
 }) {
   const [term, setTerm] = useState("");
   const [debounced, setDebounced] = useState("");
-  const [section, setSection] = useState<Section>("people");
+  const [section, setSection] = useState<Section>("jump");
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
 
@@ -121,7 +133,7 @@ export function SearchOverlay({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="top-[18%] flex max-h-[70vh] translate-y-0 flex-col gap-0 overflow-hidden p-0 sm:max-w-xl">
+      <DialogContent className="top-[10%] flex max-h-[80dvh] translate-y-0 flex-col gap-0 overflow-hidden rounded-2xl p-0 sm:top-[18%] sm:max-w-xl">
         <DialogHeader className="sr-only">
           <DialogTitle>Search Kyro</DialogTitle>
           <DialogDescription>
@@ -129,24 +141,26 @@ export function SearchOverlay({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex items-center gap-2 border-b border-border/60 px-4 py-3">
-          <Search className="size-4 shrink-0 text-muted-foreground" />
-          <Input
-            autoFocus
-            value={term}
-            onChange={(event) => setTerm(event.target.value)}
-            placeholder={
-              section === "messages"
-                ? "Search messages or use filters…"
-                : `Search ${section}…`
-            }
-            className="h-8 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
-            aria-label="Search Kyro"
-          />
-          {loading && (
-            <Loader2 className="size-4 animate-spin text-muted-foreground" />
-          )}
-        </div>
+        {section !== "jump" && (
+          <div className="flex items-center gap-2 border-b border-border/60 px-4 py-3">
+            <Search className="size-4 shrink-0 text-muted-foreground" />
+            <Input
+              autoFocus
+              value={term}
+              onChange={(event) => setTerm(event.target.value)}
+              placeholder={
+                section === "messages"
+                  ? "Search messages or use filters…"
+                  : `Search ${section}…`
+              }
+              className="h-8 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
+              aria-label="Search Kyro"
+            />
+            {loading && (
+              <Loader2 className="size-4 animate-spin text-muted-foreground" />
+            )}
+          </div>
+        )}
 
         <div className="flex gap-1 border-b border-border/60 px-3 py-2">
           {SECTIONS.map((entry) => (
@@ -192,7 +206,15 @@ export function SearchOverlay({
         )}
 
         <div className="min-h-0 flex-1 overflow-y-auto p-2">
-          {!searching && (
+          {section === "jump" && (
+            <JumpTo
+              onSelect={(route) => {
+                navigate(route);
+                close();
+              }}
+            />
+          )}
+          {!searching && section !== "jump" && (
             <p className="px-3 py-6 text-center text-sm text-muted-foreground">
               Start typing to search across Kyro.
             </p>
@@ -334,6 +356,95 @@ export function SearchOverlay({
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function JumpTo({ onSelect }: { onSelect: (route: string) => void }) {
+  const me = useQuery(api.users.me);
+  const conversations = useQuery(api.conversations.list);
+  const servers = useQuery(api.servers.listMine);
+  const byUser = useConversationFavorites((state) => state.byUser);
+  const favorites = byUser[me?.id ?? ""] ?? [];
+  const items = (conversations ?? []).map((conversation) => ({
+    id: conversation.id,
+    name:
+      conversation.name ||
+      conversation.participants
+        .filter((person) => person.id !== me?.id)
+        .map((person) => person.name)
+        .join(", ") ||
+      "Conversation",
+    unread: conversation.unread,
+    favorite: favorites.includes(conversation.id),
+  }));
+  return (
+    <Command className="rounded-xl bg-transparent">
+      <CommandInput
+        autoFocus
+        placeholder="Where would you like to go?"
+        aria-label="Jump to a conversation or community"
+        className="h-12"
+      />
+      <CommandList className="max-h-[min(45dvh,380px)]">
+        <CommandEmpty>No conversations or communities match.</CommandEmpty>
+        {conversations === undefined && (
+          <p className="p-5 text-xs text-muted-foreground">
+            Loading your conversations…
+          </p>
+        )}
+        {[true, false].map((favorite) => (
+          <CommandGroup
+            key={String(favorite)}
+            heading={favorite ? "Favorites" : "Direct messages"}
+          >
+            {items
+              .filter((item) => item.favorite === favorite)
+              .map((item) => (
+                <CommandItem
+                  key={item.id}
+                  value={`${item.name} ${item.id}`}
+                  onSelect={() => onSelect(`/dashboard/dm/${item.id}`)}
+                  className="gap-3 rounded-xl py-3"
+                >
+                  <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+                    {favorite ? (
+                      <Star className="size-4" />
+                    ) : (
+                      <MessagesSquare className="size-4" />
+                    )}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate">{item.name}</span>
+                  {item.unread && (
+                    <span className="rounded-full bg-primary/10 px-2 py-1 text-[10px] text-primary">
+                      Unread
+                    </span>
+                  )}
+                  <ArrowRight className="size-3.5 text-muted-foreground" />
+                </CommandItem>
+              ))}
+          </CommandGroup>
+        ))}
+        <CommandGroup heading="Your communities">
+          {servers?.map((server) => (
+            <CommandItem
+              key={server.id}
+              value={`${server.name} ${server.id}`}
+              onSelect={() => onSelect(`/dashboard/s/${server.id}`)}
+              className="gap-3 rounded-xl py-3"
+            >
+              <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-cyan/10 text-cyan">
+                <Hash className="size-4" />
+              </span>
+              <span className="min-w-0 flex-1 truncate">{server.name}</span>
+              <ArrowRight className="size-3.5 text-muted-foreground" />
+            </CommandItem>
+          ))}
+        </CommandGroup>
+      </CommandList>
+      <p className="border-t border-border p-3 text-[10px] text-muted-foreground">
+        ↑ ↓ to move · Enter to open · Esc to close
+      </p>
+    </Command>
   );
 }
 

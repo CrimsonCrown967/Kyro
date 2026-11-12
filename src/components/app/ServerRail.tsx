@@ -72,14 +72,16 @@ function RailButton({
   const body = (
     <span
       className={cn(
-        "relative flex size-14 items-center justify-center overflow-hidden rounded-full ring-1 ring-white/5 transition-all duration-200",
+        "relative flex size-12 items-center justify-center rounded-2xl ring-1 ring-border transition-all duration-200",
         active
-          ? "rounded-[18px] bg-primary text-white shadow-lg shadow-primary/15 ring-primary/40"
-          : "bg-surface/75 text-muted-foreground hover:rounded-[18px] hover:bg-primary hover:text-white",
+          ? "bg-primary text-white shadow-lg shadow-primary/20 ring-primary/40"
+          : "bg-surface/60 text-muted-foreground hover:bg-primary/20 hover:text-primary",
         className,
       )}
     >
-      {children}
+      <span className="flex size-full items-center justify-center overflow-hidden rounded-[inherit]">
+        {children}
+      </span>
       {mentions !== undefined && mentions > 0 && (
         <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-[11px] font-bold text-white ring-2 ring-rail">
           {mentions > 99 ? "99+" : mentions}
@@ -92,13 +94,19 @@ function RailButton({
   );
 
   const trigger = to ? (
-    <Link to={to} aria-label={label} className="block">
+    <Link
+      to={to}
+      aria-label={label}
+      aria-current={active ? "page" : undefined}
+      className="block rounded-2xl"
+    >
       {body}
     </Link>
   ) : (
     <button
       type="button"
       aria-label={label}
+      aria-pressed={active}
       onClick={onClick}
       className="block"
     >
@@ -163,7 +171,7 @@ export function ServerRail({ activeServerId }: { activeServerId?: string }) {
     <>
       <nav
         aria-label="Communities"
-        className="flex w-[88px] shrink-0 flex-col items-center gap-2 overflow-y-auto overflow-x-hidden border-r border-border/60 bg-rail px-2 py-3"
+        className="flex w-[76px] shrink-0 flex-col items-center gap-3 overflow-y-auto overflow-x-hidden border-r border-border/60 bg-rail px-2 py-4"
       >
         <RailButton
           label="Direct messages"

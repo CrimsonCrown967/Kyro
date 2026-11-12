@@ -28,6 +28,7 @@ const testMode = process.env.KYRO_DESKTOP_SMOKE_TEST === "1";
 let mainWindow: BrowserWindow | null = null;
 let captureWindow: BrowserWindow | null = null;
 let capturePending = false;
+let lastKyroUrl = KYRO_HOME;
 const granted = new Set<string>();
 app.setName("Kyro");
 app.enableSandbox();
@@ -40,6 +41,11 @@ function openExternal(value: string) {
 function secureContents(contents: WebContents) {
   contents.on("will-attach-webview", (event) => event.preventDefault());
   contents.on("will-navigate", (event, url) => {
+    if (isOfflinePage(contents.getURL()) && isKyroUrl(url)) {
+      event.preventDefault();
+      loadKyro(lastKyroUrl);
+      return;
+    }
     if (!isKyroUrl(url)) {
       event.preventDefault();
       openExternal(url);
@@ -55,20 +61,27 @@ function secureContents(contents: WebContents) {
   });
 }
 
-function loadKyro() {
-  if (!mainWindow || mainWindow.isDestroyed()) return;
-  void mainWindow.loadURL(KYRO_HOME).catch(() => showOffline());
+function isOfflinePage(url: string) {
+  return url.split("?")[0] === offlinePage;
 }
 
-function showOffline() {
-  if (
-    !mainWindow ||
-    mainWindow.isDestroyed() ||
-    mainWindow.webContents.getURL() === offlinePage
-  )
-    return;
+function loadKyro(url = KYRO_HOME) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  lastKyroUrl = isKyroUrl(url) ? url : KYRO_HOME;
+  // did-fail-load is the single recovery path. A rejected load promise may
+  // just be ERR_ABORTED from a newer navigation; it must not replace that page.
+  void mainWindow.loadURL(lastKyroUrl).catch(() => undefined);
+}
+
+function showOffline(code: number) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
   void mainWindow
-    .loadFile(path.join(resources, "offline.html"))
+    .loadFile(path.join(resources, "offline.html"), {
+      query: {
+        reason: code <= -200 && code >= -299 ? "certificate" : "unavailable",
+        code: String(code),
+      },
+    })
     .catch(() => undefined);
 }
 
@@ -77,7 +90,11 @@ function createMenu() {
     {
       label: "Kyro",
       submenu: [
-        { label: "Open Kyro", accelerator: "CmdOrCtrl+Home", click: loadKyro },
+        {
+          label: "Open Kyro",
+          accelerator: "CmdOrCtrl+Home",
+          click: () => loadKyro(),
+        },
         {
           label: "Downloads & updates",
           click: () => openExternal(`${KYRO_ORIGIN}/download`),
@@ -94,11 +111,18 @@ function createMenu() {
           label: "Reload",
           accelerator: "CmdOrCtrl+R",
           click: () =>
-            mainWindow?.webContents.getURL() === offlinePage
-              ? loadKyro()
+            isOfflinePage(mainWindow?.webContents.getURL() ?? "")
+              ? loadKyro(lastKyroUrl)
               : mainWindow?.reload(),
         },
-        { role: "forceReload" },
+        {
+          label: "Reload without cache",
+          accelerator: "CmdOrCtrl+Shift+R",
+          click: () =>
+            isOfflinePage(mainWindow?.webContents.getURL() ?? "")
+              ? loadKyro(lastKyroUrl)
+              : mainWindow?.webContents.reloadIgnoringCache(),
+        },
         { type: "separator" },
         { role: "resetZoom" },
         { role: "zoomIn" },
@@ -210,7 +234,7 @@ function configureSession() {
           title: "Kyro permission",
           message: `Allow Kyro to ${requested}?`,
           detail:
-            "Only kyro-chat.cyou can request access. This choice lasts until you quit Kyro or reset permissions in Help.",
+            "Only the official Kyro site can request access. This choice lasts until you quit Kyro or reset permissions in Help.",
           buttons: ["Don't allow", "Allow"],
           defaultId: 0,
           cancelId: 0,
@@ -280,17 +304,22 @@ function configureSession() {
         captureWindow = null;
         capturePending = false;
         const source = sources.find((source) => source.id === id);
-        callback(
-          source
-            ? {
-                video: source,
-                ...(audio && request.audioRequested
-                  ? { audio: "loopback" as const }
-                  : {}),
-              }
-            : {},
-        );
-        if (!picker.isDestroyed()) picker.close();
+        try {
+          callback(
+            source
+              ? {
+                  video: source,
+                  ...(audio && request.audioRequested
+                    ? { audio: "loopback" as const }
+                    : {}),
+                }
+              : {},
+          );
+        } finally {
+          // This is a transient local picker with no unsaved user state.
+          // Always release it, including when Chromium rejects the capture.
+          if (!picker.isDestroyed()) picker.destroy();
+        }
       };
       cancel = () => finish();
       ipcMain.handle("kyro:share-sources", (event) => {
@@ -412,9 +441,15 @@ function createWindow() {
   window.webContents.on(
     "did-fail-load",
     (_event, code, _description, url, isMainFrame) => {
-      if (isMainFrame && code !== -3 && isKyroUrl(url)) showOffline();
+      if (isMainFrame && code !== -3 && isKyroUrl(url)) {
+        lastKyroUrl = url;
+        showOffline(code);
+      }
     },
   );
+  window.webContents.on("did-navigate", (_event, url) => {
+    if (isKyroUrl(url)) lastKyroUrl = url;
+  });
   window.on("close", () => {
     try {
       fs.mkdirSync(app.getPath("userData"), { recursive: true });

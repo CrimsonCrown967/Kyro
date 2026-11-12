@@ -4,7 +4,7 @@
     Segoe UI,
     system-ui,
     sans-serif;
-  background: #111318;
+  background: #101017;
   color: #f6f7fb;
 }
 * {
@@ -51,8 +51,8 @@ a:focus-visible {
   outline-offset: 3px;
 }
 .primary {
-  background: #5865f2 !important;
-  border-color: #5865f2 !important;
+  background: #7461e8 !important;
+  border-color: #9583ff !important;
 }
 button:disabled {
   opacity: 0.4;
@@ -63,12 +63,139 @@ button:disabled {
   display: grid;
   place-items: center;
   text-align: center;
+  padding: 80px 24px;
+  background: radial-gradient(ellipse at 50% 40%, #7461e818, transparent 65%);
 }
 .offline main {
-  max-width: 530px;
+  width: min(100%, 540px);
+  max-width: 540px;
 }
 .offline .primary {
-  margin-top: 15px;
+  margin-top: 24px;
+  min-width: 190px;
+  box-shadow: 0 4px 24px #7461e833;
+}
+.offline .primary span {
+  margin-left: 28px;
+}
+.offline .primary:hover {
+  filter: brightness(1.12);
+}
+.offline .primary[aria-disabled="true"] {
+  opacity: 0.65;
+  pointer-events: none;
+}
+.shell-brand {
+  position: absolute;
+  top: 24px;
+  left: 32px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 23px;
+  font-weight: 750;
+  letter-spacing: -1px;
+}
+.shell-brand span {
+  margin-left: 12px;
+  padding-left: 20px;
+  border-left: 1px solid #ffffff1a;
+  color: #9691a8;
+  font-size: 10px;
+  letter-spacing: 2px;
+}
+.connection-card {
+  border: 1px solid #ffffff0e;
+  border-radius: 28px;
+  background: #191821aa;
+  padding: 40px;
+  box-shadow: 0 24px 100px #00000033;
+}
+.connection-card h1 {
+  font-size: 36px;
+  margin: 14px 0;
+}
+.connection-card > p {
+  font-size: 14px;
+}
+.connection-card .eyebrow {
+  font-size: 10px;
+  color: #b5a8fa;
+}
+.connection-orbit {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 136px;
+  height: 136px;
+  margin: 0 auto 30px;
+  border: 1px solid #aa9aff22;
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 16px #aa9aff04,
+    inset 0 0 35px #aa9aff08;
+}
+.connection-orbit span {
+  position: absolute;
+  top: 17px;
+  right: 11px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #b3a3ff;
+  box-shadow: 0 0 20px #aa9aff77;
+}
+.connection-status {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 9px;
+  font-size: 12px;
+  color: #c4bfd5;
+  margin-top: 24px;
+}
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #d6b57c;
+}
+.connection-card .hint {
+  font-size: 11px;
+  color: #928da2;
+}
+.connection-help {
+  margin-top: 20px;
+  color: #a7a1b8;
+  font-size: 11px;
+}
+.connection-help summary {
+  cursor: pointer;
+  padding: 4px;
+}
+.connection-help p {
+  font-size: 11px;
+  margin: 8px 0;
+}
+.shell-caption {
+  position: absolute;
+  bottom: 24px;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  color: #817b94;
+}
+.shell-caption span {
+  color: #b5a8fa;
+}
+@media (max-height: 660px) {
+  .connection-orbit {
+    width: 96px;
+    height: 96px;
+    margin-bottom: 18px;
+  }
+  .connection-card {
+    padding: 24px;
+  }
 }
 .hint {
   font-size: 12px;

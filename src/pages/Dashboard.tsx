@@ -141,7 +141,11 @@ function VoiceChannelRoute() {
   return (
     <MembershipGate serverId={serverId}>
       <ServerThemeScope serverId={serverId as Id<"servers">}>
-        <VoiceChannelPage serverId={serverId} channelId={channelId} />
+        <VoiceChannelPage
+          key={channelId}
+          serverId={serverId}
+          channelId={channelId}
+        />
       </ServerThemeScope>
     </MembershipGate>
   );

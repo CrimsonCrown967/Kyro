@@ -34,6 +34,7 @@ import type * as cleanup from "../cleanup.js";
 import type * as conversations from "../conversations.js";
 import type * as crons from "../crons.js";
 import type * as emailDelivery from "../emailDelivery.js";
+import type * as emailDispatchUrl from "../emailDispatchUrl.js";
 import type * as emailOutbox from "../emailOutbox.js";
 import type * as emailRefs from "../emailRefs.js";
 import type * as emailVerification from "../emailVerification.js";
@@ -111,6 +112,7 @@ const fullApi: ApiFromModules<{
   "conversations": typeof conversations,
   "crons": typeof crons,
   "emailDelivery": typeof emailDelivery,
+  "emailDispatchUrl": typeof emailDispatchUrl,
   "emailOutbox": typeof emailOutbox,
   "emailRefs": typeof emailRefs,
   "emailVerification": typeof emailVerification,

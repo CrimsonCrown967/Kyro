@@ -11,5 +11,5 @@ desktop/release/
 .env*
 !.env.example
 
-# Windows installers are uploaded as GitHub release assets.
+# Windows installers are distributed separately from source control.
 /Kyro-Setup-*.exe

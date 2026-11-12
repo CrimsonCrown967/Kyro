@@ -1,6 +1,8 @@
 import { makeFunctionReference } from "convex/server";
 import type { Id } from "./_generated/dataModel";
 
+type VerifyResult = { ok: true } | { ok: false; error: string };
+
 export const verificationAccountRef = makeFunctionReference<
   "query",
   { email: string },
@@ -25,7 +27,7 @@ export const prepareEmailVerificationRef = makeFunctionReference<
 export const verifyEmailCodeRef = makeFunctionReference<
   "mutation",
   { email: string; code: string },
-  { ok: true }
+  VerifyResult
 >("emailVerificationInternal:verify");
 
 export const passwordResetAccountRef = makeFunctionReference<
@@ -43,5 +45,5 @@ export const passwordResetPrepareRef = makeFunctionReference<
 export const passwordResetVerifyRef = makeFunctionReference<
   "mutation",
   { email: string; code: string },
-  { ok: true }
+  VerifyResult
 >("passwordResetInternal:verify");

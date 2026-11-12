@@ -99,24 +99,37 @@ export const verify = internalMutation({
       .collect();
     const row = rows.slice().sort((a, b) => b.createdAt - a.createdAt)[0];
     if (!row)
-      throw new Error("That code is no longer valid. Request a new one.");
+      return {
+        ok: false as const,
+        error: "That code is no longer valid. Request a new one.",
+      };
     const now = Date.now();
     if (row.expiresAt <= now) {
       await ctx.db.delete(row._id);
-      throw new Error("That code has expired. Request a new one.");
+      return {
+        ok: false as const,
+        error: "That code has expired. Request a new one.",
+      };
     }
     if (row.attempts >= MAX_ATTEMPTS) {
       await ctx.db.delete(row._id);
-      throw new Error("Too many wrong attempts — that code was canceled.");
+      return {
+        ok: false as const,
+        error: "Too many wrong attempts — that code was canceled.",
+      };
     }
     if (row.codeHash !== resetCodeHash(email, code)) {
-      await ctx.db.patch(row._id, { attempts: row.attempts + 1 });
       const left = MAX_ATTEMPTS - row.attempts - 1;
-      throw new Error(
-        left > 0
-          ? `That code isn't right. ${left} attempt${left === 1 ? "" : "s"} left.`
-          : "Too many wrong attempts — that code was canceled.",
-      );
+      if (left > 0) await ctx.db.patch(row._id, { attempts: row.attempts + 1 });
+      else await ctx.db.delete(row._id);
+      // Return the error so the mutation commits the attempt counter.
+      return {
+        ok: false as const,
+        error:
+          left > 0
+            ? `That code isn't right. ${left} attempt${left === 1 ? "" : "s"} left.`
+            : "Too many wrong attempts — that code was canceled.",
+      };
     }
     await ctx.db.delete(row._id);
     return { ok: true as const };
