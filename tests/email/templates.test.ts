@@ -12,6 +12,25 @@ const identity = {
   actionAt: Date.UTC(2026, 10, 2, 10, 0),
 };
 
+test("delivery diagnostics are clearly labeled and cannot impersonate account actions", () => {
+  const request = validateDispatchRequest({
+    eventId: "delivery-test:example",
+    to: "test@example.com",
+    template: "delivery_test",
+    payload: { subject: "Official warning", code: "123456", reason: "Spam" },
+  });
+  const rendered = renderEmailTemplate(request.template, request.payload);
+  assert.equal(rendered.subject, "[TEST] Kyro email delivery test");
+  for (const body of [rendered.html, rendered.text]) {
+    assert.match(body, /No action is required/);
+    assert.match(
+      body,
+      /No moderation warning was issued and no password reset was requested/,
+    );
+    assert.doesNotMatch(body, /123456|Official warning|Spam/);
+  }
+});
+
 test("renders every required transactional template", () => {
   const templates = [
     [

@@ -127,6 +127,23 @@ Then redeploy the frontend and test a new disposable account.
 
 ## Delivery and security behavior
 
+### Send a diagnostic email
+
+After the health check succeeds, send one test to an explicitly authorized
+recipient:
+
+```bash
+node scripts/email-delivery-test.mjs giant-cricket-958 --to recipient@example.com --send
+```
+
+The subject is `[TEST] Kyro email delivery test`. This uses the authenticated
+live dispatcher without creating a moderation action or password-reset code.
+The script never retries and keeps credentials in memory. A successful response
+confirms SMTP acceptance only; check Brevo's transactional logs and the recipient's
+inbox for delivery. If the request times out, check those logs before sending again.
+
+### Account email safeguards
+
 - Reset and verification codes contain six CSPRNG-generated digits.
 - Code records contain peppered SHA-256 hashes. The outbox retains the code
   only until delivery or expiry, then clears the sensitive payload.

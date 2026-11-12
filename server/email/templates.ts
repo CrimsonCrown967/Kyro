@@ -93,6 +93,24 @@ export function renderEmailTemplate(
   template: EmailTemplateName,
   payload: Record<string, unknown>,
 ): RenderedEmail {
+  if (template === "delivery_test") {
+    const title = "Kyro email delivery test";
+    const intro =
+      "This is a delivery test requested by the Kyro administrator. No action is required.";
+    const detail =
+      "No moderation warning was issued and no password reset was requested. This message only checks email delivery.";
+    return {
+      subject: "[TEST] Kyro email delivery test",
+      html: layout({
+        preheader: "Delivery test only. No action is required.",
+        eyebrow: "Email delivery test",
+        title,
+        intro,
+        body: `<p style="color:#A0A6B5;font-size:14px;line-height:1.65;">${detail}</p>`,
+      }),
+      text: `${title}\n\n${intro}\n\n${detail}`,
+    };
+  }
   const member = identity(payload);
   if (template === "password_reset" || template === "email_verification") {
     const code = field(payload, "code");

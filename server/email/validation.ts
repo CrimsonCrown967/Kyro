@@ -4,6 +4,7 @@ const EMAIL_PATTERN = /^[^\s@<>\r\n]+@[^\s@<>\r\n]+\.[^\s@<>\r\n]+$/;
 const EVENT_PATTERN = /^[a-zA-Z0-9:_-]{1,200}$/;
 
 export const EMAIL_TEMPLATES = [
+  "delivery_test",
   "password_reset",
   "email_verification",
   "temporary_ban",
